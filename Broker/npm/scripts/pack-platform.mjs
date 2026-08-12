@@ -62,4 +62,7 @@ writeFileSync(join(stage, 'package.json'), JSON.stringify({
 }, null, 2) + '\n');
 
 const npmExecutable = platform === 'win32' ? 'npm.cmd' : 'npm';
-execFileSync(npmExecutable, ['pack', stage, '--pack-destination', join(root, 'artifacts/npm')], { stdio: 'inherit' });
+execFileSync(npmExecutable, ['pack', stage, '--pack-destination', join(root, 'artifacts/npm')], {
+  stdio: 'inherit',
+  shell: platform === 'win32'
+});

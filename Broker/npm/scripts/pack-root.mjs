@@ -22,4 +22,7 @@ for (const dependency of Object.keys(manifest.optionalDependencies)) {
 }
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 const npmExecutable = platform === 'win32' ? 'npm.cmd' : 'npm';
-execFileSync(npmExecutable, ['pack', stage, '--ignore-scripts', '--pack-destination', join(root, 'artifacts/npm')], { stdio: 'inherit' });
+execFileSync(npmExecutable, ['pack', stage, '--ignore-scripts', '--pack-destination', join(root, 'artifacts/npm')], {
+  stdio: 'inherit',
+  shell: platform === 'win32'
+});
