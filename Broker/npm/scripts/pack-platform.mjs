@@ -61,4 +61,5 @@ writeFileSync(join(stage, 'package.json'), JSON.stringify({
   publishConfig: { access: 'public' }
 }, null, 2) + '\n');
 
-execFileSync('npm', ['pack', stage, '--pack-destination', join(root, 'artifacts/npm')], { stdio: 'inherit' });
+const npmExecutable = platform === 'win32' ? 'npm.cmd' : 'npm';
+execFileSync(npmExecutable, ['pack', stage, '--pack-destination', join(root, 'artifacts/npm')], { stdio: 'inherit' });

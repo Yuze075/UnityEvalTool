@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { platform } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
@@ -20,4 +21,5 @@ for (const dependency of Object.keys(manifest.optionalDependencies)) {
   manifest.optionalDependencies[dependency] = version;
 }
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
-execFileSync('npm', ['pack', stage, '--ignore-scripts', '--pack-destination', join(root, 'artifacts/npm')], { stdio: 'inherit' });
+const npmExecutable = platform === 'win32' ? 'npm.cmd' : 'npm';
+execFileSync(npmExecutable, ['pack', stage, '--ignore-scripts', '--pack-destination', join(root, 'artifacts/npm')], { stdio: 'inherit' });
