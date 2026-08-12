@@ -1,0 +1,381 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Net.WebSockets;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using UnityEngine;
+using Debug = UnityEngine.Debug;
+
+namespace YuzeToolkit
+{
+    public sealed class UnityBrokerClient : IDisposable
+    {
+        private static readonly Lazy<UnityBrokerClient> LazyShared = new(() => new UnityBrokerClient());
+        private readonly object _syncRoot = new();
+        private readonly SemaphoreSlim _sendGate = new(1, 1);
+        private BrokerEvalSessionRouter _sessions = new();
+        private CancellationTokenSource? _lifetime;
+        private ClientWebSocket? _socket;
+        private Task? _runTask;
+        private BrokerClientIdentity _identity = new();
+        private Func<bool>? _ensureBrokerRunning;
+        private BrokerUnityStatusSnapshot _latestStatus = new();
+        private long _mainThreadTick;
+        private bool _configured;
+        private bool _isConnected;
+        private bool _isStopping;
+
+        private UnityBrokerClient()
+        {
+        }
+
+        public static UnityBrokerClient Shared => LazyShared.Value;
+
+        public bool IsConnected
+        {
+            get { lock (_syncRoot) return _isConnected; }
+        }
+
+        public BrokerClientIdentity Identity
+        {
+            get { lock (_syncRoot) return _identity; }
+        }
+
+        public IReadOnlyList<EvalSessionSnapshot> GetSessionSnapshots(string sessionPrefix)
+        {
+            if (sessionPrefix == null) throw new ArgumentNullException(nameof(sessionPrefix));
+            BrokerEvalSessionRouter sessions;
+            lock (_syncRoot) sessions = _sessions;
+            return sessions.GetSnapshots(sessionPrefix);
+        }
+
+        public void Configure(BrokerClientIdentity identity, Func<bool>? ensureBrokerRunning = null)
+        {
+            if (identity == null) throw new ArgumentNullException(nameof(identity));
+            lock (_syncRoot)
+            {
+                if (_runTask != null) throw new InvalidOperationException("Configure the Broker client before Start.");
+                _identity = identity;
+                _ensureBrokerRunning = ensureBrokerRunning;
+                _latestStatus.VmGeneration = identity.VmGeneration;
+                _configured = true;
+            }
+        }
+
+        public void Start()
+        {
+            lock (_syncRoot)
+            {
+                if (_runTask != null) return;
+                if (!_configured) _latestStatus.VmGeneration = _identity.VmGeneration;
+                _isStopping = false;
+                _lifetime = new CancellationTokenSource();
+                _runTask = Task.Run(() => RunReconnectLoopAsync(_lifetime.Token));
+            }
+        }
+
+        public void Tick(BrokerUnityStatusSnapshot? status = null)
+        {
+            lock (_syncRoot)
+            {
+                _mainThreadTick++;
+                _latestStatus = status ?? BrokerUnityStatusSnapshot.CreateRuntime(_mainThreadTick, _identity.VmGeneration);
+                _latestStatus.MainThreadTick = _mainThreadTick;
+                _latestStatus.MainThreadTickAtUtc = DateTime.UtcNow;
+                _latestStatus.VmGeneration = _identity.VmGeneration;
+            }
+        }
+
+        public void PublishReloadingAndStop()
+        {
+            Task? publish = null;
+            lock (_syncRoot)
+            {
+                _latestStatus.Phase = "Reloading";
+                _latestStatus.CanEval = false;
+                _latestStatus.BusyReason = "Unity is reloading assemblies.";
+                if (_socket is { State: WebSocketState.Open })
+                    publish = SendStatusAsync(_socket, CancellationToken.None);
+            }
+
+            try { publish?.Wait(TimeSpan.FromMilliseconds(300)); }
+            catch (AggregateException) { }
+            Stop();
+        }
+
+        public void PublishExitingAndStop()
+        {
+            Task? publish = null;
+            lock (_syncRoot)
+            {
+                _latestStatus.Phase = "Exiting";
+                _latestStatus.CanEval = false;
+                _latestStatus.BusyReason = "Unity is exiting.";
+                if (_socket is { State: WebSocketState.Open })
+                    publish = SendStatusAsync(_socket, CancellationToken.None);
+            }
+
+            try { publish?.Wait(TimeSpan.FromMilliseconds(300)); }
+            catch (AggregateException) { }
+            Stop();
+        }
+
+        public void Stop()
+        {
+            CancellationTokenSource? lifetime;
+            ClientWebSocket? socket;
+            lock (_syncRoot)
+            {
+                if (_runTask == null) return;
+                _isStopping = true;
+                lifetime = _lifetime;
+                socket = _socket;
+                _lifetime = null;
+                _socket = null;
+                _runTask = null;
+                _isConnected = false;
+            }
+
+            lifetime?.Cancel();
+            try { socket?.Abort(); }
+            catch (ObjectDisposedException) { }
+            socket?.Dispose();
+            lifetime?.Dispose();
+            _sessions.Dispose();
+            _sessions = new BrokerEvalSessionRouter();
+        }
+
+        public void Dispose()
+        {
+            Stop();
+            _sendGate.Dispose();
+            _sessions.Dispose();
+        }
+
+        private async Task RunReconnectLoopAsync(CancellationToken cancellationToken)
+        {
+            var attempt = 0;
+            var brokerStartAttempted = false;
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await ConnectAndRunAsync(cancellationToken);
+                    attempt = 0;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    lock (_syncRoot) _isConnected = false;
+                    if (!brokerStartAttempted && _ensureBrokerRunning != null)
+                    {
+                        brokerStartAttempted = true;
+                        try
+                        {
+                            if (_ensureBrokerRunning())
+                            {
+                                await Task.Delay(350, cancellationToken);
+                                continue;
+                            }
+                        }
+                        catch (Exception startException)
+                        {
+                            Debug.LogWarning($"[UnityEvalTool] Failed to start the local Broker: {startException.Message}");
+                        }
+                    }
+
+                    if (!_isStopping && (attempt == 0 || attempt % 10 == 0))
+                        Debug.LogWarning($"[UnityEvalTool] Broker connection is unavailable: {ex.Message}");
+                }
+
+                attempt++;
+                var delay = Math.Min(10_000, 250 * (1 << Math.Min(attempt, 5)));
+                await Task.Delay(delay, cancellationToken);
+            }
+        }
+
+        private async Task ConnectAndRunAsync(CancellationToken cancellationToken)
+        {
+            var token = ReadAuthToken();
+            var socket = new ClientWebSocket();
+            await socket.ConnectAsync(new Uri(BrokerProtocolUtility.Endpoint), cancellationToken);
+            lock (_syncRoot) _socket = socket;
+
+            var registerId = Guid.NewGuid().ToString("N");
+            var registration = BuildRegistration(token);
+            await SendAsync(socket, BrokerProtocolUtility.Request(registerId, "unity/register", registration), cancellationToken);
+            var registrationResponse = await ReceiveAsync(socket, cancellationToken);
+            if (registrationResponse == null) throw new IOException("Broker closed during Unity registration.");
+            var response = BrokerProtocolUtility.ParseEnvelope(registrationResponse);
+            var error = EvalData.AsObject(response.TryGetValue("error", out var errorValue) ? errorValue : null);
+            if (error != null)
+                throw new InvalidOperationException(EvalData.GetString(error, "message") ?? "Broker rejected Unity registration.");
+            if (!string.Equals(EvalData.GetString(response, "id"), registerId, StringComparison.Ordinal))
+                throw new InvalidOperationException("Broker registration response id did not match the request.");
+
+            lock (_syncRoot) _isConnected = true;
+            Debug.Log($"[UnityEvalTool] Connected to local Broker as {_identity.InstanceId} (epoch {_identity.ConnectionEpoch}).");
+            using var connectionLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var heartbeat = RunHeartbeatAsync(socket, connectionLifetime.Token);
+            try
+            {
+                await ReceiveLoopAsync(socket, connectionLifetime.Token);
+            }
+            finally
+            {
+                connectionLifetime.Cancel();
+                try { await heartbeat; }
+                catch (OperationCanceledException) { }
+                lock (_syncRoot)
+                {
+                    if (ReferenceEquals(_socket, socket)) _socket = null;
+                    _isConnected = false;
+                }
+                socket.Dispose();
+            }
+        }
+
+        private async Task RunHeartbeatAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
+            {
+                await SendStatusAsync(socket, cancellationToken);
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            }
+        }
+
+        private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
+            {
+                var json = await ReceiveAsync(socket, cancellationToken);
+                if (json == null) return;
+                var envelope = BrokerProtocolUtility.ParseEnvelope(json);
+                if (!string.Equals(EvalData.GetString(envelope, "type"), "request", StringComparison.Ordinal)) continue;
+                var id = EvalData.GetString(envelope, "id") ?? string.Empty;
+                var method = EvalData.GetString(envelope, "method") ?? string.Empty;
+                var payload = EvalData.AsObject(envelope.TryGetValue("payload", out var rawPayload) ? rawPayload : null)
+                              ?? EvalData.Obj();
+                await HandleRequestAsync(socket, id, method, payload, cancellationToken);
+            }
+        }
+
+        private async Task HandleRequestAsync(ClientWebSocket socket, string id, string method,
+            Dictionary<string, object?> payload, CancellationToken cancellationToken)
+        {
+            try
+            {
+                object result;
+                switch (method)
+                {
+                    case "eval/execute":
+                        result = await _sessions.ExecuteEvalAsync(payload, cancellationToken);
+                        break;
+                    case "cli/execute":
+                        result = await _sessions.ExecuteCliAsync(payload, cancellationToken);
+                        break;
+                    case "session/release":
+                        _sessions.Release(EvalData.GetString(payload, "sessionId") ?? string.Empty);
+                        result = EvalData.Obj(("released", true));
+                        break;
+                    case "broker/ping":
+                        result = EvalData.Obj(("timeUtc", DateTime.UtcNow.ToString("O")));
+                        break;
+                    default:
+                        throw new InvalidOperationException($"Unknown Broker request method '{method}'.");
+                }
+
+                await SendAsync(socket, BrokerProtocolUtility.Response(id, method, result), cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                var error = EvalData.Obj(
+                    ("code", "UnityCommandFailed"),
+                    ("message", ex.Message),
+                    ("mayHaveExecuted", false));
+                await SendAsync(socket, BrokerProtocolUtility.Response(id, method, EvalData.Obj(), error), cancellationToken);
+            }
+        }
+
+        private Dictionary<string, object?> BuildRegistration(string token)
+        {
+            var process = Process.GetCurrentProcess();
+            var projectPath = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+            BrokerUnityStatusSnapshot status;
+            lock (_syncRoot) status = _latestStatus;
+            return EvalData.Obj(
+                ("authToken", token),
+                ("instanceId", _identity.InstanceId),
+                ("connectionEpoch", _identity.ConnectionEpoch),
+                ("processId", process.Id),
+                ("processStartedAtUtc", process.StartTime.ToUniversalTime().ToString("O")),
+                ("projectName", new DirectoryInfo(projectPath).Name),
+                ("projectPath", Path.GetFullPath(projectPath)),
+                ("unityVersion", Application.unityVersion),
+                ("packageVersion", "2.0.0"),
+                ("environment", Application.isEditor ? "Editor" : "Player"),
+                ("status", status.ToObject())
+            );
+        }
+
+        private async Task SendStatusAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+        {
+            BrokerUnityStatusSnapshot status;
+            lock (_syncRoot) status = _latestStatus;
+            await SendAsync(socket, BrokerProtocolUtility.Event("unity/status", status.ToObject()), cancellationToken);
+        }
+
+        private async Task SendAsync(ClientWebSocket socket, string json, CancellationToken cancellationToken)
+        {
+            var bytes = Encoding.UTF8.GetBytes(json);
+            await _sendGate.WaitAsync(cancellationToken);
+            try
+            {
+                await socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, cancellationToken);
+            }
+            finally
+            {
+                _sendGate.Release();
+            }
+        }
+
+        private static async Task<string?> ReceiveAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+        {
+            using var stream = new MemoryStream();
+            var buffer = new byte[16 * 1024];
+            while (true)
+            {
+                var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+                if (result.MessageType == WebSocketMessageType.Close) return null;
+                if (result.MessageType != WebSocketMessageType.Text)
+                    throw new IOException("Broker sent a non-text WebSocket message.");
+                stream.Write(buffer, 0, result.Count);
+                if (stream.Length > 4 * 1024 * 1024) throw new IOException("Broker message exceeds 4 MiB.");
+                if (result.EndOfMessage) break;
+            }
+
+            return Encoding.UTF8.GetString(stream.ToArray());
+        }
+
+        private static string ReadAuthToken()
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var path = Path.Combine(home, ".unityevaltool", "auth.json");
+            if (!File.Exists(path))
+                throw new FileNotFoundException("UnityEvalTool Broker auth file was not found. Install or start the `unity` CLI first.", path);
+            var root = EvalData.AsObject(LitJson.Parse(File.ReadAllText(path)))
+                       ?? throw new InvalidDataException("UnityEvalTool Broker auth file is invalid.");
+            var token = EvalData.GetString(root, "token");
+            if (string.IsNullOrWhiteSpace(token))
+                throw new InvalidDataException("UnityEvalTool Broker auth token is empty.");
+            return token!;
+        }
+    }
+}

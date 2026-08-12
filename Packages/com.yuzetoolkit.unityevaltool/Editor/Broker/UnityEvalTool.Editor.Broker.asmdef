@@ -1,0 +1,20 @@
+{
+  "name": "UnityEvalTool.Editor.Broker",
+  "rootNamespace": "YuzeToolkit",
+  "references": [
+    "UnityEvalTool",
+    "UnityEvalTool.Editor",
+    "UnityEvalTool.Broker"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

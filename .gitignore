@@ -73,3 +73,17 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# UnityEvalTool repository outputs
+/Broker/artifacts/
+/Broker/**/bin/
+/Broker/**/obj/
+/Broker/node_modules/
+node_modules/
+.DS_Store
+
+# The repository contains the real Broker project even though Unity projects
+# normally ignore generated C# project files.
+!/Broker/**/*.csproj
+!/Broker/npm/root/bin/
+!/Broker/npm/root/bin/unity.js

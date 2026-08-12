@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+artifacts/
+npm/root/node_modules/
+*.tgz
+
+!npm/root/bin/
+!npm/root/bin/unity.js
+!src/UnityEvalTool.Broker/UnityEvalTool.Broker.csproj

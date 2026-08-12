@@ -1,0 +1,52 @@
+{
+  "name": "@yuzetoolkit/unityevaltool",
+  "version": "2.0.0",
+  "description": "Local Broker, MCP server and CLI for UnityEvalTool",
+  "keywords": [
+    "unity",
+    "mcp",
+    "ai-agent",
+    "cli",
+    "nativeaot"
+  ],
+  "author": {
+    "name": "Yuze075",
+    "email": "925581968@qq.com",
+    "url": "https://github.com/Yuze075"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Yuze075/UnityEvalTool#readme",
+  "bugs": {
+    "url": "https://github.com/Yuze075/UnityEvalTool/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yuze075/UnityEvalTool.git",
+    "directory": "Broker/npm/root"
+  },
+  "bin": {
+    "unity": "bin/unity.js"
+  },
+  "files": [
+    "bin",
+    "scripts"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "preuninstall": "node scripts/preuninstall.js"
+  },
+  "optionalDependencies": {
+    "@yuzetoolkit/unityevaltool-darwin-arm64": "2.0.0",
+    "@yuzetoolkit/unityevaltool-darwin-x64": "2.0.0",
+    "@yuzetoolkit/unityevaltool-linux-arm64": "2.0.0",
+    "@yuzetoolkit/unityevaltool-linux-x64": "2.0.0",
+    "@yuzetoolkit/unityevaltool-win32-arm64": "2.0.0",
+    "@yuzetoolkit/unityevaltool-win32-x64": "2.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
