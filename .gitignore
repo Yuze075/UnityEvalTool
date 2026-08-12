@@ -79,6 +79,8 @@ crashlytics-build.properties
 /Broker/**/bin/
 /Broker/**/obj/
 /Broker/node_modules/
+/Roslyn/**/bin/
+/Roslyn/**/obj/
 node_modules/
 .DS_Store
 
@@ -87,3 +89,5 @@ node_modules/
 !/Broker/**/*.csproj
 !/Broker/npm/root/bin/
 !/Broker/npm/root/bin/unity.js
+!/Roslyn/**/*.csproj
+!/Roslyn/**/*.sln

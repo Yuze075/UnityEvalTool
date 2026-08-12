@@ -13,6 +13,7 @@ UnityEvalTool
 ├── Broker/
 │   ├── src/                             # C# NativeAOT Broker 与 CLI
 │   └── npm/                             # npm 入口包与原生平台包
+├── Roslyn/                              # Source Generator 解决方案与测试
 └── .github/workflows/
     └── release.yml                      # 六平台构建与发布
 ```
@@ -35,6 +36,13 @@ https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unit
     "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.0"
   }
 }
+```
+
+如果本仓库源码放在 Unity 项目的 `Game/UnityEvalTool`，开发时直接引用工作树，
+无需复制 Package：
+
+```json
+"com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
 ```
 
 ### 2. 安装 Broker 与 CLI
@@ -92,12 +100,18 @@ macOS 使用 LaunchAgent，Linux 使用 systemd user unit，Windows 使用当前
 
 ```bash
 dotnet build Broker/UnityEvalTool.Broker.slnx -c Release
+dotnet test Roslyn/UnityEvalToolRoslyn.sln -c Release
 cd Broker
+node --input-type=module -e "import { resolveAndValidateVersion } from './npm/scripts/version.mjs'; console.log(resolveAndValidateVersion(process.cwd()));"
 node npm/scripts/pack-platform.mjs
 node npm/scripts/pack-root.mjs
 ```
 
-`.github/workflows/release.yml` 构建六个 NativeAOT 平台包和一个平台无关入口包。发布必须显式开启并提供 npm 凭据，不会在普通构建中自动发生。更完整的打包与发布检查见 [Broker/README.md](Broker/README.md)。
+Broker、Roslyn 与 Unity Package 都以普通源码目录存放在该仓库中，不再依赖源码压缩包，
+Package 开发也不会临时下载辅助源码。`version.json` 是发布版本的唯一来源；CI 会先验证
+Broker、Unity Package、运行时常量和 npm metadata 版本一致，再构建六个 NativeAOT
+平台包和一个平台无关入口包。发布必须显式开启并提供 npm 凭据，不会在普通构建中自动发生。
+更完整的打包与发布检查见 [Broker/README.md](Broker/README.md)。
 
 ## 许可证
 

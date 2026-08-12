@@ -7,8 +7,10 @@ namespace YuzeToolkit
 {
     internal static class EditorBrokerBootstrap
     {
+        private const double StatusTickIntervalSeconds = 0.5;
         private const string KeyInstanceId = nameof(YuzeToolkit) + ".Broker.InstanceId";
         private const string KeyConnectionEpoch = nameof(YuzeToolkit) + ".Broker.ConnectionEpoch";
+        private static double _nextStatusTickAt;
 
         [InitializeOnLoadMethod]
         private static void Initialize()
@@ -56,9 +58,11 @@ namespace YuzeToolkit
 
         private static void Update()
         {
+            var now = EditorApplication.timeSinceStartup;
+            if (now < _nextStatusTickAt) return;
+            _nextStatusTickAt = now + StatusTickIntervalSeconds;
             var generation = UnityBrokerClient.Shared.Identity.VmGeneration;
             UnityBrokerClient.Shared.Tick(EditorBrokerStatusMonitor.Capture(generation));
-            EditorApplication.QueuePlayerLoopUpdate();
         }
 
         private static void BeforeAssemblyReload()

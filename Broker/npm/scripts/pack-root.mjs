@@ -3,12 +3,13 @@ import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path';
 import { platform } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { resolveAndValidateVersion } from './version.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(scriptDirectory, '../..');
 const source = join(root, 'npm/root');
 const stage = join(root, 'artifacts/npm/root');
-const version = process.env.UNITY_EVAL_TOOL_VERSION ?? '2.0.0';
+const version = resolveAndValidateVersion(root);
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });
 cpSync(source, stage, { recursive: true });

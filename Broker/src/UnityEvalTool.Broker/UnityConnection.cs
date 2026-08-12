@@ -108,6 +108,12 @@ internal sealed class UnityConnection : IAsyncDisposable
         }
     }
 
+    public async Task ReleaseSessionAsync(string sessionId, CancellationToken cancellationToken)
+    {
+        var request = new UnityCommandRequest(sessionId, Guid.NewGuid().ToString("N"), null, null, 30, false);
+        await RequestAsync("session/release", request, TimeSpan.FromSeconds(35), cancellationToken);
+    }
+
     public UnityInstanceSnapshot ToSnapshot()
     {
         var status = Status;

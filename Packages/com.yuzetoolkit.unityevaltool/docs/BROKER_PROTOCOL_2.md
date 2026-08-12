@@ -40,6 +40,9 @@ The first Unity message must be `unity/register`. Its payload contains:
 - the complete initial `status`
 
 Only the primary Unity Editor process may register. Asset Import Workers must never register or start the Broker.
+The successful response includes `brokerInstanceId`, a value unique to the current Broker
+process. Unity discards every retained PuerTS session if this value changes, preventing a
+new Broker process from accidentally inheriting sessions that it no longer owns.
 
 ## Status
 
@@ -68,7 +71,7 @@ Unity executes `eval/execute` and `cli/execute` only while `canEval` is true. Th
 
 There is no process-global selected Unity. `unity_connect` creates an opaque, unguessable `connectionHandle` bound to one registered `instanceId`. MCP calls and CLI consoles carry their own handle. A status snapshot returns `registryRevision`; connect must submit that revision so a stale discovery result cannot silently target a changed registry.
 
-Handles survive a temporary Domain Reload disconnect for the same `instanceId`, but the returned status exposes the new `connectionEpoch` and `vmGeneration`. Handles expire after inactivity and become invalid when their instance exits or is replaced by a different process lifetime.
+Handles survive a temporary Domain Reload disconnect for the same `instanceId`, but the returned status exposes the new `connectionEpoch` and `vmGeneration`. Handles expire after inactivity and become invalid when their instance exits or is replaced by a different process lifetime. Closing a CLI console, replacing its selection, or expiring a lease releases the associated Unity-side PuerTS session. If Unity is temporarily disconnected, the Broker retains the release request for the same process lifetime and sends it after reconnection.
 
 ## Compilation and reload
 

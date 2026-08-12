@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Collections.Concurrent;
 
 namespace YuzeToolkit.UnityEvalTool.Broker;
 
@@ -13,12 +14,17 @@ internal sealed class BrokerRegistry
         public required string InstanceId { get; init; }
         public required int ProcessId { get; init; }
         public required DateTimeOffset ProcessStartedAtUtc { get; init; }
+        public required string SessionId { get; init; }
         public DateTimeOffset LastUsedAtUtc { get; set; }
     }
+
+    private sealed record PendingSessionRelease(string InstanceId, int ProcessId,
+        DateTimeOffset ProcessStartedAtUtc, string SessionId, DateTimeOffset QueuedAtUtc);
 
     private readonly object _syncRoot = new();
     private readonly Dictionary<string, InstanceEntry> _instances = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Lease> _leases = new(StringComparer.Ordinal);
+    private readonly ConcurrentQueue<PendingSessionRelease> _pendingSessionReleases = new();
     private TaskCompletionSource _changed = CreateChangedSource();
     private long _revision;
 
@@ -91,7 +97,7 @@ internal sealed class BrokerRegistry
         }
     }
 
-    public ConnectionLeaseResult Connect(string instanceId, long registryRevision)
+    public ConnectionLeaseResult Connect(string instanceId, long registryRevision, string? sessionId = null)
     {
         lock (_syncRoot)
         {
@@ -114,6 +120,7 @@ internal sealed class BrokerRegistry
                 InstanceId = instanceId,
                 ProcessId = entry.Snapshot.ProcessId,
                 ProcessStartedAtUtc = entry.Snapshot.ProcessStartedAtUtc,
+                SessionId = string.IsNullOrWhiteSpace(sessionId) ? "mcp:" + handle : sessionId,
                 LastUsedAtUtc = now
             };
             return new ConnectionLeaseResult(handle, now + BrokerConstants.LeaseIdleTimeout, entry.Snapshot);
@@ -180,6 +187,67 @@ internal sealed class BrokerRegistry
         return await connection.RequestAsync("cli/execute", request, TimeSpan.FromMinutes(11), cancellationToken);
     }
 
+    public void ReleaseLease(string connectionHandle, bool releaseSession = true)
+    {
+        if (string.IsNullOrWhiteSpace(connectionHandle)) return;
+        lock (_syncRoot)
+        {
+            if (!_leases.Remove(connectionHandle, out var lease)) return;
+            if (releaseSession) QueueSessionRelease(lease);
+            Cleanup();
+        }
+    }
+
+    public async Task RunMaintenanceAsync(CancellationToken cancellationToken)
+    {
+        lock (_syncRoot) Cleanup();
+
+        var pendingCount = _pendingSessionReleases.Count;
+        for (var index = 0; index < pendingCount; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_pendingSessionReleases.TryDequeue(out var pending)) break;
+
+            UnityConnection? connection;
+            var retry = false;
+            lock (_syncRoot)
+            {
+                if (!_instances.TryGetValue(pending.InstanceId, out var entry))
+                {
+                    retry = DateTimeOffset.UtcNow - pending.QueuedAtUtc <= BrokerConstants.DisconnectedRetention;
+                    connection = null;
+                }
+                else if (entry.Snapshot.ProcessId != pending.ProcessId ||
+                         entry.Snapshot.ProcessStartedAtUtc != pending.ProcessStartedAtUtc)
+                {
+                    connection = null;
+                }
+                else
+                {
+                    connection = entry.Connection is { IsConnected: true } ? entry.Connection : null;
+                    retry = connection == null &&
+                            DateTimeOffset.UtcNow - pending.QueuedAtUtc <= BrokerConstants.DisconnectedRetention;
+                }
+            }
+
+            if (connection == null)
+            {
+                if (retry) _pendingSessionReleases.Enqueue(pending);
+                continue;
+            }
+
+            try
+            {
+                await connection.ReleaseSessionAsync(pending.SessionId, cancellationToken);
+            }
+            catch (BrokerOperationException) when (DateTimeOffset.UtcNow - pending.QueuedAtUtc <=
+                                                   BrokerConstants.DisconnectedRetention)
+            {
+                _pendingSessionReleases.Enqueue(pending);
+            }
+        }
+    }
+
     private (UnityConnection Connection, UnityInstanceSnapshot Snapshot) ResolveConnected(string handle)
     {
         lock (_syncRoot)
@@ -207,6 +275,7 @@ internal sealed class BrokerRegistry
         if (DateTimeOffset.UtcNow - lease.LastUsedAtUtc > BrokerConstants.LeaseIdleTimeout)
         {
             _leases.Remove(handle);
+            QueueSessionRelease(lease);
             throw new BrokerOperationException(BrokerErrorCodes.ConnectionHandleInvalid,
                 "The connection handle expired. Query unity_status and connect again.");
         }
@@ -278,15 +347,29 @@ internal sealed class BrokerRegistry
         var now = DateTimeOffset.UtcNow;
         foreach (var handle in _leases.Where(pair => now - pair.Value.LastUsedAtUtc > BrokerConstants.LeaseIdleTimeout)
                      .Select(pair => pair.Key).ToArray())
+        {
+            var lease = _leases[handle];
             _leases.Remove(handle);
+            QueueSessionRelease(lease);
+        }
         foreach (var instanceId in _instances.Where(pair => pair.Value.Connection == null &&
                                                             now - pair.Value.DisconnectedAtUtc > BrokerConstants.DisconnectedRetention)
                      .Select(pair => pair.Key).ToArray())
         {
+            foreach (var pair in _leases.Where(pair => pair.Value.InstanceId == instanceId).ToArray())
+            {
+                _leases.Remove(pair.Key);
+                QueueSessionRelease(pair.Value);
+            }
             _instances.Remove(instanceId);
-            RemoveLeasesForInstance(instanceId);
             SignalRegistryChanged();
         }
+    }
+
+    private void QueueSessionRelease(Lease lease)
+    {
+        _pendingSessionReleases.Enqueue(new PendingSessionRelease(lease.InstanceId, lease.ProcessId,
+            lease.ProcessStartedAtUtc, lease.SessionId, DateTimeOffset.UtcNow));
     }
 
     private void RemoveLeasesForInstance(string instanceId)

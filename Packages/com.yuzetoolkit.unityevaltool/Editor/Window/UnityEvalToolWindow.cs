@@ -134,17 +134,12 @@ namespace YuzeToolkit
 
         private static string ResolvePhase()
         {
-            if (EditorApplication.isCompiling) return "Compiling";
-            if (EditorApplication.isUpdating) return "Importing";
-            if (EditorApplication.isPlayingOrWillChangePlaymode != EditorApplication.isPlaying)
-                return "PlayModeTransition";
-            return "Ready";
+            return UnityBrokerClient.Shared.LatestStatus.Phase;
         }
 
         private static void Reconnect()
         {
-            UnityBrokerClient.Shared.Stop();
-            UnityBrokerClient.Shared.Start();
+            UnityBrokerClient.Shared.Reconnect();
         }
 
         private static void OpenBrokerFolder()

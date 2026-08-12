@@ -18,6 +18,7 @@ UnityEvalTool
 ├── Broker/
 │   ├── src/                             # C# NativeAOT Broker and CLI
 │   └── npm/                             # npm entry and native platform packages
+├── Roslyn/                              # Source generator solution and tests
 └── .github/workflows/
     └── release.yml                      # Six-platform build and release matrix
 ```
@@ -40,6 +41,13 @@ Or add it to `Packages/manifest.json`:
     "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.0"
   }
 }
+```
+
+When this repository is embedded at `Game/UnityEvalTool` in a Unity project, consume the
+working tree directly instead of copying the package:
+
+```json
+"com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
 ```
 
 ### 2. Install the Broker and CLI
@@ -97,12 +105,20 @@ The service uses a LaunchAgent on macOS, a systemd user unit on Linux, and a cur
 
 ```bash
 dotnet build Broker/UnityEvalTool.Broker.slnx -c Release
+dotnet test Roslyn/UnityEvalToolRoslyn.sln -c Release
 cd Broker
+node --input-type=module -e "import { resolveAndValidateVersion } from './npm/scripts/version.mjs'; console.log(resolveAndValidateVersion(process.cwd()));"
 node npm/scripts/pack-platform.mjs
 node npm/scripts/pack-root.mjs
 ```
 
-`release.yml` builds six NativeAOT platform packages plus the platform-independent npm entry package. Publishing is deliberately gated behind an explicit workflow input and npm credentials. See [Broker/README.md](Broker/README.md) for package internals and the release checklist.
+Broker, Roslyn and the Unity package are ordinary source folders in this repository. No
+source archive is required and package development does not download an auxiliary zip.
+`version.json` is the release version authority; CI verifies the Broker, Unity package,
+runtime constant and npm package metadata before building six NativeAOT platform packages
+plus the platform-independent npm entry package. Publishing is deliberately gated behind
+an explicit workflow input and npm credentials. See [Broker/README.md](Broker/README.md)
+for package internals and the release checklist.
 
 ## License
 

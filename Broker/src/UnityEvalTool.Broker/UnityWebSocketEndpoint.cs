@@ -35,7 +35,8 @@ internal static class UnityWebSocketEndpoint
             var responsePayload = JsonSerializer.SerializeToElement(new Dictionary<string, string>
             {
                 ["instanceId"] = registration.InstanceId,
-                ["protocolVersion"] = BrokerConstants.ProtocolVersion
+                ["protocolVersion"] = BrokerConstants.ProtocolVersion,
+                ["brokerInstanceId"] = BrokerHost.InstanceId
             }, BrokerJsonContext.Default.DictionaryStringString);
             await WebSocketJson.SendAsync(socket,
                 WebSocketJson.CreateEnvelope("response", envelope.Method, envelope.Id, responsePayload), sendGate,

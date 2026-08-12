@@ -24,10 +24,11 @@ namespace YuzeToolkit
         private BrokerClientIdentity _identity = new();
         private Func<bool>? _ensureBrokerRunning;
         private BrokerUnityStatusSnapshot _latestStatus = new();
+        private string _brokerInstanceId = string.Empty;
         private long _mainThreadTick;
+        private long _runGeneration;
         private bool _configured;
         private bool _isConnected;
-        private bool _isStopping;
 
         private UnityBrokerClient()
         {
@@ -43,6 +44,11 @@ namespace YuzeToolkit
         public BrokerClientIdentity Identity
         {
             get { lock (_syncRoot) return _identity; }
+        }
+
+        public BrokerUnityStatusSnapshot LatestStatus
+        {
+            get { lock (_syncRoot) return _latestStatus.Clone(); }
         }
 
         public IReadOnlyList<EvalSessionSnapshot> GetSessionSnapshots(string sessionPrefix)
@@ -72,9 +78,11 @@ namespace YuzeToolkit
             {
                 if (_runTask != null) return;
                 if (!_configured) _latestStatus.VmGeneration = _identity.VmGeneration;
-                _isStopping = false;
-                _lifetime = new CancellationTokenSource();
-                _runTask = Task.Run(() => RunReconnectLoopAsync(_lifetime.Token));
+                var generation = ++_runGeneration;
+                var sessions = _sessions;
+                var lifetime = new CancellationTokenSource();
+                _lifetime = lifetime;
+                _runTask = Task.Run(() => RunReconnectLoopAsync(generation, sessions, lifetime.Token));
             }
         }
 
@@ -128,35 +136,43 @@ namespace YuzeToolkit
         {
             CancellationTokenSource? lifetime;
             ClientWebSocket? socket;
+            Task runTask;
+            BrokerEvalSessionRouter sessions;
             lock (_syncRoot)
             {
                 if (_runTask == null) return;
-                _isStopping = true;
+                _runGeneration++;
                 lifetime = _lifetime;
                 socket = _socket;
+                runTask = _runTask;
+                sessions = _sessions;
                 _lifetime = null;
                 _socket = null;
                 _runTask = null;
                 _isConnected = false;
+                _sessions = new BrokerEvalSessionRouter();
             }
 
             lifetime?.Cancel();
             try { socket?.Abort(); }
             catch (ObjectDisposedException) { }
-            socket?.Dispose();
-            lifetime?.Dispose();
-            _sessions.Dispose();
-            _sessions = new BrokerEvalSessionRouter();
+            _ = DisposeStoppedGenerationAsync(runTask, lifetime, sessions);
+        }
+
+        public void Reconnect()
+        {
+            Stop();
+            Start();
         }
 
         public void Dispose()
         {
             Stop();
-            _sendGate.Dispose();
             _sessions.Dispose();
         }
 
-        private async Task RunReconnectLoopAsync(CancellationToken cancellationToken)
+        private async Task RunReconnectLoopAsync(long generation, BrokerEvalSessionRouter sessions,
+            CancellationToken cancellationToken)
         {
             var attempt = 0;
             var brokerStartAttempted = false;
@@ -164,8 +180,11 @@ namespace YuzeToolkit
             {
                 try
                 {
-                    await ConnectAndRunAsync(cancellationToken);
-                    attempt = 0;
+                    await ConnectAndRunAsync(generation, sessions, () =>
+                    {
+                        attempt = 0;
+                        brokerStartAttempted = false;
+                    }, cancellationToken);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -173,7 +192,10 @@ namespace YuzeToolkit
                 }
                 catch (Exception ex)
                 {
-                    lock (_syncRoot) _isConnected = false;
+                    lock (_syncRoot)
+                    {
+                        if (generation == _runGeneration) _isConnected = false;
+                    }
                     if (!brokerStartAttempted && _ensureBrokerRunning != null)
                     {
                         brokerStartAttempted = true;
@@ -191,7 +213,7 @@ namespace YuzeToolkit
                         }
                     }
 
-                    if (!_isStopping && (attempt == 0 || attempt % 10 == 0))
+                    if (IsCurrentGeneration(generation) && (attempt == 0 || attempt % 10 == 0))
                         Debug.LogWarning($"[UnityEvalTool] Broker connection is unavailable: {ex.Message}");
                 }
 
@@ -201,12 +223,21 @@ namespace YuzeToolkit
             }
         }
 
-        private async Task ConnectAndRunAsync(CancellationToken cancellationToken)
+        private async Task ConnectAndRunAsync(long generation, BrokerEvalSessionRouter sessions,
+            Action onConnected, CancellationToken cancellationToken)
         {
             var token = ReadAuthToken();
             var socket = new ClientWebSocket();
             await socket.ConnectAsync(new Uri(BrokerProtocolUtility.Endpoint), cancellationToken);
-            lock (_syncRoot) _socket = socket;
+            lock (_syncRoot)
+            {
+                if (generation != _runGeneration)
+                {
+                    socket.Abort();
+                    throw new OperationCanceledException(cancellationToken);
+                }
+                _socket = socket;
+            }
 
             var registerId = Guid.NewGuid().ToString("N");
             var registration = BuildRegistration(token);
@@ -220,13 +251,28 @@ namespace YuzeToolkit
             if (!string.Equals(EvalData.GetString(response, "id"), registerId, StringComparison.Ordinal))
                 throw new InvalidOperationException("Broker registration response id did not match the request.");
 
-            lock (_syncRoot) _isConnected = true;
+            var responsePayload = EvalData.AsObject(response.TryGetValue("payload", out var payloadValue)
+                ? payloadValue
+                : null) ?? EvalData.Obj();
+            var brokerInstanceId = EvalData.GetString(responsePayload, "brokerInstanceId") ?? string.Empty;
+            var resetSessions = false;
+            lock (_syncRoot)
+            {
+                if (generation != _runGeneration)
+                    throw new OperationCanceledException(cancellationToken);
+                resetSessions = !string.IsNullOrWhiteSpace(brokerInstanceId) &&
+                                !string.Equals(_brokerInstanceId, brokerInstanceId, StringComparison.Ordinal);
+                _brokerInstanceId = brokerInstanceId;
+                _isConnected = true;
+            }
+            if (resetSessions) sessions.Reset();
+            onConnected();
             Debug.Log($"[UnityEvalTool] Connected to local Broker as {_identity.InstanceId} (epoch {_identity.ConnectionEpoch}).");
             using var connectionLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var heartbeat = RunHeartbeatAsync(socket, connectionLifetime.Token);
             try
             {
-                await ReceiveLoopAsync(socket, connectionLifetime.Token);
+                await ReceiveLoopAsync(socket, sessions, connectionLifetime.Token);
             }
             finally
             {
@@ -235,8 +281,11 @@ namespace YuzeToolkit
                 catch (OperationCanceledException) { }
                 lock (_syncRoot)
                 {
-                    if (ReferenceEquals(_socket, socket)) _socket = null;
-                    _isConnected = false;
+                    if (generation == _runGeneration && ReferenceEquals(_socket, socket))
+                    {
+                        _socket = null;
+                        _isConnected = false;
+                    }
                 }
                 socket.Dispose();
             }
@@ -251,7 +300,8 @@ namespace YuzeToolkit
             }
         }
 
-        private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+        private async Task ReceiveLoopAsync(ClientWebSocket socket, BrokerEvalSessionRouter sessions,
+            CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
             {
@@ -263,11 +313,12 @@ namespace YuzeToolkit
                 var method = EvalData.GetString(envelope, "method") ?? string.Empty;
                 var payload = EvalData.AsObject(envelope.TryGetValue("payload", out var rawPayload) ? rawPayload : null)
                               ?? EvalData.Obj();
-                await HandleRequestAsync(socket, id, method, payload, cancellationToken);
+                await HandleRequestAsync(socket, sessions, id, method, payload, cancellationToken);
             }
         }
 
-        private async Task HandleRequestAsync(ClientWebSocket socket, string id, string method,
+        private async Task HandleRequestAsync(ClientWebSocket socket, BrokerEvalSessionRouter sessions,
+            string id, string method,
             Dictionary<string, object?> payload, CancellationToken cancellationToken)
         {
             try
@@ -276,13 +327,13 @@ namespace YuzeToolkit
                 switch (method)
                 {
                     case "eval/execute":
-                        result = await _sessions.ExecuteEvalAsync(payload, cancellationToken);
+                        result = await sessions.ExecuteEvalAsync(payload, cancellationToken);
                         break;
                     case "cli/execute":
-                        result = await _sessions.ExecuteCliAsync(payload, cancellationToken);
+                        result = await sessions.ExecuteCliAsync(payload, cancellationToken);
                         break;
                     case "session/release":
-                        _sessions.Release(EvalData.GetString(payload, "sessionId") ?? string.Empty);
+                        sessions.Release(EvalData.GetString(payload, "sessionId") ?? string.Empty);
                         result = EvalData.Obj(("released", true));
                         break;
                     case "broker/ping":
@@ -319,7 +370,7 @@ namespace YuzeToolkit
                 ("projectName", new DirectoryInfo(projectPath).Name),
                 ("projectPath", Path.GetFullPath(projectPath)),
                 ("unityVersion", Application.unityVersion),
-                ("packageVersion", "2.0.0"),
+                ("packageVersion", UnityEvalToolVersion.Current),
                 ("environment", Application.isEditor ? "Editor" : "Player"),
                 ("status", status.ToObject())
             );
@@ -376,6 +427,33 @@ namespace YuzeToolkit
             if (string.IsNullOrWhiteSpace(token))
                 throw new InvalidDataException("UnityEvalTool Broker auth token is empty.");
             return token!;
+        }
+
+        private bool IsCurrentGeneration(long generation)
+        {
+            lock (_syncRoot) return generation == _runGeneration;
+        }
+
+        private static async Task DisposeStoppedGenerationAsync(Task runTask, CancellationTokenSource? lifetime,
+            BrokerEvalSessionRouter sessions)
+        {
+            try
+            {
+                await runTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when this connection generation is stopped.
+            }
+            catch (WebSocketException)
+            {
+                // Expected when Abort interrupts a pending WebSocket operation.
+            }
+            finally
+            {
+                lifetime?.Dispose();
+                sessions.Dispose();
+            }
         }
     }
 }

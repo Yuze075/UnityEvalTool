@@ -22,6 +22,11 @@ Each connection handle maps to `mcp:<handle>` in Unity; each interactive termina
 Unity reloads its scripting domain, or `resetSession` is requested. A VM generation change
 is visible in status and the CLI console.
 
+The Broker releases a CLI VM when its console closes and releases an MCP VM when its
+connection lease expires. A release that coincides with Domain Reload is retained for the
+same Unity process and delivered after reconnection. If the Broker itself restarts, Unity
+detects the new `brokerInstanceId` and disposes all sessions owned by the previous process.
+
 ## Safe compilation flow
 
 1. Call `unity_status`, retain its `capturedAtUtc`, and call `unity_connect`.

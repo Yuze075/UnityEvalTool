@@ -1,6 +1,6 @@
 {
   "name": "@yuzetoolkit/unityevaltool",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Local Broker, MCP server and CLI for UnityEvalTool",
   "keywords": [
     "unity",
@@ -36,12 +36,12 @@
     "preuninstall": "node scripts/preuninstall.js"
   },
   "optionalDependencies": {
-    "@yuzetoolkit/unityevaltool-darwin-arm64": "2.0.0",
-    "@yuzetoolkit/unityevaltool-darwin-x64": "2.0.0",
-    "@yuzetoolkit/unityevaltool-linux-arm64": "2.0.0",
-    "@yuzetoolkit/unityevaltool-linux-x64": "2.0.0",
-    "@yuzetoolkit/unityevaltool-win32-arm64": "2.0.0",
-    "@yuzetoolkit/unityevaltool-win32-x64": "2.0.0"
+    "@yuzetoolkit/unityevaltool-darwin-arm64": "2.0.1",
+    "@yuzetoolkit/unityevaltool-darwin-x64": "2.0.1",
+    "@yuzetoolkit/unityevaltool-linux-arm64": "2.0.1",
+    "@yuzetoolkit/unityevaltool-linux-x64": "2.0.1",
+    "@yuzetoolkit/unityevaltool-win32-arm64": "2.0.1",
+    "@yuzetoolkit/unityevaltool-win32-x64": "2.0.1"
   },
   "engines": {
     "node": ">=18"

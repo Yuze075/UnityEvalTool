@@ -81,6 +81,11 @@ namespace YuzeToolkit
 
         public void Dispose()
         {
+            Reset();
+        }
+
+        public void Reset()
+        {
             Entry[] entries;
             lock (_syncRoot)
             {

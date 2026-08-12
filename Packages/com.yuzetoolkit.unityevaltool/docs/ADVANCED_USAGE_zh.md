@@ -20,6 +20,10 @@ async function execute() {
 `cli:<consoleId>`。后续调用复用同一 PuerTS VM，直到 handle/console 被释放、Unity
 重载脚本域或请求 `resetSession`。状态和 CLI 控制台会显示 VM generation 变化。
 
+CLI 控制台关闭时 Broker 会释放对应 VM；MCP 连接租约过期时也会释放对应 VM。
+如果释放恰逢 Domain Reload，Broker 会为同一个 Unity 进程保留请求，并在重连后派发。
+Broker 自身重启时，Unity 会识别新的 `brokerInstanceId`，释放旧 Broker 持有的全部 Session。
+
 ## 安全编译流程
 
 1. 调用 `unity_status`，保留其 `capturedAtUtc`，再调用 `unity_connect`。

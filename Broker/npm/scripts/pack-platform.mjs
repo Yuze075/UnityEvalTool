@@ -3,10 +3,11 @@ import { chmodSync, cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, platform } from 'node:process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveAndValidateVersion } from './version.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(scriptDirectory, '../..');
-const version = process.env.UNITY_EVAL_TOOL_VERSION ?? '2.0.0';
+const version = resolveAndValidateVersion(root);
 const platformName = process.env.UNITY_EVAL_TOOL_PLATFORM ?? platform;
 const architecture = process.env.UNITY_EVAL_TOOL_ARCH ?? arch;
 const key = `${platformName}-${architecture}`;

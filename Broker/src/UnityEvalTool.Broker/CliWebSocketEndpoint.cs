@@ -51,7 +51,8 @@ internal static class CliWebSocketEndpoint
                         result = envelope.Method switch
                         {
                             "unity/list" => Serialize(registry.GetSnapshot(selectedHandle)),
-                            "unity/connect" => Connect(registry, envelope.Payload, out selectedHandle),
+                            "unity/connect" => Connect(registry, envelope.Payload, consoleId,
+                                selectedHandle, out selectedHandle),
                             "unity/status" => await StatusAsync(registry, selectedHandle, envelope.Payload,
                                 context.RequestAborted),
                             "cli/execute" => await ExecuteAsync(registry, selectedHandle, consoleId,
@@ -82,9 +83,15 @@ internal static class CliWebSocketEndpoint
         {
             // Peer disconnected.
         }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(selectedHandle))
+                registry.ReleaseLease(selectedHandle);
+        }
     }
 
-    private static JsonElement Connect(BrokerRegistry registry, JsonElement payload, out string handle)
+    private static JsonElement Connect(BrokerRegistry registry, JsonElement payload, string consoleId,
+        string? previousHandle, out string handle)
     {
         var instanceId = payload.TryGetProperty("instanceId", out var instanceElement)
             ? instanceElement.GetString() ?? string.Empty
@@ -92,8 +99,10 @@ internal static class CliWebSocketEndpoint
         var revision = payload.TryGetProperty("registryRevision", out var revisionElement)
             ? revisionElement.GetInt64()
             : 0;
-        var result = registry.Connect(instanceId, revision);
+        var result = registry.Connect(instanceId, revision, "cli:" + consoleId);
         handle = result.ConnectionHandle;
+        if (!string.IsNullOrWhiteSpace(previousHandle))
+            registry.ReleaseLease(previousHandle, releaseSession: false);
         return JsonSerializer.SerializeToElement(result, BrokerJsonContext.Default.ConnectionLeaseResult);
     }
 

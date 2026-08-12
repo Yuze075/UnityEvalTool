@@ -5,6 +5,7 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 internal static class BrokerHost
 {
     private static readonly DateTimeOffset StartedAtUtc = DateTimeOffset.UtcNow;
+    public static readonly string InstanceId = Guid.NewGuid().ToString("N");
 
     public static async Task RunAsync(string[] args)
     {
@@ -12,6 +13,7 @@ internal static class BrokerHost
         builder.WebHost.ConfigureKestrel(options => options.ListenLocalhost(BrokerConstants.Port));
         builder.Services.AddSingleton<AuthTokenStore>();
         builder.Services.AddSingleton<BrokerRegistry>();
+        builder.Services.AddHostedService<BrokerMaintenanceService>();
         builder.Services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, BrokerJsonContext.Default));
         builder.Services.AddMcpServer()

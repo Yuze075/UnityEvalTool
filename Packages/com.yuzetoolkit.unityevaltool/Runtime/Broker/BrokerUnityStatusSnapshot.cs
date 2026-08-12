@@ -42,6 +42,27 @@ namespace YuzeToolkit
             );
         }
 
+        public BrokerUnityStatusSnapshot Clone()
+        {
+            return new BrokerUnityStatusSnapshot
+            {
+                Phase = Phase,
+                CanEval = CanEval,
+                BusyReason = BusyReason,
+                MainThreadTick = MainThreadTick,
+                MainThreadTickAtUtc = MainThreadTickAtUtc,
+                IsPlaying = IsPlaying,
+                IsPaused = IsPaused,
+                IsUpdating = IsUpdating,
+                CompilationCycleId = CompilationCycleId,
+                CompilerErrorCount = CompilerErrorCount,
+                CompilerWarningCount = CompilerWarningCount,
+                LastCompilationStartedAtUtc = LastCompilationStartedAtUtc,
+                LastCompilationFinishedAtUtc = LastCompilationFinishedAtUtc,
+                VmGeneration = VmGeneration
+            };
+        }
+
         internal static BrokerUnityStatusSnapshot CreateRuntime(long mainThreadTick, long vmGeneration)
         {
             return new BrokerUnityStatusSnapshot

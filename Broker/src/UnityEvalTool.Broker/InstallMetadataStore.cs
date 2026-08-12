@@ -33,7 +33,7 @@ internal static class InstallMetadataStore
         var document = new JsonObject
         {
             ["executablePath"] = executable,
-            ["version"] = "2.0.0",
+            ["version"] = BrokerConstants.PackageVersion,
             ["updatedAtUtc"] = DateTimeOffset.UtcNow.ToString("O")
         };
         File.WriteAllText(path, document.ToJsonString() + Environment.NewLine);

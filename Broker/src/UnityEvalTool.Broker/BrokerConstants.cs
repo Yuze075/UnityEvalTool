@@ -5,6 +5,8 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 internal static class BrokerConstants
 {
     public const string ProtocolVersion = "2.0";
+    public static readonly string PackageVersion =
+        typeof(BrokerConstants).Assembly.GetName().Version?.ToString(3) ?? "unknown";
     public const string Host = "127.0.0.1";
     public const int Port = 2347;
     public static readonly TimeSpan MainThreadStallAfter = TimeSpan.FromSeconds(10);

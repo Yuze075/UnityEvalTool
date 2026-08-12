@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.1 - 2026-08-12
+
+- Release Unity-side PuerTS sessions when CLI consoles close or Broker leases expire, including deferred release across a temporary Unity disconnect.
+- Isolate Unity Broker client connection generations so a stopped reconnect loop cannot tear down a newly started connection.
+- Detect Broker process replacement and reset Unity-side sessions that belonged to the previous Broker.
+- Replace the self-sustaining Editor player-loop wakeup with a throttled status heartbeat driven by normal Editor updates.
+- Keep Broker, Unity package, npm and runtime versions synchronized from the committed `version.json` release version.
+- Store the Roslyn generator as ordinary repository source in `Roslyn` instead of embedding a source zip in the Unity package.
+
 ## 2.0.0 - 2026-08-12
 
 - Replaced Unity-hosted MCP and CLI listeners with a computer-level C# NativeAOT Broker on `127.0.0.1:2347`.
