@@ -1,3 +1,1 @@
-.yuzu-runtime-console .yuzu-runtime-console-card .unity-base-field {
-    margin-bottom: 3px;
-}
+.yuzu-runtime-console .yuzu-runtime-console-card .unity-base-field { margin-bottom: 4px; }

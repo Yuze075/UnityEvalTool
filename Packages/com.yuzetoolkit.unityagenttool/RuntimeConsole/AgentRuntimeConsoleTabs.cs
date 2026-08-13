@@ -54,8 +54,7 @@ namespace YuzeToolkit.UnityAgent
     {
         public static AgentScrollContainer CreateAgentScrollContainerForConsole()
         {
-            var panView = RuntimeConsoleUi.CreatePanView();
-            return new AgentScrollContainer(panView.Root, panView.Content, panView.ScrollToEnd);
+            return AgentScrollContainer.CreateDefault();
         }
     }
 }

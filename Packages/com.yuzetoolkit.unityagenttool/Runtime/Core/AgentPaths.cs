@@ -15,6 +15,7 @@ namespace YuzeToolkit.UnityAgent
     {
         public const string SettingsDirectoryName = ".unityagenttool";
         public const string SettingsFileName = "settings.json";
+        public const string SecretsFileName = "secrets.json";
         private static readonly object SnapshotLock = new();
         private static UnityPathSnapshot? _snapshot;
 

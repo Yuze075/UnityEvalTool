@@ -32,6 +32,7 @@ namespace YuzeToolkit
 
             var content = new ScrollView(ScrollViewMode.Vertical);
             DebugWindowUss.ApplyWindowContent(content);
+            content.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             for (var index = 0; index < node.Children.Count; index++)
             {
                 var child = node.Children[index];
@@ -222,8 +223,14 @@ namespace YuzeToolkit
             var root = new VisualElement();
             DebugWindowUss.ApplyInlineGroup(root);
             DebugWindowUss.ApplyInlineGroupDirection(root, group.Direction);
-            foreach (var child in group.Children)
-                root.Add(CreateNode(child, bindings));
+            for (var index = 0; index < group.Children.Count; index++)
+            {
+                var child = group.Children[index];
+                var visual = CreateNode(child, bindings);
+                if (group.Direction == FlexDirection.Row && index == 0 && visual is Label label)
+                    DebugWindowUss.ApplyInlineFieldLabel(label);
+                root.Add(visual);
+            }
             return root;
         }
 
@@ -280,9 +287,25 @@ namespace YuzeToolkit
 
         private static VisualElement CreateButton(DebugButtonNode node)
         {
-            var button = new Button(() => node.Action()) { text = node.Label };
+            var iconDirection = GetDirectionIcon(node.Label);
+            var button = new Button(() => node.Action()) { text = iconDirection == 0 ? node.Label : string.Empty };
             DebugWindowUss.ApplyButton(button);
+            if (iconDirection == 0)
+                DebugWindowUss.ApplyPrimaryButton(button);
+            else
+                DebugWindowUss.ApplyIconButton(button, iconDirection < 0);
             return button;
+        }
+
+        private static int GetDirectionIcon(string label)
+        {
+            if (label.Length != 1) return 0;
+            return label[0] switch
+            {
+                '\u2039' => -1,
+                '\u203a' => 1,
+                _ => 0
+            };
         }
 
         private static VisualElement CreateStateButton(
@@ -302,7 +325,7 @@ namespace YuzeToolkit
             var binding = new FieldBinding<bool>(node.StateGetter, value =>
             {
                 button.text = node.LabelGetter();
-                ApplyState(button, value, node.Tone);
+                ApplyState(button!, value, node.Tone);
             });
             bindings.Add(binding);
             binding.Refresh();
@@ -330,12 +353,11 @@ namespace YuzeToolkit
             ICollection<IDebugValueBinding> bindings)
         {
             Button? button = null;
+            Label? status = null;
             void Apply(bool value)
             {
-                button!.text = string.IsNullOrWhiteSpace(node.Label)
-                    ? value.ToString()
-                    : $"{node.Label} [{value}]";
-                ApplyState(button, value, node.Tone);
+                status!.text = value ? "On" : "Off";
+                ApplyState(button!, value, node.Tone);
             }
 
             button = new Button(() =>
@@ -345,7 +367,28 @@ namespace YuzeToolkit
                 Apply(node.Getter());
             });
             DebugWindowUss.ApplyButton(button);
-            DebugWindowUss.ApplyStateButton(button);
+            DebugWindowUss.ApplyBoolButton(button);
+
+            var label = new Label(string.IsNullOrWhiteSpace(node.Label) ? "Value" : node.Label)
+            {
+                pickingMode = PickingMode.Ignore,
+                enableRichText = false
+            };
+            label.AddToClassList(DebugWindowUss.BoolButtonLabelClass);
+            button.Add(label);
+            status = new Label
+            {
+                pickingMode = PickingMode.Ignore,
+                enableRichText = false
+            };
+            status.AddToClassList(DebugWindowUss.BoolButtonStatusClass);
+            button.Add(status);
+            var toggle = new VisualElement { pickingMode = PickingMode.Ignore };
+            toggle.AddToClassList(DebugWindowUss.BoolSwitchClass);
+            var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
+            thumb.AddToClassList(DebugWindowUss.BoolSwitchThumbClass);
+            toggle.Add(thumb);
+            button.Add(toggle);
 
             var binding = new FieldBinding<bool>(node.Getter, Apply);
             bindings.Add(binding);
@@ -408,7 +451,7 @@ namespace YuzeToolkit
                 return CreateReadOnlyLabel(node, label, bindings);
 
             var type = Nullable.GetUnderlyingType(node.ValueType) ?? node.ValueType;
-            if (type == typeof(bool)) return CreateTypedField<bool, Toggle>(node, label, new Toggle(), bindings);
+            if (type == typeof(bool)) return CreateBoolField(node, label, bindings);
             if (type == typeof(int)) return CreateTypedField<int, IntegerField>(node, label, new IntegerField(), bindings);
             if (type == typeof(float)) return CreateTypedField<float, FloatField>(node, label, new FloatField(), bindings);
             if (type == typeof(double)) return CreateTypedField<double, DoubleField>(node, label, new DoubleField(), bindings);
@@ -470,6 +513,35 @@ namespace YuzeToolkit
                 });
             }
 
+            return field;
+        }
+
+        private static VisualElement CreateBoolField(
+            IDebugFieldNode node,
+            string label,
+            ICollection<IDebugValueBinding> bindings)
+        {
+            var field = new Toggle { label = label };
+            field.SetEnabled(!node.IsReadOnly);
+            DebugWindowUss.ApplyField(field);
+            if (string.IsNullOrEmpty(label))
+                DebugWindowUss.ApplyFieldWithoutLabel(field);
+            var status = DebugWindowUss.ApplyOwnedToggle(field);
+            void Sync(bool value)
+            {
+                status.text = value ? "On" : "Off";
+                DebugWindowUss.ApplyActiveState(field, value);
+            }
+
+            var binding = new ObjectFieldBinding<bool>(node, field, Sync);
+            bindings.Add(binding);
+            binding.Refresh();
+            field.RegisterValueChangedCallback(evt =>
+            {
+                if (binding.IsRefreshing) return;
+                node.SetObjectValue(evt.newValue);
+                binding.Refresh();
+            });
             return field;
         }
 
@@ -549,14 +621,14 @@ namespace YuzeToolkit
 
             var valueLabel = new Label();
             DebugWindowUss.ApplySliderValue(valueLabel);
-            var filler = CreateSliderFiller(slider);
+            var chrome = CreateSliderChrome(slider);
 
             void Apply(float value)
             {
                 var clamped = Mathf.Clamp(value, node.LowValue, node.HighValue);
                 slider.SetValueWithoutNotify(clamped);
                 valueLabel.text = DebugToolUtility.FormatNumber(node.Format, clamped);
-                ApplySliderFiller(filler, node.LowValue, node.HighValue, clamped);
+                ApplySliderChrome(chrome, node.LowValue, node.HighValue, clamped);
             }
 
             var binding = new FieldBinding<float>(() => node.Getter(), Apply);
@@ -595,14 +667,14 @@ namespace YuzeToolkit
 
             var valueLabel = new Label();
             DebugWindowUss.ApplySliderValue(valueLabel);
-            var filler = CreateSliderFiller(slider);
+            var chrome = CreateSliderChrome(slider);
 
             void Apply(int value)
             {
                 var clamped = Mathf.Clamp(value, node.LowValue, node.HighValue);
                 slider.SetValueWithoutNotify(clamped);
                 valueLabel.text = DebugToolUtility.FormatNumber(node.Format, clamped);
-                ApplySliderFiller(filler, node.LowValue, node.HighValue, clamped);
+                ApplySliderChrome(chrome, node.LowValue, node.HighValue, clamped);
             }
 
             var binding = new FieldBinding<int>(() => node.Getter(), Apply);
@@ -643,32 +715,56 @@ namespace YuzeToolkit
             return progress;
         }
 
-        private static VisualElement CreateSliderFiller(VisualElement slider)
+        private static SliderChrome CreateSliderChrome(VisualElement slider)
         {
             var filler = new VisualElement();
             DebugWindowUss.ApplySliderFiller(filler);
+            filler.pickingMode = PickingMode.Ignore;
+            var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
+            DebugWindowUss.ApplySliderThumb(thumb);
 
-            var tracker = slider.Q("unity-tracker");
-            if (tracker != null)
-                tracker.Insert(0, filler);
+            var tracker = slider.Q<VisualElement>(className: "unity-base-slider__tracker") ??
+                          throw new InvalidOperationException("Unity 2022.3 Slider tracker was not created.");
+            tracker.Insert(0, filler);
+            tracker.Add(thumb);
 
-            return filler;
+            return new SliderChrome(filler, thumb);
         }
 
-        private static void ApplySliderFiller(VisualElement filler, float lowValue, float highValue, float value)
+        private static void ApplySliderChrome(SliderChrome chrome, float lowValue, float highValue, float value)
         {
-            filler.style.width = Length.Percent(Mathf.InverseLerp(lowValue, highValue, value) * 100f);
+            var percentage = Mathf.InverseLerp(lowValue, highValue, value) * 100f;
+            chrome.Filler.style.width = Length.Percent(percentage);
+            chrome.Thumb.style.left = Length.Percent(percentage);
+        }
+
+        private readonly struct SliderChrome
+        {
+            public SliderChrome(VisualElement filler, VisualElement thumb)
+            {
+                Filler = filler;
+                Thumb = thumb;
+            }
+
+            public VisualElement Filler { get; }
+
+            public VisualElement Thumb { get; }
         }
 
         private sealed class ObjectFieldBinding<TValue> : IDebugValueBinding
         {
             private readonly IDebugFieldNode _node;
             private readonly BaseField<TValue> _field;
+            private readonly Action<TValue>? _afterRefresh;
 
-            public ObjectFieldBinding(IDebugFieldNode node, BaseField<TValue> field)
+            public ObjectFieldBinding(
+                IDebugFieldNode node,
+                BaseField<TValue> field,
+                Action<TValue>? afterRefresh = null)
             {
                 _node = node;
                 _field = field;
+                _afterRefresh = afterRefresh;
             }
 
             public bool IsRefreshing { get; private set; }
@@ -680,7 +776,10 @@ namespace YuzeToolkit
                     IsRefreshing = true;
                     var value = _node.GetObjectValue();
                     if (value is TValue typed)
+                    {
                         _field.SetValueWithoutNotify(typed);
+                        _afterRefresh?.Invoke(typed);
+                    }
                 }
                 finally
                 {

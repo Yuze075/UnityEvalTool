@@ -43,8 +43,10 @@ Toggle、Dropdown、模型菜单、右键菜单、Tooltip、滚动条和全部�
 同一份文件；**Reload from disk** 会显式应用外部改动。对话历史根目录由设置中的单个稳定路径配置，默认是
 `PersistentData + .unityagenttool`，每个对话文档实际位于其 `Sessions` 子目录。路径只保存稳定基点枚举与相对路径，
 不会保存某台电脑的绝对路径。首次升级会从旧的 Editor `Library/UnityAgentTool` 或 Player
-`persistentDataPath/UnityAgentTool` 非破坏复制设置与历史，源文件保留。Session API key 只保留在内存中；持久化
-profile 可以记录环境变量名，但解析出的密钥不会写入设置或对话记录。
+`persistentDataPath/UnityAgentTool` 非破坏复制设置与历史，源文件保留。API key 可以只保留在当前进程，也可以由用户
+明确保存到 `Application.persistentDataPath/.unityagenttool/secrets.json`。密钥文件与 `settings.json` 分离，在 macOS 与
+Linux 上限制为当前用户访问；界面不会回显已保存密钥，密钥也不会写入 Provider profile、对话记录或打包项目内容。
+持久化 profile 还可以记录环境变量名，作为最低优先级的密钥来源。
 
 ## Provider
 
@@ -56,8 +58,9 @@ profile 可以记录环境变量名，但解析出的密钥不会写入设置或
 - Google Gemini Interactions API
 - 通过本机 JSONL 进程通信的 Codex App Server
 
-Chat 与 Settings 初次显示每个 profile 时会自动请求 Provider 的远端模型列表，也可以手工刷新。发现不可用时仍保留可编辑模型字段，并回退到内置的厂商目录，
-快速填写默认 endpoint、模型限制和受支持的推理档位。目录覆盖 OpenAI、Anthropic、Google、xAI、Meta、
+Chat 与 Settings 初次显示每个 profile 时会自动请求 Provider 的远端模型列表，也可以手工刷新。模型始终通过选择器
+设置，不存在自由输入模型 ID 的字段；远端发现可用时以远端列表为准，发现失败时回退到维护的厂商目录，提供可选择的
+默认 endpoint、模型限制和受支持的推理档位。目录覆盖 OpenAI、Anthropic、Google、xAI、Meta、
 Kimi/Moonshot、GLM/Z.AI、Qwen、MiniMax、MiMo 与 DeepSeek，并为 Qwen 国际站和中国站分别提供 endpoint。
 厂商模型会持续变化，因此远端发现结果始终优先于内置目录。
 

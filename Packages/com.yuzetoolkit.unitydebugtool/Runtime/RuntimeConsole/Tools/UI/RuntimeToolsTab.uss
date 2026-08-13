@@ -1,109 +1,27 @@
-.yuzu-runtime-tool-item {
-    margin-bottom: 6px;
-    padding-left: 6px;
-    padding-right: 6px;
-    padding-top: 4px;
-    padding-bottom: 5px;
-    background-color: rgba(255, 255, 255, 0.035);
-    border-left-width: 3px;
-    border-left-color: rgba(53, 173, 159, 0.72);
-    border-bottom-width: 1px;
-    border-bottom-color: rgba(255, 255, 255, 0.07);
-    border-radius: 2px;
-}
-
-.yuzu-runtime-tool-item .unity-foldout__toggle {
-    margin: 0;
-    color: rgba(255, 255, 255, 0.9);
-}
-
-.yuzu-runtime-tool-item .unity-foldout__content {
-    margin-left: 0;
-    padding-left: 0;
-}
-
-.yuzu-runtime-tool-header {
-    flex-direction: row;
-    align-items: center;
-    margin-bottom: 5px;
-}
-
-.yuzu-runtime-tool-description {
-    flex-grow: 1;
-    min-width: 0;
-    color: rgba(255, 255, 255, 0.7);
-    white-space: normal;
-}
-
 .yuzu-runtime-console .yuzu-runtime-tool-item {
     margin-bottom: 8px;
     padding: 0;
-    background-color: rgb(36, 36, 38);
-    border-left-width: 0;
-    border-bottom-width: 0;
-    border-top-width: 1px;
-    border-right-width: 1px;
-    border-bottom-width: 1px;
-    border-left-width: 1px;
-    border-top-color: rgb(55, 55, 58);
-    border-right-color: rgb(55, 55, 58);
-    border-bottom-color: rgb(55, 55, 58);
-    border-left-color: rgb(55, 55, 58);
+    background-color: rgb(44, 44, 46);
+    border-width: 0;
     border-radius: 10px;
     overflow: hidden;
 }
-
 .yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle {
-    min-height: 36px;
+    min-height: 40px;
     margin: 0;
-    padding: 3px 10px;
-    background-color: rgb(40, 40, 42);
-    color: rgb(229, 229, 231);
-    border-radius: 9px;
+    padding: 6px 10px;
+    background-image: none;
+    background-color: rgb(44, 44, 46);
+    border-radius: 11px;
 }
-
-.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle:hover {
-    background-color: rgb(48, 48, 51);
-}
-
+.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle:hover { background-color: rgba(255, 255, 255, 0.08); }
 .yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle:focus,
-.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle:active {
-    background-color: rgb(58, 46, 40);
-}
-
-.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle .unity-foldout__checkmark {
-    width: 12px;
-    min-width: 12px;
-    height: 12px;
-    min-height: 12px;
-    margin-right: 9px;
-    background-image: none;
-    background-color: rgb(69, 69, 73);
-    border-top-width: 0;
-    border-right-width: 0;
-    border-bottom-width: 0;
-    border-left-width: 0;
-    border-radius: 4px;
-}
-
-.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle:checked .unity-foldout__checkmark,
-.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle .unity-toggle:checked .unity-foldout__checkmark {
-    background-image: none;
-    background-color: rgb(255, 122, 69);
-}
-
-.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__content {
-    margin: 0;
-    padding: 10px 12px 12px 12px;
-    background-color: rgb(33, 33, 35);
-    border-left-width: 0;
-}
-
-.yuzu-runtime-console .yuzu-runtime-tool-header {
-    min-height: 34px;
-    margin-bottom: 8px;
-}
-
-.yuzu-runtime-console .yuzu-runtime-tool-description {
-    color: rgb(164, 164, 169);
-}
+.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle:active { background-color: rgba(255, 255, 255, 0.14); }
+.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle > .unity-toggle__input { min-width: 0; min-height: 28px; margin: 0; padding: 0; align-items: center; }
+.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle .unity-toggle__label { min-width: 0; min-height: 22px; color: rgb(249, 250, 251); font-size: 14px; white-space: nowrap; text-overflow: ellipsis; }
+.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle .unity-foldout__checkmark { display: none; width: 0; min-width: 0; height: 0; min-height: 0; margin: 0; background-image: none; background-color: transparent; border-width: 0; }
+.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle:checked .unity-foldout__checkmark { background-image: none; background-color: transparent; }
+.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__content { margin: 0; padding: 10px 12px 12px 12px; background-color: rgb(35, 35, 36); border-left-width: 0; }
+.yuzu-runtime-console .yuzu-runtime-tool-item > .unity-foldout__toggle:disabled { opacity: 0.4; background-image: none; }
+.yuzu-runtime-console .yuzu-runtime-tool-header { min-width: 0; min-height: 34px; margin-bottom: 8px; flex-direction: row; align-items: center; }
+.yuzu-runtime-console .yuzu-runtime-tool-description { flex-grow: 1; min-width: 0; min-height: 22px; color: rgb(173, 178, 184); font-size: 14px; white-space: normal; }

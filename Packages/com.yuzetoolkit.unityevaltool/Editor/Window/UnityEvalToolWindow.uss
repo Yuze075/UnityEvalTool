@@ -1,12 +1,12 @@
 .uet-root {
     color: rgb(224, 225, 230);
     font-size: 12px;
-    --unity-selection-color: rgba(249, 111, 45, 0.42);
-    --unity-cursor-color: rgb(255, 143, 86);
+    --unity-selection-color: rgba(96, 165, 250, 0.34);
+    --unity-cursor-color: rgb(96, 165, 250);
 }
 
 .uet-root .uet-button {
-    min-height: 26px;
+    min-height: 32px;
     padding-left: 12px;
     padding-right: 12px;
     margin-left: 0;
@@ -42,17 +42,17 @@
 
 .uet-root .uet-button:active {
     background-color: rgb(27, 28, 32);
-    border-left-color: rgb(249, 111, 45);
-    border-right-color: rgb(249, 111, 45);
-    border-top-color: rgb(249, 111, 45);
-    border-bottom-color: rgb(249, 111, 45);
+    border-left-color: rgb(96, 165, 250);
+    border-right-color: rgb(96, 165, 250);
+    border-top-color: rgb(96, 165, 250);
+    border-bottom-color: rgb(96, 165, 250);
 }
 
 .uet-root .uet-button:focus {
-    border-left-color: rgb(255, 143, 86);
-    border-right-color: rgb(255, 143, 86);
-    border-top-color: rgb(255, 143, 86);
-    border-bottom-color: rgb(255, 143, 86);
+    border-left-color: rgb(126, 190, 255);
+    border-right-color: rgb(126, 190, 255);
+    border-top-color: rgb(126, 190, 255);
+    border-bottom-color: rgb(126, 190, 255);
 }
 
 .uet-root .uet-button:disabled {
@@ -81,9 +81,9 @@
 }
 
 .uet-root .uet-tab--active {
-    color: rgb(255, 143, 86);
-    background-color: rgb(35, 30, 28);
-    border-bottom-color: rgb(249, 111, 45);
+    color: rgb(126, 190, 255);
+    background-color: rgb(25, 34, 47);
+    border-bottom-color: rgb(96, 165, 250);
 }
 
 .uet-root .uet-switch {
@@ -123,8 +123,26 @@
     -unity-text-align: middle-left;
 }
 
+.uet-root .uet-tool-expand__icon {
+    width: 9px;
+    min-width: 9px;
+    height: 9px;
+    min-height: 9px;
+    margin-right: 10px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-right-color: rgb(173, 178, 184);
+    border-bottom-color: rgb(173, 178, 184);
+    rotate: -45deg;
+}
+
+.uet-root .uet-tool-expand--open .uet-tool-expand__icon {
+    margin-top: -4px;
+    rotate: 45deg;
+}
+
 .uet-root .uet-tool-expand:hover {
-    color: rgb(255, 143, 86);
+    color: rgb(126, 190, 255);
     background-color: rgb(30, 30, 34);
 }
 
@@ -188,10 +206,10 @@
 .uet-root .uet-text-field--focus > .unity-base-field__input,
 .uet-root .uet-text-field--focus .unity-base-text-field__input,
 .uet-root .uet-text-field--focus .unity-text-input {
-    border-left-color: rgb(249, 111, 45);
-    border-right-color: rgb(249, 111, 45);
-    border-top-color: rgb(249, 111, 45);
-    border-bottom-color: rgb(249, 111, 45);
+    border-left-color: rgb(96, 165, 250);
+    border-right-color: rgb(96, 165, 250);
+    border-top-color: rgb(96, 165, 250);
+    border-bottom-color: rgb(96, 165, 250);
     background-color: rgb(35, 35, 39);
 }
 
@@ -220,7 +238,7 @@
 
 .uet-root .uet-notice--warning {
     background-color: rgb(44, 31, 24);
-    border-left-color: rgb(249, 111, 45);
+    border-left-color: rgb(246, 185, 74);
 }
 
 .uet-root .uet-notice__title {
@@ -258,7 +276,7 @@
 
 .uet-root .uet-tooltip__text {
     color: rgb(226, 227, 231);
-    font-size: 11px;
+    font-size: 12px;
     white-space: normal;
 }
 
@@ -339,7 +357,7 @@
 .uet-root .uet-scroll .unity-base-slider__dragger:hover,
 .uet-root .uet-scroll .unity-base-slider:active .unity-base-slider__dragger,
 .uet-root .uet-scroll .unity-base-slider:focus .unity-base-slider__dragger {
-    background-color: rgb(249, 111, 45);
+    background-color: rgb(96, 165, 250);
 }
 
 .uet-root .uet-scroll .unity-base-slider:disabled .unity-base-slider__tracker {

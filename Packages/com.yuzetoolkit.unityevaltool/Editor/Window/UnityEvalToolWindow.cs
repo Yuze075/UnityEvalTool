@@ -372,7 +372,7 @@ namespace YuzeToolkit
                 RefreshToolsView(false);
             })
             {
-                text = (expanded ? "▼  " : "▶  ") + tool.Name
+                text = tool.Name
             };
             expand.style.flexGrow = 1;
             expand.style.unityTextAlign = TextAnchor.MiddleLeft;
@@ -380,6 +380,10 @@ namespace YuzeToolkit
             expand.style.fontSize = 14;
             expand.AddToClassList("uet-button");
             expand.AddToClassList("uet-tool-expand");
+            expand.EnableInClassList("uet-tool-expand--open", expanded);
+            var disclosure = new VisualElement { pickingMode = PickingMode.Ignore };
+            disclosure.AddToClassList("uet-tool-expand__icon");
+            expand.Insert(0, disclosure);
             AttachTooltip(expand, expanded ? "Collapse tool details." : "Expand tool details.");
             header.Add(expand);
 
@@ -581,7 +585,7 @@ namespace YuzeToolkit
             button.AddToClassList("uet-button");
             AttachTooltip(button, tooltip);
             button.style.width = width;
-            button.style.height = 26;
+            button.style.height = 32;
             button.style.marginRight = 6;
             return button;
         }
@@ -688,7 +692,7 @@ namespace YuzeToolkit
             pill.style.paddingRight = 7;
             pill.style.marginLeft = 5;
             pill.style.unityTextAlign = TextAnchor.MiddleCenter;
-            pill.style.fontSize = 10;
+            pill.style.fontSize = 11;
             pill.style.color = Color.white;
             pill.style.backgroundColor = new Color(color.r, color.g, color.b, 0.72f);
             pill.style.borderTopLeftRadius = 10;
@@ -719,7 +723,7 @@ namespace YuzeToolkit
 
         private static void SetSwitchStyle(Button button, bool enabled, string enabledText, string disabledText)
         {
-            button.text = enabled ? "●  " + enabledText : "○  " + disabledText;
+            button.text = enabled ? enabledText : disabledText;
             button.EnableInClassList("uet-switch--on", enabled);
             button.EnableInClassList("uet-switch--off", !enabled);
             button.style.unityFontStyleAndWeight = FontStyle.Bold;

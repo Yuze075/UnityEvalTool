@@ -53,9 +53,12 @@ selects the conversation-history root and defaults to `PersistentData + .unityag
 documents live in its `Sessions` child directory. Portable paths persist a stable base plus a
 relative path, never a machine-specific absolute path. On first upgrade, settings and history are
 copied non-destructively from the old Editor `Library/UnityAgentTool` or Player
-`persistentDataPath/UnityAgentTool` location; source files remain untouched. Session API keys are
-memory-only. A persisted profile may name an environment variable, but its resolved secret is not
-written to settings or transcripts.
+`persistentDataPath/UnityAgentTool` location; source files remain untouched. API keys may be kept
+for the current process or explicitly saved to
+`Application.persistentDataPath/.unityagenttool/secrets.json`. The secret file is separate from
+`settings.json`, is restricted to the current user on macOS and Linux, is never rendered back into
+the UI, and is never written to provider profiles, transcripts, or packaged project content. A
+persisted profile may also name an environment variable as the lowest-priority secret source.
 
 ## Providers
 
@@ -68,9 +71,10 @@ Provider profiles use one normalized Agent contract and currently support:
 - Codex App Server over a local JSONL process
 
 Chat and Settings automatically try the provider's remote model-list endpoint the first time each
-profile is shown, and discovery can also be refreshed manually. When discovery is unavailable they
-keeps an editable model field and falls back to a curated catalog with provider defaults, model
-limits, and supported reasoning choices. The catalog includes presets for OpenAI, Anthropic,
+profile is shown, and discovery can also be refreshed manually. Model selection is never a free-form
+text field: remote discovery is authoritative when available, and a maintained catalog supplies
+selection-only fallback values, provider defaults, model limits, and supported reasoning choices
+when discovery fails. The catalog includes presets for OpenAI, Anthropic,
 Google, xAI, Meta, Kimi/Moonshot, GLM/Z.AI, Qwen, MiniMax, MiMo, and DeepSeek, plus separate Qwen
 international and China endpoints. Remote discovery remains authoritative because vendor catalogs
 change over time.

@@ -112,12 +112,16 @@ namespace YuzeToolkit
             DisableKeyboardFocus(foldout);
             if (foldout.Q<Toggle>() is { } foldoutToggle)
                 DisableKeyboardFocus(foldoutToggle);
+            RuntimeConsoleUss.ApplyDisclosure(foldout);
 
             var header = new VisualElement();
             header.AddToClassList(ToolHeaderClass);
             foldout.Add(header);
 
-            var description = new Label(string.IsNullOrWhiteSpace(tool.Description) ? "No description." : tool.Description);
+            var description = new Label(string.IsNullOrWhiteSpace(tool.Description) ? "No description." : tool.Description)
+            {
+                enableRichText = false
+            };
             description.AddToClassList(ToolDescriptionClass);
             description.style.whiteSpace = WhiteSpace.Normal;
             header.Add(description);
@@ -145,7 +149,7 @@ namespace YuzeToolkit
 
         private static void AddFunctions(VisualElement parent, IReadOnlyList<EvalToolFunctionDescriptor> functions)
         {
-            var title = new Label($"Functions ({functions.Count})");
+            var title = new Label($"Functions ({functions.Count})") { enableRichText = false };
             title.AddToClassList(RuntimeConsoleUss.LabelClass);
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
             title.style.marginTop = 8;
@@ -154,7 +158,7 @@ namespace YuzeToolkit
 
             if (functions.Count == 0)
             {
-                var empty = new Label("No generated function metadata is available.");
+                var empty = new Label("No generated function metadata is available.") { enableRichText = false };
                 empty.AddToClassList(RuntimeConsoleUss.LabelClass);
                 empty.AddToClassList(RuntimeConsoleUss.MutedLabelClass);
                 parent.Add(empty);
@@ -165,7 +169,7 @@ namespace YuzeToolkit
             {
                 var signature = function.MethodName + "(" + string.Join(", ", function.Parameters.Select(FormatParameter)) + ")";
                 var value = RuntimeConsoleUi.AddField(parent, signature);
-                value.text = string.IsNullOrWhiteSpace(function.Description) ? "—" : function.Description;
+                value.text = string.IsNullOrWhiteSpace(function.Description) ? "No description." : function.Description;
                 RuntimeConsoleUi.AttachHelp(value, BuildFunctionHelp(function));
                 if (function.RequiresConfirmation)
                     value.style.color = RuntimeConsoleUi.WarningColor;
@@ -215,11 +219,10 @@ namespace YuzeToolkit
 
         private static void SetSwitchStyle(Button button, bool enabled, bool blockedByAncestor = false)
         {
-            button.text = blockedByAncestor ? "○  Blocked" : enabled ? "●  Enabled" : "○  Disabled";
-            button.AddToClassList(RuntimeConsoleUss.SwitchClass);
-            button.EnableInClassList(RuntimeConsoleUss.SwitchOnClass, enabled && !blockedByAncestor);
-            button.EnableInClassList(RuntimeConsoleUss.SwitchOffClass, !enabled && !blockedByAncestor);
-            button.EnableInClassList(RuntimeConsoleUss.SwitchBlockedClass, blockedByAncestor);
+            RuntimeConsoleUss.ApplySwitch(button,
+                blockedByAncestor ? "Blocked" : enabled ? "Enabled" : "Disabled",
+                enabled,
+                blockedByAncestor);
         }
 
         internal static IReadOnlyList<EvalToolDescriptor> ReadCompleteCatalog(bool refresh)

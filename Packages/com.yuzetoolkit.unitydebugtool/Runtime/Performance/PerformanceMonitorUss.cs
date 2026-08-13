@@ -12,7 +12,7 @@ namespace YuzeToolkit
 
         public static readonly Color TextColor = new(1f, 1f, 1f, 0.86f);
         public static readonly Color MutedTextColor = new(1f, 1f, 1f, 0.55f);
-        public static readonly Color GoodColor = new(1f, 0.478f, 0.271f, 1f);
+        public static readonly Color GoodColor = new(0.208f, 0.679f, 0.622f, 1f);
         public static readonly Color CautionColor = new(0.914f, 0.769f, 0.416f, 1f);
         public static readonly Color CriticalColor = new(0.906f, 0.435f, 0.318f, 1f);
         public static readonly Color RamReservedColor = new(0.996f, 0.894f, 0.251f, 1f);

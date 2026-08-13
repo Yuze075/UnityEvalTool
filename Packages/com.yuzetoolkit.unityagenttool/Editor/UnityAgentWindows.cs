@@ -28,7 +28,7 @@ namespace YuzeToolkit.UnityAgent
         {
             _requestedPage = page;
             var window = GetWindow<UnityAgentWindow>("Unity Agent");
-            window.minSize = new Vector2(780, 520);
+            window.minSize = new Vector2(480, 480);
             window.Show();
             window._view?.ShowPage(page);
         }

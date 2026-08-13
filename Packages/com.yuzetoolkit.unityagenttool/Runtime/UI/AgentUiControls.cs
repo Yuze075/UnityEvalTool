@@ -9,6 +9,177 @@ using UnityEngine.UIElements;
 
 namespace YuzeToolkit.UnityAgent
 {
+    internal enum AgentIconKind
+    {
+        None,
+        Add,
+        Back,
+        ChevronDown,
+        ChevronRight,
+        ChevronUp,
+        Refresh,
+        Send,
+        Stop,
+        Check,
+        Settings,
+        Pin,
+        Archive,
+        Restore,
+        Delete,
+        Provider,
+        Sliders,
+        Folder,
+        History,
+        Chat
+    }
+
+    /// <summary>Package-owned vector icon seat. No glyph or editor skin participates in rendering.</summary>
+    internal sealed class AgentIcon : VisualElement
+    {
+        private AgentIconKind _kind;
+        private Color _tint;
+
+        public AgentIcon(AgentIconKind kind, float size = 16)
+        {
+            _kind = kind;
+            _tint = AgentUi.TextSecondary;
+            pickingMode = PickingMode.Ignore;
+            style.width = size;
+            style.height = size;
+            style.flexShrink = 0;
+            generateVisualContent += Draw;
+        }
+
+        public AgentIconKind Kind
+        {
+            get => _kind;
+            set
+            {
+                if (_kind == value) return;
+                _kind = value;
+                MarkDirtyRepaint();
+            }
+        }
+
+        public Color Tint
+        {
+            get => _tint;
+            set
+            {
+                _tint = value;
+                MarkDirtyRepaint();
+            }
+        }
+
+        private void Draw(MeshGenerationContext context)
+        {
+            if (_kind == AgentIconKind.None) return;
+            var painter = context.painter2D;
+            var rect = contentRect;
+            var scale = Mathf.Min(rect.width, rect.height) / 16f;
+            var origin = rect.center - new Vector2(8f * scale, 8f * scale);
+            painter.strokeColor = _tint;
+            painter.fillColor = _tint;
+            painter.lineWidth = Mathf.Max(1.5f, 1.9f * scale);
+
+            Vector2 P(float x, float y) => origin + new Vector2(x * scale, y * scale);
+            void Stroke(params Vector2[] points)
+            {
+                if (points.Length < 2) return;
+                painter.BeginPath();
+                painter.MoveTo(points[0]);
+                for (var i = 1; i < points.Length; i++) painter.LineTo(points[i]);
+                painter.Stroke();
+            }
+            void Fill(params Vector2[] points)
+            {
+                if (points.Length < 3) return;
+                painter.BeginPath();
+                painter.MoveTo(points[0]);
+                for (var i = 1; i < points.Length; i++) painter.LineTo(points[i]);
+                painter.ClosePath();
+                painter.Fill();
+            }
+
+            switch (_kind)
+            {
+                case AgentIconKind.Add:
+                    Stroke(P(3, 8), P(13, 8));
+                    Stroke(P(8, 3), P(8, 13));
+                    break;
+                case AgentIconKind.Back:
+                    Stroke(P(10.5f, 3), P(5.5f, 8), P(10.5f, 13));
+                    break;
+                case AgentIconKind.ChevronDown:
+                    Stroke(P(3.5f, 6), P(8, 10.5f), P(12.5f, 6));
+                    break;
+                case AgentIconKind.ChevronRight:
+                    Stroke(P(6, 3.5f), P(10.5f, 8), P(6, 12.5f));
+                    break;
+                case AgentIconKind.ChevronUp:
+                    Stroke(P(3.5f, 10), P(8, 5.5f), P(12.5f, 10));
+                    break;
+                case AgentIconKind.Send:
+                    Fill(P(3, 8), P(8, 3), P(13, 8), P(10, 8), P(10, 13), P(6, 13), P(6, 8));
+                    break;
+                case AgentIconKind.Stop:
+                    Fill(P(4, 4), P(12, 4), P(12, 12), P(4, 12));
+                    break;
+                case AgentIconKind.Check:
+                    Stroke(P(3, 8), P(6.5f, 11.5f), P(13, 4.5f));
+                    break;
+                case AgentIconKind.Refresh:
+                    Stroke(P(12.5f, 6.5f), P(12.5f, 3), P(9, 3));
+                    Stroke(P(12, 4), P(10.5f, 2.8f), P(8, 2.2f), P(5.4f, 3), P(3.4f, 5), P(2.8f, 7.5f));
+                    Stroke(P(3.5f, 9.5f), P(3.5f, 13), P(7, 13));
+                    Stroke(P(4, 12), P(5.5f, 13.2f), P(8, 13.8f), P(10.6f, 13), P(12.6f, 11), P(13.2f, 8.5f));
+                    break;
+                case AgentIconKind.Pin:
+                    Stroke(P(5, 3), P(11, 3), P(10, 7), P(12, 9), P(4, 9), P(6, 7), P(5, 3));
+                    Stroke(P(8, 9), P(8, 14));
+                    break;
+                case AgentIconKind.Archive:
+                    Stroke(P(3, 5), P(13, 5), P(12, 13), P(4, 13), P(3, 5));
+                    Stroke(P(2.5f, 3), P(13.5f, 3), P(13.5f, 5), P(2.5f, 5), P(2.5f, 3));
+                    Stroke(P(6, 8), P(10, 8));
+                    break;
+                case AgentIconKind.Restore:
+                    Stroke(P(5.5f, 5), P(2.5f, 5), P(2.5f, 2));
+                    Stroke(P(3, 5), P(5, 3), P(8, 2.5f), P(11, 4), P(13, 7), P(12.5f, 10.5f), P(10, 13), P(6, 13));
+                    break;
+                case AgentIconKind.Delete:
+                    Stroke(P(4, 5), P(12, 5), P(11, 13), P(5, 13), P(4, 5));
+                    Stroke(P(3, 3.5f), P(13, 3.5f));
+                    Stroke(P(6.5f, 2), P(9.5f, 2));
+                    break;
+                case AgentIconKind.Settings:
+                case AgentIconKind.Sliders:
+                    Stroke(P(3, 4), P(13, 4));
+                    Stroke(P(3, 8), P(13, 8));
+                    Stroke(P(3, 12), P(13, 12));
+                    Fill(P(5, 2.5f), P(7, 2.5f), P(7, 5.5f), P(5, 5.5f));
+                    Fill(P(9, 6.5f), P(11, 6.5f), P(11, 9.5f), P(9, 9.5f));
+                    Fill(P(6, 10.5f), P(8, 10.5f), P(8, 13.5f), P(6, 13.5f));
+                    break;
+                case AgentIconKind.Provider:
+                    Stroke(P(4, 3), P(12, 3), P(12, 7), P(4, 7), P(4, 3));
+                    Stroke(P(4, 9), P(12, 9), P(12, 13), P(4, 13), P(4, 9));
+                    break;
+                case AgentIconKind.Folder:
+                    Stroke(P(2.5f, 5), P(6.5f, 5), P(8, 6.5f), P(13.5f, 6.5f), P(12.5f, 13), P(3.5f, 13), P(2.5f, 5));
+                    break;
+                case AgentIconKind.History:
+                    Stroke(P(5, 4), P(3, 4), P(3, 2));
+                    Stroke(P(3.5f, 4), P(5.5f, 2.5f), P(9, 2.5f), P(12, 5), P(13, 8), P(12, 11), P(9, 13), P(5.5f, 12.5f));
+                    Stroke(P(8, 5), P(8, 8), P(10.5f, 9.5f));
+                    break;
+                case AgentIconKind.Chat:
+                    Stroke(P(3, 3), P(13, 3), P(13, 11), P(8, 11), P(5, 14), P(5, 11), P(3, 11), P(3, 3));
+                    break;
+            }
+        }
+    }
+
     /// <summary>
     /// Package-owned button. It intentionally does not derive from UI Toolkit's Button, so no
     /// editor skin, background image, padding, border, or state selector can leak into the Agent UI.
@@ -16,14 +187,19 @@ namespace YuzeToolkit.UnityAgent
     internal sealed class AgentButton : VisualElement
     {
         private readonly Label _label;
+        private readonly Label _description;
+        private readonly VisualElement _textStack;
+        private readonly AgentIcon _icon;
         private readonly Action _clicked;
         private string _helpText;
         private Color _surface;
         private Color _foreground;
         private bool _hovered;
         private bool _pressed;
+        private bool _focused;
 
-        public AgentButton(string text, string tooltip, Action clicked, Color surface, Color foreground)
+        public AgentButton(string text, string tooltip, Action clicked, Color surface, Color foreground,
+            AgentIconKind icon = AgentIconKind.None)
         {
             _clicked = clicked ?? throw new ArgumentNullException(nameof(clicked));
             _helpText = tooltip ?? string.Empty;
@@ -35,21 +211,34 @@ namespace YuzeToolkit.UnityAgent
             style.justifyContent = Justify.Center;
             style.flexShrink = 0;
             style.backgroundImage = StyleKeyword.None;
-            style.borderTopWidth = 0;
-            style.borderRightWidth = 0;
-            style.borderBottomWidth = 0;
-            style.borderLeftWidth = 0;
+            style.borderTopWidth = 1;
+            style.borderRightWidth = 1;
+            style.borderBottomWidth = 1;
+            style.borderLeftWidth = 1;
             style.paddingTop = 0;
             style.paddingRight = 10;
             style.paddingBottom = 0;
             style.paddingLeft = 10;
             style.opacity = 1;
 
+            _icon = new AgentIcon(icon);
+            _icon.style.display = icon == AgentIconKind.None ? DisplayStyle.None : DisplayStyle.Flex;
+            _icon.style.marginRight = string.IsNullOrEmpty(text) ? 0 : 6;
+            Add(_icon);
+
+            _textStack = new VisualElement { pickingMode = PickingMode.Ignore };
+            _textStack.style.minWidth = 0;
+            _textStack.style.flexShrink = 1;
+            _textStack.style.justifyContent = Justify.Center;
+            Add(_textStack);
+
             _label = new Label { pickingMode = PickingMode.Ignore };
             _label.style.flexShrink = 1;
             _label.style.minWidth = 0;
             _label.style.unityTextAlign = TextAnchor.MiddleCenter;
             _label.style.whiteSpace = WhiteSpace.NoWrap;
+            _label.style.overflow = Overflow.Hidden;
+            _label.style.textOverflow = TextOverflow.Ellipsis;
             _label.style.backgroundImage = StyleKeyword.None;
             _label.style.marginTop = 0;
             _label.style.marginRight = 0;
@@ -59,7 +248,16 @@ namespace YuzeToolkit.UnityAgent
             _label.style.paddingRight = 0;
             _label.style.paddingBottom = 0;
             _label.style.paddingLeft = 0;
-            Add(_label);
+            AgentUi.ApplyTypography(_label, AgentTypography.Control);
+            _textStack.Add(_label);
+            _description = new Label { pickingMode = PickingMode.Ignore };
+            _description.style.display = DisplayStyle.None;
+            _description.style.minWidth = 0;
+            _description.style.overflow = Overflow.Hidden;
+            _description.style.textOverflow = TextOverflow.Ellipsis;
+            _description.style.color = AgentUi.TextCaption;
+            AgentUi.ApplyTypography(_description, AgentTypography.Caption);
+            _textStack.Add(_description);
 
             SetPalette(surface, foreground);
             this.text = text;
@@ -99,21 +297,13 @@ namespace YuzeToolkit.UnityAgent
             });
             RegisterCallback<FocusInEvent>(_ =>
             {
-                style.borderTopWidth = 1;
-                style.borderRightWidth = 1;
-                style.borderBottomWidth = 1;
-                style.borderLeftWidth = 1;
-                style.borderTopColor = AgentUi.Focus;
-                style.borderRightColor = AgentUi.Focus;
-                style.borderBottomColor = AgentUi.Focus;
-                style.borderLeftColor = AgentUi.Focus;
+                _focused = true;
+                RefreshSurface();
             });
             RegisterCallback<FocusOutEvent>(_ =>
             {
-                style.borderTopWidth = 0;
-                style.borderRightWidth = 0;
-                style.borderBottomWidth = 0;
-                style.borderLeftWidth = 0;
+                _focused = false;
+                RefreshSurface();
             });
         }
 
@@ -121,6 +311,27 @@ namespace YuzeToolkit.UnityAgent
         {
             get => _label.text;
             set => _label.text = value ?? string.Empty;
+        }
+
+        public void SetIcon(AgentIconKind icon)
+        {
+            _icon.Kind = icon;
+            _icon.style.display = icon == AgentIconKind.None ? DisplayStyle.None : DisplayStyle.Flex;
+            _icon.style.marginRight = string.IsNullOrEmpty(_label.text) ? 0 : 6;
+        }
+
+        public void ShowLabel(bool visible)
+        {
+            _textStack.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            _icon.style.marginRight = visible && !string.IsNullOrEmpty(_label.text) ? 6 : 0;
+        }
+
+        public void SetDescription(string description)
+        {
+            _description.text = description ?? string.Empty;
+            _description.style.display = string.IsNullOrWhiteSpace(_description.text)
+                ? DisplayStyle.None
+                : DisplayStyle.Flex;
         }
 
         public string HelpText
@@ -134,6 +345,7 @@ namespace YuzeToolkit.UnityAgent
             _surface = surface;
             _foreground = foreground;
             _label.style.color = foreground;
+            _icon.Tint = foreground;
             style.color = foreground;
             RefreshSurface();
         }
@@ -159,7 +371,16 @@ namespace YuzeToolkit.UnityAgent
                     ? Color.Lerp(_surface, Color.white, 0.10f)
                     : _surface;
             style.backgroundColor = target;
+            var outline = _focused ? AgentUi.Focus : _hovered ? AgentUi.BorderStrong : AgentUi.Transparent;
+            style.borderTopColor = outline;
+            style.borderRightColor = outline;
+            style.borderBottomColor = outline;
+            style.borderLeftColor = outline;
             _label.style.color = enabledInHierarchy ? _foreground : Color.Lerp(_foreground, AgentUi.Muted, 0.55f);
+            _description.style.color = enabledInHierarchy
+                ? AgentUi.TextCaption
+                : Color.Lerp(AgentUi.TextCaption, AgentUi.TextDimmed, 0.55f);
+            _icon.Tint = enabledInHierarchy ? _foreground : Color.Lerp(_foreground, AgentUi.Muted, 0.55f);
         }
     }
 
@@ -201,7 +422,7 @@ namespace YuzeToolkit.UnityAgent
             labelElement.style.minWidth = 0;
             labelElement.style.flexGrow = 0;
             labelElement.style.flexShrink = 0;
-            labelElement.style.fontSize = 11;
+            AgentUi.ApplyTypography(labelElement, AgentTypography.Caption);
             labelElement.style.color = AgentUi.Muted;
             labelElement.style.marginTop = 0;
             labelElement.style.marginRight = 0;
@@ -221,8 +442,8 @@ namespace YuzeToolkit.UnityAgent
 
             _placeholder = new Label { pickingMode = PickingMode.Ignore };
             _placeholder.style.position = Position.Absolute;
-            _placeholder.style.left = 11;
-            _placeholder.style.top = string.IsNullOrEmpty(label) ? 10 : 31;
+            _placeholder.style.left = _surface ? 9 : 0;
+            _placeholder.style.top = string.IsNullOrEmpty(label) ? (_surface ? 7 : 4) : 31;
             _placeholder.style.color = AgentUi.Placeholder;
             _placeholder.style.whiteSpace = WhiteSpace.NoWrap;
             _placeholder.style.display = DisplayStyle.None;
@@ -302,7 +523,7 @@ namespace YuzeToolkit.UnityAgent
             }
             _input.style.flexGrow = 1;
             _input.style.minWidth = 0;
-            _input.style.minHeight = _surface ? 38 : 32;
+            _input.style.minHeight = 32;
             _input.style.backgroundImage = StyleKeyword.None;
             _input.style.backgroundColor = _invalid
                 ? AgentUi.ErrorPanel
@@ -312,27 +533,51 @@ namespace YuzeToolkit.UnityAgent
             _input.style.marginRight = 0;
             _input.style.marginBottom = 0;
             _input.style.marginLeft = 0;
-            _input.style.paddingTop = _surface ? 8 : 5;
-            _input.style.paddingRight = _surface ? 10 : 4;
-            _input.style.paddingBottom = _surface ? 8 : 5;
-            _input.style.paddingLeft = _surface ? 10 : 4;
-            _input.style.borderTopLeftRadius = _surface ? 9 : 0;
-            _input.style.borderTopRightRadius = _surface ? 9 : 0;
-            _input.style.borderBottomLeftRadius = _surface ? 9 : 0;
-            _input.style.borderBottomRightRadius = _surface ? 9 : 0;
+            _input.style.paddingTop = _surface ? 5 : 4;
+            _input.style.paddingRight = _surface ? 8 : 0;
+            _input.style.paddingBottom = _surface ? 5 : 4;
+            _input.style.paddingLeft = _surface ? 8 : 0;
+            _placeholder.style.left = _surface ? 9 : 0;
+            _placeholder.style.top = string.IsNullOrEmpty(label) ? (_surface ? 7 : 4) : 31;
+            _input.style.borderTopLeftRadius = _surface ? 8 : 0;
+            _input.style.borderTopRightRadius = _surface ? 8 : 0;
+            _input.style.borderBottomLeftRadius = _surface ? 8 : 0;
+            _input.style.borderBottomRightRadius = _surface ? 8 : 0;
+            if (!_surface)
+            {
+                _input.style.borderTopWidth = 0;
+                _input.style.borderRightWidth = 0;
+                _input.style.borderBottomWidth = 0;
+                _input.style.borderLeftWidth = 0;
+                _input.style.borderTopColor = AgentUi.Transparent;
+                _input.style.borderRightColor = AgentUi.Transparent;
+                _input.style.borderBottomColor = AgentUi.Transparent;
+                _input.style.borderLeftColor = AgentUi.Transparent;
+            }
             SetInputBorder(_invalid ? AgentUi.Error : _surface ? AgentUi.Border : AgentUi.Transparent);
 
-            foreach (var child in _input.Children())
+            ResetNativeTextVisuals(_input);
+            RefreshPlaceholder();
+        }
+
+        private static void ResetNativeTextVisuals(VisualElement root)
+        {
+            foreach (var child in root.Children())
             {
                 child.style.backgroundImage = StyleKeyword.None;
                 child.style.backgroundColor = AgentUi.Transparent;
                 child.style.color = AgentUi.Text;
+                child.style.borderTopWidth = 0;
+                child.style.borderRightWidth = 0;
+                child.style.borderBottomWidth = 0;
+                child.style.borderLeftWidth = 0;
                 child.style.marginTop = 0;
                 child.style.marginRight = 0;
                 child.style.marginBottom = 0;
                 child.style.marginLeft = 0;
+                if (child is TextElement textElement) StyleTextSelection(textElement);
+                ResetNativeTextVisuals(child);
             }
-            RefreshPlaceholder();
         }
 
         private static void StyleTextSelection(TextElement textElement)
@@ -345,7 +590,7 @@ namespace YuzeToolkit.UnityAgent
             interfaceType.GetProperty("cursorColor", BindingFlags.Instance | BindingFlags.Public)?
                 .SetValue(textElement, AgentUi.Text, null);
             interfaceType.GetProperty("selectionColor", BindingFlags.Instance | BindingFlags.Public)?
-                .SetValue(textElement, new Color(1f, 0.36f, 0.13f, 0.42f), null);
+                .SetValue(textElement, AgentUi.Selection, null);
         }
 
         private void SetInputBorder(Color color)
@@ -370,17 +615,31 @@ namespace YuzeToolkit.UnityAgent
         }
     }
 
+    internal enum AgentChoiceMenuState
+    {
+        Ready,
+        Loading,
+        Empty,
+        Error,
+        Warning
+    }
+
     /// <summary>Package-owned dropdown whose choices are rendered by the owned overlay layer.</summary>
     internal sealed class AgentChoiceField : VisualElement, INotifyValueChanged<string>
     {
         private readonly Label _caption;
         private readonly Label _valueLabel;
-        private readonly Label _arrow;
+        private readonly AgentIcon _arrow;
         private readonly VisualElement _trigger;
         private readonly bool _compact;
         private List<string> _choices = new();
         private string _value = string.Empty;
         private bool _hovered;
+        private bool _focused;
+        private Color? _foreground;
+        private AgentChoiceMenuState _menuState;
+        private string _menuMessage = string.Empty;
+        private Action? _retry;
 
         public AgentChoiceField(string label, IEnumerable<string> choices, bool compact = false)
         {
@@ -393,7 +652,7 @@ namespace YuzeToolkit.UnityAgent
             style.marginBottom = compact ? 0 : 4;
 
             _caption = new Label(label) { pickingMode = PickingMode.Ignore };
-            _caption.style.fontSize = 11;
+            AgentUi.ApplyTypography(_caption, AgentTypography.Caption);
             _caption.style.color = AgentUi.Muted;
             _caption.style.marginLeft = 1;
             _caption.style.marginBottom = 6;
@@ -401,41 +660,49 @@ namespace YuzeToolkit.UnityAgent
             Add(_caption);
 
             _trigger = new VisualElement { focusable = true };
-            _trigger.style.height = compact ? 30 : 38;
+            _trigger.style.height = compact ? 28 : 32;
+            _trigger.style.width = new Length(100, LengthUnit.Percent);
+            _trigger.style.maxWidth = new Length(100, LengthUnit.Percent);
             _trigger.style.minWidth = 0;
+            _trigger.style.flexShrink = 1;
             _trigger.style.flexDirection = FlexDirection.Row;
             _trigger.style.alignItems = Align.Center;
             _trigger.style.backgroundImage = StyleKeyword.None;
-            _trigger.style.backgroundColor = compact ? AgentUi.Transparent : AgentUi.Input;
-            _trigger.style.borderTopLeftRadius = compact ? 7 : 9;
-            _trigger.style.borderTopRightRadius = compact ? 7 : 9;
-            _trigger.style.borderBottomLeftRadius = compact ? 7 : 9;
-            _trigger.style.borderBottomRightRadius = compact ? 7 : 9;
-            _trigger.style.borderTopWidth = compact ? 0 : 1;
-            _trigger.style.borderRightWidth = compact ? 0 : 1;
-            _trigger.style.borderBottomWidth = compact ? 0 : 1;
-            _trigger.style.borderLeftWidth = compact ? 0 : 1;
+            _trigger.style.backgroundColor = compact ? AgentUi.Surface3 : AgentUi.Input;
+            _trigger.style.borderTopLeftRadius = compact ? 14 : 8;
+            _trigger.style.borderTopRightRadius = compact ? 14 : 8;
+            _trigger.style.borderBottomLeftRadius = compact ? 14 : 8;
+            _trigger.style.borderBottomRightRadius = compact ? 14 : 8;
+            _trigger.style.borderTopWidth = 1;
+            _trigger.style.borderRightWidth = 1;
+            _trigger.style.borderBottomWidth = 1;
+            _trigger.style.borderLeftWidth = 1;
             _trigger.style.borderTopColor = AgentUi.Border;
             _trigger.style.borderRightColor = AgentUi.Border;
             _trigger.style.borderBottomColor = AgentUi.Border;
             _trigger.style.borderLeftColor = AgentUi.Border;
-            _trigger.style.paddingLeft = compact ? 7 : 10;
-            _trigger.style.paddingRight = compact ? 6 : 9;
+            _trigger.style.paddingLeft = compact ? 8 : 8;
+            _trigger.style.paddingRight = compact ? 4 : 8;
             Add(_trigger);
 
             _valueLabel = new Label { pickingMode = PickingMode.Ignore };
             _valueLabel.style.flexGrow = 1;
+            _valueLabel.style.flexShrink = 1;
             _valueLabel.style.minWidth = 0;
             _valueLabel.style.whiteSpace = WhiteSpace.NoWrap;
             _valueLabel.style.overflow = Overflow.Hidden;
             _valueLabel.style.textOverflow = TextOverflow.Ellipsis;
             _valueLabel.style.color = AgentUi.Text;
+            AgentUi.ApplyTypography(_valueLabel, compact ? AgentTypography.Control : AgentTypography.Body);
             _trigger.Add(_valueLabel);
-            _arrow = new Label("⌄") { pickingMode = PickingMode.Ignore };
+            _arrow = new AgentIcon(AgentIconKind.ChevronDown, 16);
             _arrow.style.width = 16;
-            _arrow.style.marginLeft = 5;
-            _arrow.style.color = AgentUi.Muted;
-            _arrow.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _arrow.style.minWidth = 16;
+            _arrow.style.maxWidth = 16;
+            _arrow.style.flexGrow = 0;
+            _arrow.style.flexShrink = 0;
+            _arrow.style.marginLeft = 4;
+            _arrow.Tint = AgentUi.TextSecondary;
             _trigger.Add(_arrow);
 
             this.choices = choices.ToList();
@@ -454,17 +721,34 @@ namespace YuzeToolkit.UnityAgent
             _trigger.RegisterCallback<PointerDownEvent>(evt =>
             {
                 if (evt.button != 0 || !enabledInHierarchy) return;
+                _trigger.Focus();
                 ShowMenu();
                 evt.StopPropagation();
             });
             _trigger.RegisterCallback<KeyDownEvent>(evt =>
             {
-                if (!enabledInHierarchy || evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.Space) return;
-                ShowMenu();
-                evt.StopPropagation();
+                if (!enabledInHierarchy) return;
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.Space)
+                {
+                    ShowMenu();
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.UpArrow || evt.keyCode == KeyCode.DownArrow)
+                {
+                    SelectOffset(evt.keyCode == KeyCode.UpArrow ? -1 : 1);
+                    evt.StopPropagation();
+                }
             });
-            _trigger.RegisterCallback<FocusInEvent>(_ => SetBorder(AgentUi.Focus));
-            _trigger.RegisterCallback<FocusOutEvent>(_ => RefreshTrigger());
+            _trigger.RegisterCallback<FocusInEvent>(_ =>
+            {
+                _focused = true;
+                RefreshTrigger();
+            });
+            _trigger.RegisterCallback<FocusOutEvent>(_ =>
+            {
+                _focused = false;
+                RefreshTrigger();
+            });
         }
 
         public string label
@@ -482,12 +766,24 @@ namespace YuzeToolkit.UnityAgent
             get => _choices;
             set
             {
-                _choices = value?.Where(item => item != null).ToList() ?? new List<string>();
+                _choices = value?.Where(item => !string.IsNullOrWhiteSpace(item))
+                    .Distinct(StringComparer.Ordinal).ToList() ?? new List<string>();
                 RefreshValueLabel();
             }
         }
 
         public Func<string, string>? ValueFormatter { get; set; }
+        public Func<string, string>? OptionFormatter { get; set; }
+        public Func<string, string>? OptionDescriptionFormatter { get; set; }
+        public bool OpenUpward { get; set; }
+
+        public void SetMenuStatus(AgentChoiceMenuState state, string message = "", Action? retry = null)
+        {
+            _menuState = state;
+            _menuMessage = message ?? string.Empty;
+            _retry = retry;
+            RefreshValueLabel();
+        }
 
         public string value
         {
@@ -512,8 +808,9 @@ namespace YuzeToolkit.UnityAgent
 
         public void SetForeground(Color color)
         {
+            _foreground = color;
             _valueLabel.style.color = color;
-            _arrow.style.color = color;
+            _arrow.Tint = color;
         }
 
         public new void SetEnabled(bool value)
@@ -525,36 +822,74 @@ namespace YuzeToolkit.UnityAgent
 
         private void ShowMenu()
         {
-            var options = _choices.Select(choice => new AgentMenuItem(
-                string.IsNullOrEmpty(choice) ? "Default" : choice,
+            var options = new List<AgentMenuItem>();
+            if (_menuState != AgentChoiceMenuState.Ready)
+            {
+                var fallback = _menuState switch
+                {
+                    AgentChoiceMenuState.Loading => "Loading options...",
+                    AgentChoiceMenuState.Empty => "No options available",
+                    AgentChoiceMenuState.Error => "Options unavailable",
+                    AgentChoiceMenuState.Warning => "Using curated fallback",
+                    _ => "Options unavailable"
+                };
+                var text = string.IsNullOrWhiteSpace(_menuMessage) ? fallback : _menuMessage;
+                var actionable = _menuState is AgentChoiceMenuState.Error or AgentChoiceMenuState.Warning;
+                options.Add(new AgentMenuItem(text,
+                    actionable ? _retry : null,
+                    dangerous: _menuState == AgentChoiceMenuState.Error,
+                    disabled: !actionable || _retry == null,
+                    description: actionable && _retry != null ? "Refresh catalog" : string.Empty));
+            }
+            options.AddRange(_choices.Select(choice => new AgentMenuItem(
+                string.IsNullOrEmpty(choice) ? "Default" : OptionFormatter?.Invoke(choice) ?? choice,
                 () => value = choice,
-                string.Equals(choice, _value, StringComparison.Ordinal))).ToList();
+                string.Equals(choice, _value, StringComparison.Ordinal),
+                description: OptionDescriptionFormatter?.Invoke(choice) ?? string.Empty)));
             if (options.Count == 0)
                 options.Add(new AgentMenuItem("No options available", null, false, false, true));
-            AgentPopupMenu.Show(_trigger, options, Math.Max(180, Mathf.RoundToInt(worldBound.width)));
+            AgentPopupMenu.Show(_trigger, options, Math.Max(_compact ? 240 : 180,
+                Mathf.RoundToInt(worldBound.width)), OpenUpward);
         }
 
         private void RefreshValueLabel()
         {
+            if (_choices.Count == 0)
+            {
+                _valueLabel.text = _menuState == AgentChoiceMenuState.Loading ? "Loading..." : "No options";
+                _valueLabel.style.color = _menuState == AgentChoiceMenuState.Error
+                    ? AgentUi.Error
+                    : AgentUi.TextCaption;
+                return;
+            }
             var formatted = ValueFormatter?.Invoke(_value) ?? _value;
-            _valueLabel.text = string.IsNullOrEmpty(formatted) ? "Default" : formatted;
+            _valueLabel.text = string.IsNullOrEmpty(formatted) ? "Select…" : formatted;
+            _valueLabel.style.color = _foreground ?? AgentUi.Text;
+            _arrow.Kind = AgentIconKind.ChevronDown;
         }
 
         private void RefreshTrigger()
         {
             _trigger.style.backgroundColor = _hovered
-                ? (_compact ? AgentUi.Hover : AgentUi.InputHover)
-                : (_compact ? AgentUi.Transparent : AgentUi.Input);
-            SetBorder(_compact ? AgentUi.Transparent : AgentUi.Border);
+                ? (_compact ? AgentUi.Active : AgentUi.InputHover)
+                : (_compact ? AgentUi.Surface3 : AgentUi.Input);
+            SetBorder(_focused ? AgentUi.Focus : _compact ? AgentUi.Border1 : AgentUi.Border2);
         }
 
         private void SetBorder(Color color)
         {
-            if (_compact) return;
             _trigger.style.borderTopColor = color;
             _trigger.style.borderRightColor = color;
             _trigger.style.borderBottomColor = color;
             _trigger.style.borderLeftColor = color;
+        }
+
+        private void SelectOffset(int direction)
+        {
+            if (_choices.Count == 0) return;
+            var index = _choices.IndexOf(_value);
+            if (index < 0) index = direction > 0 ? -1 : 0;
+            value = _choices[(index + direction + _choices.Count) % _choices.Count];
         }
     }
 
@@ -759,7 +1094,7 @@ namespace YuzeToolkit.UnityAgent
     internal sealed class AgentMenuItem
     {
         public AgentMenuItem(string text, Action? action, bool selected = false, bool dangerous = false,
-            bool disabled = false, bool separatorBefore = false)
+            bool disabled = false, bool separatorBefore = false, string description = "")
         {
             Text = text;
             Action = action;
@@ -767,6 +1102,7 @@ namespace YuzeToolkit.UnityAgent
             Dangerous = dangerous;
             Disabled = disabled;
             SeparatorBefore = separatorBefore;
+            Description = description ?? string.Empty;
         }
 
         public string Text { get; }
@@ -775,19 +1111,31 @@ namespace YuzeToolkit.UnityAgent
         public bool Dangerous { get; }
         public bool Disabled { get; }
         public bool SeparatorBefore { get; }
+        public string Description { get; }
     }
 
     internal static class AgentPopupMenu
     {
         private const string LayerName = "unity-agent-owned-popup-layer";
 
-        public static void Show(VisualElement anchor, IReadOnlyList<AgentMenuItem> items, int minWidth = 220)
+        public static void Show(VisualElement anchor, IReadOnlyList<AgentMenuItem> items, int minWidth = 220,
+            bool openUpward = false)
         {
-            var root = anchor.panel?.visualTree;
+            var panelRoot = anchor.panel?.visualTree;
+            if (panelRoot == null) return;
+            var root = FindPopupRoot(anchor, panelRoot);
             if (root == null) return;
             root.Q<VisualElement>(LayerName)?.RemoveFromHierarchy();
+            AgentTooltip.HideAll(root);
+
+            var rows = items?.Where(item => item != null).ToList() ?? new List<AgentMenuItem>();
+            if (rows.Count == 0)
+                rows.Add(new AgentMenuItem("No options available", null, disabled: true));
 
             var layer = new VisualElement { name = LayerName, focusable = true };
+            var optionButtons = new List<AgentButton>();
+            var focusedIndex = 0;
+            EventCallback<GeometryChangedEvent>? geometryChanged = null;
             layer.style.position = Position.Absolute;
             layer.style.left = 0;
             layer.style.right = 0;
@@ -795,38 +1143,84 @@ namespace YuzeToolkit.UnityAgent
             layer.style.bottom = 0;
             layer.style.backgroundColor = AgentUi.Transparent;
             layer.style.backgroundImage = StyleKeyword.None;
+            void Close()
+            {
+                if (geometryChanged != null) root.UnregisterCallback(geometryChanged);
+                if (layer.parent != null) layer.RemoveFromHierarchy();
+            }
+            geometryChanged = _ => Close();
+            root.RegisterCallback(geometryChanged);
             layer.RegisterCallback<PointerDownEvent>(evt =>
             {
-                if (evt.target == layer) layer.RemoveFromHierarchy();
+                if (evt.target == layer) Close();
             });
+            layer.RegisterCallback<DetachFromPanelEvent>(_ => AgentTooltip.HideAll(root));
+            anchor.RegisterCallback<DetachFromPanelEvent>(_ => Close());
             layer.RegisterCallback<KeyDownEvent>(evt =>
             {
-                if (evt.keyCode != KeyCode.Escape) return;
-                layer.RemoveFromHierarchy();
+                if (evt.keyCode == KeyCode.Escape)
+                {
+                    Close();
+                    anchor.Focus();
+                    evt.StopPropagation();
+                    return;
+                }
+                if (optionButtons.Count == 0 || evt.keyCode != KeyCode.UpArrow && evt.keyCode != KeyCode.DownArrow)
+                    return;
+                focusedIndex = (focusedIndex + (evt.keyCode == KeyCode.UpArrow ? -1 : 1) + optionButtons.Count) %
+                               optionButtons.Count;
+                optionButtons[focusedIndex].Focus();
                 evt.StopPropagation();
             });
             root.Add(layer);
             layer.BringToFront();
 
-            var position = root.WorldToLocal(new Vector2(anchor.worldBound.xMin, anchor.worldBound.yMax + 5));
-            var menu = AgentUi.RoundedPanel(11);
+            var offset = openUpward ? 8f : 4f;
+            var position = root.WorldToLocal(new Vector2(anchor.worldBound.xMin, anchor.worldBound.yMax + offset));
+            var anchorTop = root.WorldToLocal(new Vector2(anchor.worldBound.xMin, anchor.worldBound.yMin - offset));
+            var menu = AgentUi.RoundedPanel(12);
             menu.style.position = Position.Absolute;
-            menu.style.left = Mathf.Max(8, position.x);
-            menu.style.top = Mathf.Max(8, position.y);
-            menu.style.width = Mathf.Max(minWidth, anchor.worldBound.width);
-            menu.style.maxHeight = 330;
-            menu.style.paddingTop = 6;
-            menu.style.paddingRight = 6;
-            menu.style.paddingBottom = 6;
-            menu.style.paddingLeft = 6;
+            var availableWidth = Mathf.Max(0, root.resolvedStyle.width - 32f);
+            menu.style.left = Mathf.Max(16, position.x);
+            var estimatedHeight = Mathf.Clamp(14f + rows.Sum(item =>
+                (string.IsNullOrWhiteSpace(item.Description) ? 40f : 58f) + (item.SeparatorBefore ? 11f : 0f)),
+                46f, openUpward ? 352f : 312f);
+            menu.style.top = openUpward
+                ? Mathf.Max(16, anchorTop.y - estimatedHeight)
+                : Mathf.Max(16, position.y);
+            var widthCap = openUpward ? 240f : 320f;
+            menu.style.width = Mathf.Min(Mathf.Min(Mathf.Max(minWidth, anchor.worldBound.width), widthCap),
+                availableWidth);
+            menu.style.minHeight = 46;
+            menu.style.maxHeight = Mathf.Min(openUpward ? 360 : 320,
+                Mathf.Max(46, root.resolvedStyle.height - 96));
+            menu.style.paddingTop = 4;
+            menu.style.paddingRight = 4;
+            menu.style.paddingBottom = 4;
+            menu.style.paddingLeft = 4;
             menu.style.backgroundColor = AgentUi.Popup;
-            AgentUi.SetBorder(menu, AgentUi.BorderStrong, 1);
+            AgentUi.SetBorder(menu, AgentUi.Border1, 1);
             layer.Add(menu);
 
-            var scroll = AgentUi.Scroll(ScrollViewMode.Vertical);
-            scroll.style.maxHeight = 316;
-            menu.Add(scroll);
-            foreach (var item in items)
+            var maxListHeight = Mathf.Min(openUpward ? 352 : 312,
+                Mathf.Max(38, root.resolvedStyle.height - 104));
+            var needsScroll = estimatedHeight > maxListHeight;
+            VisualElement list;
+            if (needsScroll)
+            {
+                var scroll = AgentUi.Scroll(ScrollViewMode.Vertical);
+                scroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+                scroll.style.height = maxListHeight;
+                list = scroll.contentContainer;
+                menu.Add(scroll);
+            }
+            else
+            {
+                list = new VisualElement();
+                list.style.flexShrink = 0;
+                menu.Add(list);
+            }
+            foreach (var item in rows)
             {
                 if (item.SeparatorBefore)
                 {
@@ -837,43 +1231,78 @@ namespace YuzeToolkit.UnityAgent
                     separator.style.marginBottom = 5;
                     separator.style.marginLeft = 5;
                     separator.style.backgroundColor = AgentUi.Border;
-                    scroll.Add(separator);
+                    list.Add(separator);
                 }
 
-                var marker = item.Selected ? "✓  " : "   ";
                 var action = item.Action;
-                var option = AgentUi.Button(marker + item.Text, item.Text, () =>
+                var option = AgentUi.Button(item.Text, item.Text, () =>
                 {
                     if (item.Disabled) return;
-                    layer.RemoveFromHierarchy();
+                    Close();
                     action?.Invoke();
-                }, 0, AgentUi.Transparent, item.Dangerous ? AgentUi.Error : AgentUi.Text);
-                option.style.height = 31;
+                }, 0, AgentUi.Transparent, item.Dangerous ? AgentUi.Error : AgentUi.Text,
+                    item.Selected ? AgentIconKind.Check : AgentIconKind.None);
+                option.style.minHeight = 38;
                 option.style.marginTop = 1;
                 option.style.marginRight = 0;
                 option.style.marginBottom = 1;
                 option.style.marginLeft = 0;
                 option.style.justifyContent = Justify.FlexStart;
+                option.SetDescription(item.Description);
+                if (!string.IsNullOrWhiteSpace(item.Description))
+                    option.style.height = 58;
                 option.style.opacity = item.Disabled ? 0.45f : 1f;
                 option.SetEnabled(!item.Disabled);
-                scroll.Add(option);
+                if (!item.Disabled)
+                {
+                    var navigationIndex = optionButtons.Count;
+                    option.RegisterCallback<FocusInEvent>(_ => focusedIndex = navigationIndex);
+                    optionButtons.Add(option);
+                }
+                list.Add(option);
             }
 
             layer.schedule.Execute(() =>
             {
                 var width = menu.resolvedStyle.width;
                 var height = menu.resolvedStyle.height;
-                var availableWidth = root.resolvedStyle.width;
+                var rootWidth = root.resolvedStyle.width;
                 var availableHeight = root.resolvedStyle.height;
-                if (!float.IsNaN(width) && position.x + width > availableWidth - 8)
-                    menu.style.left = Mathf.Max(8, availableWidth - width - 8);
-                if (!float.IsNaN(height) && position.y + height > availableHeight - 8)
+                if (!float.IsNaN(width) && position.x + width > rootWidth - 16)
+                    menu.style.left = Mathf.Max(16, rootWidth - width - 16);
+                var shouldOpenAbove = openUpward || !float.IsNaN(height) && position.y + height > availableHeight - 16;
+                if (shouldOpenAbove && !float.IsNaN(height))
                 {
-                    var above = root.WorldToLocal(new Vector2(anchor.worldBound.xMin, anchor.worldBound.yMin - 5)).y;
-                    menu.style.top = Mathf.Max(8, above - height);
+                    menu.style.top = Mathf.Max(16, anchorTop.y - height);
                 }
-                layer.Focus();
+                else if (!float.IsNaN(height))
+                {
+                    menu.style.top = Mathf.Clamp(position.y, 16, Mathf.Max(16, availableHeight - height - 16));
+                }
+                if (optionButtons.Count > 0)
+                {
+                    var selectedIndex = rows.Where(value => !value.Disabled).ToList()
+                        .FindIndex(value => value.Selected);
+                    focusedIndex = selectedIndex < 0 ? 0 : selectedIndex;
+                    optionButtons[focusedIndex].Focus();
+                }
+                else
+                {
+                    layer.Focus();
+                }
             });
+        }
+
+        private static VisualElement FindPopupRoot(VisualElement anchor, VisualElement panelRoot)
+        {
+            // Runtime Console owns its clipping/window contract. Keep menus inside that window instead of
+            // attaching them to the fullscreen panel where they can fall behind or outside the console.
+            for (var current = anchor; current != null && current != panelRoot; current = current.parent)
+            {
+                if (current.ClassListContains("yuzu-runtime-console"))
+                    return current;
+            }
+            return panelRoot;
         }
     }
 
@@ -921,7 +1350,7 @@ namespace YuzeToolkit.UnityAgent
                 var label = new Label { name = LayerName + "-text", pickingMode = PickingMode.Ignore };
                 label.style.color = AgentUi.Text;
                 label.style.whiteSpace = WhiteSpace.Normal;
-                label.style.fontSize = 11;
+                AgentUi.ApplyTypography(label, AgentTypography.Caption, false);
                 popup.Add(label);
                 root.Add(popup);
             }
@@ -949,6 +1378,12 @@ namespace YuzeToolkit.UnityAgent
         private static void Hide(VisualElement target)
         {
             var popup = target.panel?.visualTree.Q<VisualElement>(LayerName);
+            if (popup != null) popup.style.display = DisplayStyle.None;
+        }
+
+        internal static void HideAll(VisualElement root)
+        {
+            var popup = root.Q<VisualElement>(LayerName);
             if (popup != null) popup.style.display = DisplayStyle.None;
         }
     }

@@ -19,24 +19,29 @@ namespace YuzeToolkit.UnityAgent
     public sealed class AgentScrollContainer
     {
         private readonly Action _scrollToEnd;
+        private readonly Action<VisualElement> _scrollTo;
 
-        public AgentScrollContainer(VisualElement root, VisualElement content, Action scrollToEnd)
+        public AgentScrollContainer(VisualElement root, VisualElement content, Action scrollToEnd,
+            Action<VisualElement>? scrollTo = null)
         {
             Root = root ?? throw new ArgumentNullException(nameof(root));
             Content = content ?? throw new ArgumentNullException(nameof(content));
             _scrollToEnd = scrollToEnd ?? throw new ArgumentNullException(nameof(scrollToEnd));
+            _scrollTo = scrollTo ?? (_ => { });
         }
 
         public VisualElement Root { get; }
         public VisualElement Content { get; }
         public void ScrollToEnd() => _scrollToEnd();
+        public void ScrollTo(VisualElement element) => _scrollTo(element);
 
         public static AgentScrollContainer CreateDefault()
         {
             var scroll = AgentUi.Scroll(ScrollViewMode.Vertical);
             return new AgentScrollContainer(scroll, scroll.contentContainer,
                 () => scroll.schedule.Execute(() => scroll.scrollOffset =
-                    new Vector2(scroll.scrollOffset.x, scroll.contentContainer.layout.height)));
+                    new Vector2(scroll.scrollOffset.x, scroll.contentContainer.layout.height)),
+                element => scroll.schedule.Execute(() => scroll.ScrollTo(element)));
         }
     }
 
@@ -62,6 +67,7 @@ namespace YuzeToolkit.UnityAgent
             style.minHeight = 0;
             style.backgroundColor = AgentUi.Background;
             style.color = AgentUi.Text;
+            AgentUi.ApplyRoot(this);
 
             _pageHost = new VisualElement { name = "unity-agent-page-host" };
             _pageHost.style.flexGrow = 1;
@@ -127,19 +133,24 @@ namespace YuzeToolkit.UnityAgent
         private readonly VisualElement _messageList;
         private readonly AgentScrollContainer _messageScroll;
         private readonly AgentChoiceField _provider;
-        private readonly AgentEditableChoiceField _model;
+        private readonly AgentChoiceField _model;
+        private readonly AgentButton _refreshModels;
+        private readonly Label _modelSource;
         private readonly AgentChoiceField _effort;
         private readonly AgentChoiceField _permission;
         private readonly Label _status;
+        private readonly Label _conversationTitle;
         private readonly AgentTextField _composer;
         private readonly AgentButton _action;
         private readonly CancellationTokenSource _lifetime = new();
         private readonly Dictionary<string, IReadOnlyList<string>> _modelChoices = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _modelDisplayNames = new(StringComparer.Ordinal);
         private readonly HashSet<string> _discoveryStartedProfiles = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _profileIdsByLabel = new(StringComparer.Ordinal);
         private long _lastRevision = -1;
         private string _selectedSessionId = string.Empty;
         private string _shownSessionError = string.Empty;
+        private string _modelCatalogDetail = string.Empty;
         private bool _archiveCollapsed = true;
         private bool _initialized;
         private bool _disposed;
@@ -180,12 +191,14 @@ namespace YuzeToolkit.UnityAgent
             header.style.paddingRight = 20;
             header.style.borderBottomWidth = 1;
             header.style.borderBottomColor = AgentUi.Border;
-            var title = new Label("Agent conversation");
-            title.style.fontSize = 16;
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            header.Add(title);
+            _conversationTitle = new Label("Conversation") { style = { flexGrow = 1, minWidth = 0 } };
+            _conversationTitle.style.overflow = Overflow.Hidden;
+            _conversationTitle.style.textOverflow = TextOverflow.Ellipsis;
+            AgentUi.ApplyTypography(_conversationTitle, AgentTypography.PageTitle);
+            AgentTooltip.Attach(_conversationTitle, () => _conversationTitle.text);
+            header.Add(_conversationTitle);
             _status = new Label("Loading…");
-            _status.style.flexGrow = 1;
+            AgentUi.ApplyTypography(_status, AgentTypography.Caption);
             _status.style.unityTextAlign = TextAnchor.MiddleRight;
             _status.style.color = AgentUi.Muted;
             header.Add(_status);
@@ -198,21 +211,32 @@ namespace YuzeToolkit.UnityAgent
             _messageScroll.Content.style.paddingRight = 24;
             _messageScroll.Content.style.paddingTop = 18;
             _messageScroll.Content.style.paddingBottom = 16;
+            _messageScroll.Content.style.minHeight = new Length(100, LengthUnit.Percent);
             _messageList = _messageScroll.Content;
+            _messageList.style.flexGrow = 1;
             main.Add(_messageScroll.Root);
 
-            var composer = AgentUi.RoundedPanel(20);
+            var composerDock = new VisualElement();
+            composerDock.style.width = new Length(100, LengthUnit.Percent);
+            composerDock.style.maxWidth = 780;
+            composerDock.style.alignSelf = Align.Center;
+            composerDock.style.paddingLeft = 16;
+            composerDock.style.paddingRight = 16;
+            composerDock.style.paddingBottom = 8;
+            composerDock.style.flexShrink = 0;
+            main.Add(composerDock);
+
+            var composer = AgentUi.RoundedPanel(22);
+            composer.style.width = new Length(100, LengthUnit.Percent);
             composer.style.flexShrink = 0;
-            composer.style.marginLeft = 22;
-            composer.style.marginRight = 22;
-            composer.style.marginBottom = 18;
-            composer.style.paddingLeft = 12;
-            composer.style.paddingRight = 10;
+            composer.style.minHeight = 104;
+            composer.style.paddingLeft = 16;
+            composer.style.paddingRight = 12;
             composer.style.paddingTop = 10;
-            composer.style.paddingBottom = 10;
+            composer.style.paddingBottom = 6;
             composer.style.backgroundColor = AgentUi.Composer;
-            AgentUi.SetBorder(composer, AgentUi.BorderStrong, 1);
-            main.Add(composer);
+            AgentUi.SetBorder(composer, AgentUi.Border1, 1);
+            composerDock.Add(composer);
 
             _composer = new AgentTextField(surface: false)
             {
@@ -220,8 +244,9 @@ namespace YuzeToolkit.UnityAgent
                 Placeholder = "Describe a task or ask a question…"
             };
             AgentTooltip.Attach(_composer, "Describe a task. Press Ctrl/Cmd+Enter to send.");
-            _composer.style.minHeight = 52;
-            _composer.style.maxHeight = 180;
+            AgentUi.ApplyTypography(_composer, AgentTypography.Composer, false);
+            _composer.style.minHeight = 24;
+            _composer.style.maxHeight = 336;
             _composer.style.whiteSpace = WhiteSpace.Normal;
             _composer.RegisterValueChangedCallback(_ => RefreshActionButton());
             _composer.RegisterCallback<KeyDownEvent>(evt =>
@@ -234,20 +259,30 @@ namespace YuzeToolkit.UnityAgent
 
             var controls = new VisualElement();
             controls.style.flexDirection = FlexDirection.Row;
-            controls.style.flexWrap = Wrap.Wrap;
+            controls.style.flexWrap = Wrap.NoWrap;
             controls.style.alignItems = Align.Center;
-            controls.style.marginTop = 5;
+            controls.style.minWidth = 0;
+            controls.style.paddingTop = 2;
+            controls.style.paddingRight = 8;
+            controls.style.paddingBottom = 0;
+            controls.style.paddingLeft = 0;
+            controls.style.marginTop = 10;
             composer.Add(controls);
+
+            var attach = AgentUi.IconButton(AgentIconKind.Add, "Attachments are not available in this build.",
+                () => _showError("Attachments unavailable",
+                    "This build does not currently support attaching files to a conversation."),
+                28, AgentUi.Surface3, AgentUi.TextSecondary);
+            controls.Add(attach);
 
             _permission = AgentUi.CompactDropdown(new[]
             {
                 AgentPermissionMode.FullAccess.ToString(), AgentPermissionMode.ConfirmWrites.ToString()
             }, "Execution permission");
-            _permission.style.width = 128;
+            _permission.style.width = 146;
             _permission.ValueFormatter = value => value == AgentPermissionMode.FullAccess.ToString()
-                ? "◉  Full access"
-                : "◉  Confirm writes";
-            _permission.SetForeground(AgentUi.Accent);
+                ? "Full access"
+                : "Confirm writes";
             _permission.RegisterValueChangedCallback(_ => SaveConversationSelection());
             controls.Add(_permission);
             var spacer = new VisualElement();
@@ -255,7 +290,8 @@ namespace YuzeToolkit.UnityAgent
             spacer.style.minWidth = 14;
             controls.Add(spacer);
             _provider = AgentUi.CompactDropdown(Array.Empty<string>(), "API provider profile");
-            _provider.style.width = 154;
+            _provider.style.width = 148;
+            _provider.ValueFormatter = value => HumanProviderLabel(value);
             _provider.RegisterValueChangedCallback(_ =>
             {
                 RefreshCuratedModels();
@@ -263,26 +299,44 @@ namespace YuzeToolkit.UnityAgent
                 SaveConversationSelection();
             });
             controls.Add(_provider);
-            _model = new AgentEditableChoiceField(string.Empty,
-                "Choose a discovered model or type an exact model id.");
+            _model = AgentUi.CompactDropdown(Array.Empty<string>(),
+                "Choose a remotely discovered model or a curated offline fallback.");
             _model.style.width = 190;
             _model.style.flexGrow = 0;
-            _model.ValueCommitted += SaveConversationSelection;
-            _model.ChoiceSelected += value =>
+            _model.style.minWidth = 80;
+            _model.OpenUpward = true;
+            _model.RegisterValueChangedCallback(evt =>
             {
-                ApplyChatModelOptions(value);
+                ApplyChatModelOptions(evt.newValue);
                 SaveConversationSelection();
-            };
+            });
             controls.Add(_model);
+            _refreshModels = AgentUi.IconButton(AgentIconKind.Refresh, "Refresh the model catalog",
+                () => RunUiTask(RefreshModelsAsync), 28, AgentUi.Surface3, AgentUi.TextSecondary);
+            controls.Add(_refreshModels);
             _effort = AgentUi.CompactDropdown(new[] { "default", "none", "low", "medium", "high", "xhigh" },
                 "Reasoning effort");
-            _effort.style.width = 104;
+            _effort.style.width = 132;
+            _effort.style.minWidth = 132;
+            _effort.style.maxWidth = 132;
+            _effort.style.flexShrink = 0;
+            _effort.ValueFormatter = value => "Effort: " + HumanEffort(value);
+            _effort.OptionFormatter = HumanEffort;
             _effort.RegisterValueChangedCallback(_ => SaveConversationSelection());
             controls.Add(_effort);
-            _action = AgentUi.IconButton("↑", "Send", () => RunUiTask(ActAsync), 36,
+            _action = AgentUi.IconButton(AgentIconKind.Send, "Send", () => RunUiTask(ActAsync), 34,
                 AgentUi.Send, AgentUi.SendForeground);
             _action.style.marginLeft = 7;
             controls.Add(_action);
+
+            _modelSource = new Label("MODEL CATALOG · WAITING");
+            AgentUi.ApplyTypography(_modelSource, AgentTypography.Caption);
+            _modelSource.style.color = AgentUi.Muted;
+            _modelSource.style.marginBottom = 4;
+            _modelSource.style.marginLeft = 16;
+            AgentTooltip.Attach(_modelSource, () => _modelCatalogDetail);
+
+            RegisterCallback<GeometryChangedEvent>(evt => ApplyResponsiveLayout(sidebar, evt.newRect.width));
 
             RunUiTask(InitializeAsync);
         }
@@ -290,36 +344,68 @@ namespace YuzeToolkit.UnityAgent
         private VisualElement CreateSidebar()
         {
             var sidebar = new VisualElement { name = "unity-agent-sidebar" };
-            sidebar.style.width = 246;
-            sidebar.style.minWidth = 190;
+            sidebar.style.width = 280;
+            sidebar.style.minWidth = 264;
+            sidebar.style.maxWidth = 420;
             sidebar.style.flexShrink = 0;
-            sidebar.style.paddingLeft = 10;
-            sidebar.style.paddingRight = 10;
-            sidebar.style.paddingTop = 12;
-            sidebar.style.paddingBottom = 10;
+            sidebar.style.paddingLeft = 12;
+            sidebar.style.paddingRight = 12;
+            sidebar.style.paddingTop = 6;
+            sidebar.style.paddingBottom = 6;
             sidebar.style.borderRightWidth = 1;
             sidebar.style.borderRightColor = AgentUi.Border;
             sidebar.style.backgroundColor = AgentUi.Sidebar;
 
+            var brandRow = new VisualElement();
+            brandRow.style.flexDirection = FlexDirection.Row;
+            brandRow.style.alignItems = Align.Center;
+            brandRow.style.marginLeft = 3;
+            brandRow.name = "unity-agent-sidebar-logo";
+            brandRow.style.height = 60;
+            brandRow.style.paddingLeft = 4;
+            brandRow.style.paddingTop = 8;
+            brandRow.style.paddingBottom = 8;
+            brandRow.style.marginBottom = 8;
+            var mark = AgentUi.RoundedPanel(10);
+            mark.style.width = 34;
+            mark.style.height = 34;
+            mark.style.alignItems = Align.Center;
+            mark.style.justifyContent = Justify.Center;
+            mark.style.backgroundColor = AgentUi.Accent;
+            mark.Add(new AgentIcon(AgentIconKind.Chat, 18) { Tint = AgentUi.AccentForeground });
+            brandRow.Add(mark);
+            var brandCopy = new VisualElement { name = "unity-agent-sidebar-brand-copy", style = { marginLeft = 10 } };
             var brand = new Label("Unity Agent");
-            brand.style.fontSize = 19;
-            brand.style.unityFontStyleAndWeight = FontStyle.Bold;
-            brand.style.marginLeft = 5;
-            brand.style.marginBottom = 11;
-            sidebar.Add(brand);
-            var newConversation = AgentUi.Button("＋  New conversation", "Create an independent conversation.",
-                () => RunUiTask(CreateSessionAsync), 0, AgentUi.Panel);
+            AgentUi.ApplyTypography(brand, AgentTypography.PageTitle);
+            brandCopy.Add(brand);
+            var brandMeta = new Label("Agent workspace");
+            AgentUi.ApplyTypography(brandMeta, AgentTypography.Caption);
+            brandMeta.style.color = AgentUi.Muted;
+            brandCopy.Add(brandMeta);
+            brandRow.Add(brandCopy);
+            sidebar.Add(brandRow);
+            var newConversation = AgentUi.Button("New conversation", "Create an independent conversation.",
+                () => RunUiTask(CreateSessionAsync), 0, AgentUi.PanelRaised, icon: AgentIconKind.Add);
+            newConversation.name = "unity-agent-sidebar-new";
+            newConversation.style.height = 38;
+            newConversation.style.borderTopLeftRadius = 12;
+            newConversation.style.borderTopRightRadius = 12;
+            newConversation.style.borderBottomLeftRadius = 12;
+            newConversation.style.borderBottomRightRadius = 12;
             newConversation.style.flexGrow = 0;
             sidebar.Add(newConversation);
 
             var listScroll = AgentUi.Scroll(ScrollViewMode.Vertical);
+            listScroll.name = "unity-agent-sidebar-list";
             listScroll.style.flexGrow = 1;
             listScroll.style.minHeight = 0;
             listScroll.style.marginTop = 8;
             _sessionList = listScroll.contentContainer;
             sidebar.Add(listScroll);
 
-            var settings = AgentUi.Button("⚙  Settings", "Open API and Agent settings.", _openSettings, 0, AgentUi.Transparent);
+            var settings = AgentUi.Button("Settings", "Open provider and Agent settings.", _openSettings, 0,
+                AgentUi.Transparent, icon: AgentIconKind.Settings);
+            settings.name = "unity-agent-sidebar-settings";
             settings.style.flexGrow = 0;
             settings.style.unityTextAlign = TextAnchor.MiddleLeft;
             settings.style.marginTop = 8;
@@ -443,7 +529,9 @@ namespace YuzeToolkit.UnityAgent
                 ? parsed
                 : AgentPermissionMode.FullAccess;
             var effort = _effort.value == "default" ? string.Empty : _effort.value;
-            await _host.UpdateSessionAsync(sessionId, profile.Id, _model.Value, effort, permission,
+            if (string.IsNullOrWhiteSpace(_model.value))
+                throw new InvalidOperationException("Select a model before sending a message.");
+            await _host.UpdateSessionAsync(sessionId, profile.Id, _model.value, effort, permission,
                 _lifetime.Token);
         }
 
@@ -451,24 +539,33 @@ namespace YuzeToolkit.UnityAgent
         {
             var profile = ResolveSelectedProfile();
             if (profile == null) return;
+            _refreshModels.SetEnabled(false);
+            SetModelCatalogState("MODEL CATALOG · REFRESHING", AgentUi.Muted);
             try
             {
                 var discovery = await _host.DiscoverModelsAsync(profile, _lifetime.Token);
-                var models = discovery.Models.Select(value => value.Id).ToList();
+                var models = discovery.Models.Select(value => value.Id).Distinct(StringComparer.Ordinal).ToList();
+                foreach (var option in discovery.Models)
+                    _modelDisplayNames[option.Id] = string.IsNullOrWhiteSpace(option.DisplayName)
+                        ? option.Id
+                        : option.DisplayName;
                 _modelChoices[profile.Id] = models;
-                _model.SetChoices(models);
-                if (string.IsNullOrWhiteSpace(_model.Value) && models.Count > 0) _model.SetValue(models[0]);
-                ApplyChatModelOptions(_model.Value);
+                ApplyModelCatalog(profile, models, _model.value);
+                SetDiscoveryState(discovery);
                 if (!string.IsNullOrWhiteSpace(discovery.Warning))
                     _showError("Using curated model defaults", discovery.Warning);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _model.SetChoices(string.IsNullOrWhiteSpace(profile.Model)
-                    ? Array.Empty<string>()
-                    : new[] { profile.Model });
+                ApplyCuratedCatalog(profile, _model.value);
+                SetModelCatalogState("MODEL CATALOG · FALLBACK — REFRESH AVAILABLE", AgentUi.Warning,
+                    exception.Message);
                 _showError("Model discovery failed", exception.Message +
-                    "\n\nYou can still type an exact model id in the model field.");
+                    "\n\nA curated fallback is shown when this provider has one. Use Refresh to try again.");
+            }
+            finally
+            {
+                _refreshModels.SetEnabled(true);
             }
         }
 
@@ -481,18 +578,22 @@ namespace YuzeToolkit.UnityAgent
             {
                 var discovery = await _host.DiscoverModelsAsync(profile, _lifetime.Token);
                 var models = discovery.Models.Select(value => value.Id).ToList();
+                foreach (var option in discovery.Models)
+                    _modelDisplayNames[option.Id] = string.IsNullOrWhiteSpace(option.DisplayName)
+                        ? option.Id
+                        : option.DisplayName;
                 _modelChoices[profile.Id] = models;
                 var current = CurrentSession();
                 if (current?.ProviderProfileId == profile.Id)
                 {
-                    _model.SetChoices(models);
                     var selectedModel = !string.IsNullOrWhiteSpace(current.Model)
                         ? current.Model
                         : !string.IsNullOrWhiteSpace(profile.Model)
                             ? profile.Model
                             : models.FirstOrDefault() ?? string.Empty;
-                    _model.SetValueWithoutNotify(selectedModel);
-                    ApplyChatModelOptions(_model.Value);
+                    ApplyModelCatalog(profile, models, selectedModel);
+                    selectedModel = _model.value;
+                    SetDiscoveryState(discovery);
                     if (string.IsNullOrWhiteSpace(current.Model) && !string.IsNullOrWhiteSpace(selectedModel))
                     {
                         await _host.UpdateSessionAsync(current.Id, profile.Id, selectedModel,
@@ -501,16 +602,16 @@ namespace YuzeToolkit.UnityAgent
                                 : current.ReasoningEffort,
                             current.PermissionMode, _lifetime.Token);
                     }
-                    // Automatic discovery commonly falls back before the user has configured a
-                    // session key. Keep that expected state visible without interrupting every
-                    // newly opened page; explicit discovery still presents its warning modally.
-                    AgentTooltip.Attach(_model, discovery.Warning);
                 }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _showError("Model discovery failed", exception.Message +
-                    "\n\nYou can still type an exact model id in the model field.");
+                if (_selectedSessionId.Length > 0 && CurrentSession()?.ProviderProfileId == profile.Id)
+                {
+                    ApplyCuratedCatalog(profile, CurrentSession()?.Model ?? string.Empty);
+                    SetModelCatalogState("MODEL CATALOG · FALLBACK — REFRESH AVAILABLE", AgentUi.Warning,
+                        exception.Message);
+                }
             }
         }
 
@@ -525,9 +626,12 @@ namespace YuzeToolkit.UnityAgent
             if (current == null)
             {
                 _messageList.Clear();
+                _conversationTitle.text = "Conversation";
                 _status.text = "No conversation";
                 return;
             }
+
+            _conversationTitle.text = string.IsNullOrWhiteSpace(current.Title) ? "Conversation" : current.Title;
 
             var settings = _host.Settings;
             var labels = settings.ProviderProfiles.Select(ProfileLabel).ToList();
@@ -539,11 +643,12 @@ namespace YuzeToolkit.UnityAgent
             _provider.SetValueWithoutNotify(ProfileLabel(profile));
             if (!_discoveryStartedProfiles.Contains(profile.Id))
                 RunUiTask(() => DiscoverSessionModelsOnceAsync(profile.Id));
-            _model.SetChoices(_modelChoices.TryGetValue(profile.Id, out var discovered)
-                ? discovered
-                : AgentProviderCatalog.GetModels(profile.ProviderPresetId).Select(value => value.Id));
             var active = IsActive(current);
-            _model.SetValueWithoutNotify(string.IsNullOrWhiteSpace(current.Model) ? profile.Model : current.Model);
+            ApplyModelCatalog(profile,
+                _modelChoices.TryGetValue(profile.Id, out var discovered)
+                    ? discovered
+                    : AgentProviderCatalog.GetModels(profile.ProviderPresetId).Select(value => value.Id),
+                string.IsNullOrWhiteSpace(current.Model) ? profile.Model : current.Model);
             _effort.SetValueWithoutNotify(string.IsNullOrWhiteSpace(current.ReasoningEffort)
                 ? "default"
                 : current.ReasoningEffort);
@@ -559,6 +664,7 @@ namespace YuzeToolkit.UnityAgent
             _status.style.color = current.State == AgentSessionState.Failed ? AgentUi.Error : AgentUi.Muted;
             _provider.SetEnabled(!active);
             _model.SetEnabled(!active);
+            _refreshModels.SetEnabled(!active);
             _effort.SetEnabled(!active);
             _permission.SetEnabled(!active);
             RefreshActionButton();
@@ -606,9 +712,10 @@ namespace YuzeToolkit.UnityAgent
         private void AddSessionSection(string title, IEnumerable<AgentSessionDocument> source, string groupId, bool collapsed)
         {
             var sessions = source.OrderBy(value => value.SortOrder).ThenByDescending(value => value.UpdatedAtUtc).ToList();
+            if (sessions.Count == 0 && groupId == "__archive") return;
             if (sessions.Count == 0 && string.IsNullOrEmpty(groupId) && title != "CONVERSATIONS") return;
-            var header = new Label((collapsed ? "▸  " : "▾  ") + title);
-            header.style.fontSize = 10;
+            var header = new Label(title);
+            AgentUi.ApplyTypography(header, AgentTypography.Caption);
             header.style.unityFontStyleAndWeight = FontStyle.Bold;
             header.style.color = AgentUi.Muted;
             header.style.marginLeft = 6;
@@ -663,23 +770,36 @@ namespace YuzeToolkit.UnityAgent
             var label = new Label(session.Title);
             label.style.flexGrow = 1;
             label.style.minWidth = 0;
-            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.whiteSpace = WhiteSpace.NoWrap;
+            label.style.overflow = Overflow.Hidden;
+            label.style.textOverflow = TextOverflow.Ellipsis;
             row.Add(label);
-            var pin = AgentUi.IconButton(session.IsPinned ? "◆" : "◇", session.IsPinned ? "Unpin" : "Pin",
+            var actions = new VisualElement();
+            actions.style.position = Position.Absolute;
+            actions.style.right = 4;
+            actions.style.top = 4;
+            actions.style.flexDirection = FlexDirection.Row;
+            actions.style.alignItems = Align.Center;
+            actions.style.backgroundColor = session.Id == _selectedSessionId ? AgentUi.Selected : AgentUi.Sidebar;
+            actions.style.borderTopLeftRadius = 8;
+            actions.style.borderTopRightRadius = 8;
+            actions.style.borderBottomLeftRadius = 8;
+            actions.style.borderBottomRightRadius = 8;
+            actions.style.opacity = 0.18f;
+            item.Add(actions);
+            var pin = AgentUi.IconButton(AgentIconKind.Pin, session.IsPinned ? "Unpin" : "Pin",
                 () => RunUiTask(() => UpdateOrganizationAsync(session, !session.IsPinned,
                     session.IsArchived, session.GroupId)), 24, AgentUi.Transparent);
-            pin.style.fontSize = 10;
             pin.SetEnabled(!session.IsArchived);
-            row.Add(pin);
-            var archive = AgentUi.IconButton(session.IsArchived ? "↩" : "▾",
+            actions.Add(pin);
+            var archive = AgentUi.IconButton(session.IsArchived ? AgentIconKind.Restore : AgentIconKind.Archive,
                 session.IsArchived ? "Restore from archive" : "Archive",
                 () => RunUiTask(() => UpdateOrganizationAsync(session,
                     session.IsArchived && session.IsPinned, !session.IsArchived, string.Empty)), 24,
                 AgentUi.Transparent);
-            archive.style.fontSize = 11;
-            row.Add(archive);
+            actions.Add(archive);
             var meta = new Label(SessionMeta(session));
-            meta.style.fontSize = 9;
+            AgentUi.ApplyTypography(meta, AgentTypography.Caption);
             meta.style.color = AgentUi.Muted;
             meta.style.marginTop = 3;
             item.Add(meta);
@@ -698,14 +818,22 @@ namespace YuzeToolkit.UnityAgent
             });
             item.RegisterCallback<PointerEnterEvent>(_ =>
             {
+                actions.style.opacity = 1;
                 if (session.Id != _selectedSessionId) item.style.backgroundColor = AgentUi.Hover;
             });
             item.RegisterCallback<PointerLeaveEvent>(_ =>
             {
+                if (!IsFocusedWithin(actions)) actions.style.opacity = 0.18f;
                 item.style.backgroundColor = session.Id == _selectedSessionId
                     ? AgentUi.Selected
                     : AgentUi.Transparent;
             });
+            actions.RegisterCallback<FocusInEvent>(_ => actions.style.opacity = 1);
+            actions.RegisterCallback<FocusOutEvent>(_ =>
+                actions.schedule.Execute(() =>
+                {
+                    if (!IsFocusedWithin(actions)) actions.style.opacity = 0.18f;
+                }));
             item.userData = new AgentSessionDropTarget(
                 session.IsPinned || session.IsArchived ? string.Empty : session.GroupId,
                 session.IsArchived, session.IsPinned && !session.IsArchived,
@@ -713,6 +841,17 @@ namespace YuzeToolkit.UnityAgent
             item.AddManipulator(new AgentSessionDragManipulator(item, target =>
                 RunUiTask(() => MoveSessionAsync(session, target))));
             return item;
+        }
+
+        private static bool IsFocusedWithin(VisualElement root)
+        {
+            var focused = root.panel?.focusController?.focusedElement as VisualElement;
+            while (focused != null)
+            {
+                if (focused == root) return true;
+                focused = focused.parent;
+            }
+            return false;
         }
 
         private void ShowSessionMenu(AgentSessionDocument session, VisualElement anchor)
@@ -807,7 +946,7 @@ namespace YuzeToolkit.UnityAgent
             var current = CurrentSession();
             var active = current != null && IsActive(current);
             var hasText = !string.IsNullOrWhiteSpace(_composer.value);
-            _action.text = hasText || !active ? "↑" : "■";
+            _action.SetIcon(hasText || !active ? AgentIconKind.Send : AgentIconKind.Stop);
             _action.HelpText = hasText
                 ? active ? "Stop the active turn and send this message" : "Send message"
                 : active ? "Stop the active turn" : "Type a message to send";
@@ -831,11 +970,11 @@ namespace YuzeToolkit.UnityAgent
             var profile = ResolveSelectedProfile();
             if (profile == null) return;
             var models = AgentProviderCatalog.GetModels(profile.ProviderPresetId).Select(value => value.Id).ToList();
-            _model.SetChoices(models);
-            _model.SetValueWithoutNotify(!string.IsNullOrWhiteSpace(profile.Model)
-                ? profile.Model
-                : models.FirstOrDefault() ?? string.Empty);
-            ApplyChatModelOptions(_model.Value);
+            ApplyModelCatalog(profile, models, profile.Model);
+            SetModelCatalogState(models.Count == 0
+                    ? "MODEL CATALOG · UNAVAILABLE — OPEN SETTINGS"
+                    : "MODEL CATALOG · CURATED FALLBACK — REFRESH AVAILABLE",
+                models.Count == 0 ? AgentUi.Error : AgentUi.Warning);
             var effort = string.IsNullOrWhiteSpace(profile.ReasoningEffort) ? "default" : profile.ReasoningEffort;
             if (!_effort.choices.Contains(effort))
             {
@@ -844,6 +983,123 @@ namespace YuzeToolkit.UnityAgent
                 _effort.choices = choices;
             }
             _effort.SetValueWithoutNotify(effort);
+        }
+
+        private void ApplyModelCatalog(AgentProviderProfile profile, IEnumerable<string> source, string preferred)
+        {
+            var choices = source.Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.Ordinal).ToList();
+            _model.OptionFormatter = id =>
+            {
+                if (_modelDisplayNames.TryGetValue(id, out var remoteName)) return remoteName;
+                return AgentProviderCatalog.GetModel(profile.ProviderPresetId, id)?.DisplayName ?? id;
+            };
+            _model.ValueFormatter = _model.OptionFormatter;
+            _model.OptionDescriptionFormatter = id =>
+                string.Equals(_model.OptionFormatter(id), id, StringComparison.Ordinal) ? string.Empty : id;
+            _model.choices = choices;
+            var selected = choices.Contains(preferred)
+                ? preferred
+                : choices.Contains(profile.Model)
+                    ? profile.Model
+                    : choices.FirstOrDefault() ?? string.Empty;
+            _model.SetValueWithoutNotify(selected);
+            _model.SetEnabled(choices.Count > 0 && !(CurrentSession() is { } session && IsActive(session)));
+            ApplyChatModelOptions(selected);
+        }
+
+        private void ApplyCuratedCatalog(AgentProviderProfile profile, string preferred)
+        {
+            ApplyModelCatalog(profile,
+                AgentProviderCatalog.GetModels(profile.ProviderPresetId).Select(value => value.Id), preferred);
+        }
+
+        private void SetDiscoveryState(AgentModelDiscoveryResult discovery)
+        {
+            if (discovery.Models.Count == 0)
+            {
+                SetModelCatalogState("MODEL CATALOG · NO MODELS — OPEN SETTINGS OR REFRESH", AgentUi.Error,
+                    discovery.Warning);
+                return;
+            }
+            var fallback = discovery.Source != AgentModelDiscoverySource.Remote;
+            SetModelCatalogState(fallback
+                    ? "MODEL CATALOG · CURATED FALLBACK — REFRESH AVAILABLE"
+                    : $"MODEL CATALOG · REMOTE · {discovery.Models.Count}",
+                fallback ? AgentUi.Warning : AgentUi.Success, discovery.Warning);
+        }
+
+        private void SetModelCatalogState(string text, Color color, string tooltip = "")
+        {
+            _modelSource.text = text;
+            _modelSource.style.color = color;
+            _modelCatalogDetail = tooltip;
+            var state = CatalogMenuState(text);
+            _model.SetMenuStatus(state, HumanCatalogMessage(state),
+                () => RunUiTask(RefreshModelsAsync));
+        }
+
+        private static string HumanCatalogMessage(AgentChoiceMenuState state) => state switch
+        {
+            AgentChoiceMenuState.Loading => "Loading the model catalog...",
+            AgentChoiceMenuState.Empty => "No models are available. Check Settings, then refresh.",
+            AgentChoiceMenuState.Error => "No models are available. Check Settings, then refresh.",
+            AgentChoiceMenuState.Warning => "Using curated fallback models.",
+            _ => string.Empty
+        };
+
+        private static AgentChoiceMenuState CatalogMenuState(string text)
+        {
+            if (text.IndexOf("WAIT", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("REFRESHING", StringComparison.OrdinalIgnoreCase) >= 0)
+                return AgentChoiceMenuState.Loading;
+            if (text.IndexOf("NO MODELS", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("UNAVAILABLE", StringComparison.OrdinalIgnoreCase) >= 0)
+                return AgentChoiceMenuState.Error;
+            return text.IndexOf("FALLBACK", StringComparison.OrdinalIgnoreCase) >= 0
+                ? AgentChoiceMenuState.Warning
+                : AgentChoiceMenuState.Ready;
+        }
+
+        private void ApplyResponsiveLayout(VisualElement sidebar, float width)
+        {
+            var rail = width < 1024f;
+            style.flexDirection = FlexDirection.Row;
+            sidebar.style.width = rail ? 56 : 280;
+            sidebar.style.minWidth = rail ? 56 : 264;
+            sidebar.style.maxWidth = rail ? 56 : 420;
+            sidebar.style.height = StyleKeyword.Auto;
+            sidebar.style.paddingLeft = rail ? 10 : 12;
+            sidebar.style.paddingRight = rail ? 10 : 12;
+            sidebar.style.paddingTop = rail ? 18 : 6;
+            sidebar.style.borderRightWidth = 1;
+            sidebar.style.borderBottomWidth = 0;
+            var brandCopy = sidebar.Q<VisualElement>("unity-agent-sidebar-brand-copy");
+            if (brandCopy != null) brandCopy.style.display = rail ? DisplayStyle.None : DisplayStyle.Flex;
+            var list = sidebar.Q<ScrollView>("unity-agent-sidebar-list");
+            if (list != null) list.style.display = rail ? DisplayStyle.None : DisplayStyle.Flex;
+            var logo = sidebar.Q<VisualElement>("unity-agent-sidebar-logo");
+            if (logo != null)
+            {
+                logo.style.height = rail ? 36 : 60;
+                logo.style.paddingLeft = rail ? 0 : 4;
+                logo.style.paddingTop = rail ? 0 : 8;
+                logo.style.paddingBottom = rail ? 0 : 8;
+            }
+            var newConversation = sidebar.Q<AgentButton>("unity-agent-sidebar-new");
+            if (newConversation != null)
+            {
+                newConversation.ShowLabel(!rail);
+                newConversation.style.width = rail ? 36 : StyleKeyword.Auto;
+                newConversation.style.height = rail ? 36 : 38;
+            }
+            var settings = sidebar.Q<AgentButton>("unity-agent-sidebar-settings");
+            if (settings != null)
+            {
+                settings.ShowLabel(!rail);
+                settings.style.width = rail ? 36 : StyleKeyword.Auto;
+                settings.style.height = rail ? 36 : 38;
+            }
         }
 
         private AgentProviderProfile? ResolveSelectedProfile()
@@ -869,17 +1125,19 @@ namespace YuzeToolkit.UnityAgent
         private static VisualElement CreateEmptyState()
         {
             var empty = new VisualElement();
+            empty.style.flexGrow = 1;
             empty.style.alignItems = Align.Center;
-            empty.style.marginTop = 72;
+            empty.style.justifyContent = Justify.Center;
+            empty.style.minHeight = 160;
             var title = new Label("What would you like to build?");
-            title.style.fontSize = 21;
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            AgentUi.ApplyTypography(title, AgentTypography.EmptyHero);
             empty.Add(title);
             var hint = new Label("The workspace is bound to this Unity project. Agent instructions and tools are ready.");
             hint.style.color = AgentUi.Muted;
             hint.style.whiteSpace = WhiteSpace.Normal;
-            hint.style.unityTextAlign = TextAnchor.MiddleCenter;
             hint.style.marginTop = 7;
+            AgentUi.ApplyTypography(hint, AgentTypography.Caption, false);
+            hint.style.unityTextAlign = TextAnchor.MiddleCenter;
             empty.Add(hint);
             return empty;
         }
@@ -887,7 +1145,7 @@ namespace YuzeToolkit.UnityAgent
         private static VisualElement CreateMessage(AgentMessage message)
         {
             var box = new VisualElement();
-            box.style.maxWidth = new Length(86, LengthUnit.Percent);
+            box.style.maxWidth = new Length(88, LengthUnit.Percent);
             box.style.alignSelf = message.Role == AgentMessageRole.User ? Align.FlexEnd : Align.FlexStart;
             box.style.flexShrink = 0;
             box.style.marginBottom = 11;
@@ -895,22 +1153,30 @@ namespace YuzeToolkit.UnityAgent
             box.style.paddingRight = 12;
             box.style.paddingTop = 9;
             box.style.paddingBottom = 9;
-            box.style.borderTopLeftRadius = 9;
-            box.style.borderTopRightRadius = 9;
-            box.style.borderBottomLeftRadius = 9;
-            box.style.borderBottomRightRadius = 9;
+            box.style.borderTopLeftRadius = 12;
+            box.style.borderTopRightRadius = 12;
+            box.style.borderBottomLeftRadius = 12;
+            box.style.borderBottomRightRadius = 12;
             box.style.backgroundColor = message.Role switch
             {
                 AgentMessageRole.User => AgentUi.UserMessage,
                 AgentMessageRole.Tool => message.IsError ? AgentUi.ErrorPanel : AgentUi.ToolMessage,
                 _ => AgentUi.AssistantMessage
             };
+            box.style.borderLeftWidth = 2;
+            box.style.borderLeftColor = message.Role switch
+            {
+                AgentMessageRole.User => AgentUi.Accent,
+                AgentMessageRole.Tool => message.IsError ? AgentUi.Error : AgentUi.Success,
+                _ => AgentUi.BorderStrong
+            };
             var role = new Label(message.Role == AgentMessageRole.Tool
                 ? "TOOL · " + message.ToolName
                 : message.Role.ToString().ToUpperInvariant());
-            role.style.fontSize = 10;
+            AgentUi.ApplyTypography(role, AgentTypography.Caption);
             role.style.unityFontStyleAndWeight = FontStyle.Bold;
-            role.style.color = AgentUi.Muted;
+            role.style.letterSpacing = 0.7f;
+            role.style.color = message.Role == AgentMessageRole.User ? AgentUi.Accent : AgentUi.Muted;
             box.Add(role);
             if (!string.IsNullOrEmpty(message.Text))
             {
@@ -921,7 +1187,7 @@ namespace YuzeToolkit.UnityAgent
             }
             foreach (var call in message.ToolCalls)
             {
-                var tool = new Label("↳ " + call.Name + "\n" + call.ArgumentsJson);
+                var tool = new Label("Tool call: " + call.Name + "\n" + call.ArgumentsJson);
                 tool.style.whiteSpace = WhiteSpace.Normal;
                 tool.style.color = AgentUi.Muted;
                 tool.style.marginTop = 6;
@@ -973,6 +1239,19 @@ namespace YuzeToolkit.UnityAgent
         private static string ProfileLabel(AgentProviderProfile profile) =>
             profile.Name + "  ·  " + profile.Protocol + "  ·  " + ShortId(profile.Id);
 
+        private static string HumanProviderLabel(string label)
+        {
+            if (string.IsNullOrWhiteSpace(label)) return "Provider";
+            var separator = label.IndexOf("  ·  ", StringComparison.Ordinal);
+            return separator < 0 ? label : label.Substring(0, separator);
+        }
+
+        private static string HumanEffort(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value == "default") return "Default";
+            return char.ToUpperInvariant(value[0]) + value.Substring(1);
+        }
+
         private static string ShortId(string id) => id.Length <= 6 ? id : id.Substring(0, 6);
     }
 
@@ -988,11 +1267,15 @@ namespace YuzeToolkit.UnityAgent
         private readonly AgentTextField _name;
         private readonly AgentChoiceField _protocol;
         private readonly AgentTextField _baseUrl;
-        private readonly AgentEditableChoiceField _model;
+        private readonly AgentChoiceField _model;
+        private readonly AgentButton _refreshModels;
+        private readonly Label _modelSource;
         private readonly AgentChoiceField _effort;
         private readonly AgentIntegerField _maxTokens;
         private readonly AgentTextField _secretEnvironment;
-        private readonly AgentTextField _sessionSecret;
+        private readonly AgentTextField _localSecret;
+        private readonly VisualElement _localSecretActions;
+        private readonly Label _localSecretStatus;
         private readonly VisualElement _codexBlock;
         private readonly Label _codexAccount;
         private readonly AgentChoiceField _permission;
@@ -1006,6 +1289,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly CancellationTokenSource _lifetime = new();
         private AgentSettingsDocument _editing = AgentSettingsDocument.CreateDefault();
         private string _selectedProfileId = string.Empty;
+        private string _modelCatalogDetail = string.Empty;
         private long _lastRevision = -1;
         private readonly HashSet<string> _discoveryStartedProfiles = new(StringComparer.Ordinal);
         private bool _initialized;
@@ -1025,26 +1309,22 @@ namespace YuzeToolkit.UnityAgent
             style.flexGrow = 1;
             style.minWidth = 0;
             style.minHeight = 0;
+            AgentUi.ApplyRoot(this);
 
             var header = new VisualElement();
-            header.style.height = 58;
+            header.style.height = 54;
             header.style.flexShrink = 0;
             header.style.flexDirection = FlexDirection.Row;
             header.style.alignItems = Align.Center;
-            header.style.paddingLeft = 16;
-            header.style.paddingRight = 18;
+            header.style.paddingLeft = 18;
+            header.style.paddingRight = 20;
             header.style.borderBottomWidth = 1;
             header.style.borderBottomColor = AgentUi.Border;
-            header.Add(AgentUi.IconButton("‹", "Back to conversations", _back, 34));
-            var heading = new VisualElement { style = { marginLeft = 8, flexGrow = 1 } };
-            var title = new Label("Settings");
-            title.style.fontSize = 19;
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            header.Add(AgentUi.IconButton(AgentIconKind.Back, "Back to conversations", _back, 28));
+            var heading = new VisualElement { style = { marginLeft = 10, flexGrow = 1, minWidth = 0 } };
+            var title = new Label("Workspace settings");
+            AgentUi.ApplyTypography(title, AgentTypography.PageTitle);
             heading.Add(title);
-            var subtitle = new Label("Providers, instructions, history, and conversation organization");
-            subtitle.style.fontSize = 10;
-            subtitle.style.color = AgentUi.Muted;
-            heading.Add(subtitle);
             header.Add(heading);
             _status = new Label("Loading…");
             _status.style.color = AgentUi.Muted;
@@ -1052,30 +1332,110 @@ namespace YuzeToolkit.UnityAgent
             header.Add(_status);
             header.Add(AgentUi.Button("Save", "Persist all settings.", () => RunUiTask(SaveAsync), 78, AgentUi.Accent));
             Add(header);
+            RegisterCallback<GeometryChangedEvent>(evt =>
+            {
+                var narrow = evt.newRect.width < 620f;
+                _status.style.display = narrow ? DisplayStyle.None : DisplayStyle.Flex;
+                header.style.paddingLeft = narrow ? 10 : 18;
+                header.style.paddingRight = narrow ? 10 : 20;
+            });
+
+            var workspace = new VisualElement { name = "unity-agent-settings-workspace" };
+            workspace.style.flexGrow = 1;
+            workspace.style.minWidth = 0;
+            workspace.style.minHeight = 0;
+            workspace.style.flexDirection = FlexDirection.Row;
+            workspace.style.width = new Length(100, LengthUnit.Percent);
+            workspace.style.maxWidth = 800;
+            workspace.style.maxHeight = 800;
+            workspace.style.marginTop = 24;
+            workspace.style.marginRight = 24;
+            workspace.style.marginBottom = 24;
+            workspace.style.marginLeft = 24;
+            workspace.style.alignSelf = Align.Center;
+            workspace.style.backgroundColor = AgentUi.Surface1;
+            workspace.style.borderTopLeftRadius = 24;
+            workspace.style.borderTopRightRadius = 24;
+            workspace.style.borderBottomLeftRadius = 24;
+            workspace.style.borderBottomRightRadius = 24;
+            workspace.style.overflow = Overflow.Hidden;
+            AgentUi.SetBorder(workspace, AgentUi.Border1, 1);
+            Add(workspace);
+
+            var navigation = new VisualElement { name = "unity-agent-settings-navigation" };
+            navigation.style.width = 188;
+            navigation.style.minWidth = 188;
+            navigation.style.flexShrink = 0;
+            navigation.style.paddingTop = 12;
+            navigation.style.paddingRight = 8;
+            navigation.style.paddingBottom = 12;
+            navigation.style.paddingLeft = 8;
+            navigation.style.borderRightWidth = 1;
+            navigation.style.borderRightColor = AgentUi.Border1;
+            workspace.Add(navigation);
+            RegisterCallback<GeometryChangedEvent>(evt =>
+            {
+                var compact = evt.newRect.width < 1024f;
+                workspace.style.width = Mathf.Min(960f, Mathf.Max(0, evt.newRect.width - 48f));
+                workspace.style.maxHeight = Mathf.Max(0, evt.newRect.height - 54f - 48f);
+                workspace.style.flexDirection = compact ? FlexDirection.Column : FlexDirection.Row;
+                navigation.style.width = compact ? new Length(100, LengthUnit.Percent) : 188;
+                navigation.style.minWidth = compact ? 0 : 188;
+                navigation.style.height = compact ? 52 : StyleKeyword.Auto;
+                navigation.style.minHeight = compact ? 52 : StyleKeyword.Auto;
+                navigation.style.flexDirection = compact ? FlexDirection.Row : FlexDirection.Column;
+                navigation.style.paddingTop = compact ? 8 : 12;
+                navigation.style.paddingRight = 8;
+                navigation.style.paddingBottom = compact ? 4 : 12;
+                navigation.style.paddingLeft = 8;
+                navigation.style.borderRightWidth = compact ? 0 : 1;
+                navigation.style.borderBottomWidth = compact ? 1 : 0;
+                navigation.style.borderBottomColor = AgentUi.Border1;
+                foreach (var cell in navigation.Children().OfType<AgentButton>())
+                {
+                    cell.ShowLabel(true);
+                    cell.style.width = compact ? StyleKeyword.Auto : StyleKeyword.Auto;
+                    cell.style.flexGrow = compact ? 1 : 0;
+                    cell.style.marginRight = compact ? 4 : 0;
+                    cell.style.justifyContent = compact ? Justify.Center : Justify.FlexStart;
+                }
+            });
 
             _scroll = scrollContainer ?? AgentScrollContainer.CreateDefault();
             _scroll.Root.style.flexGrow = 1;
             _scroll.Root.style.minHeight = 0;
-            _scroll.Content.style.paddingLeft = 22;
-            _scroll.Content.style.paddingRight = 22;
-            _scroll.Content.style.paddingTop = 15;
-            _scroll.Content.style.paddingBottom = 28;
+            _scroll.Root.style.marginRight = 4;
+            _scroll.Content.style.paddingLeft = 24;
+            _scroll.Content.style.paddingRight = 24;
+            _scroll.Content.style.paddingTop = 16;
+            _scroll.Content.style.paddingBottom = 24;
             _scroll.Content.style.minWidth = 0;
             _scroll.Content.style.maxWidth = new Length(100, LengthUnit.Percent);
-            Add(_scroll.Root);
+            _scroll.Content.style.alignItems = Align.Stretch;
+            workspace.Add(_scroll.Root);
 
-            var providerCard = AgentUi.Card("API providers", "Select a preset, discover models, or enter a compatible endpoint.");
+            var providerCard = AgentUi.Card("Provider studio",
+                "Configure endpoints and select only verified remote models or maintained offline fallbacks.");
+            FlattenSettingsCard(providerCard);
+            providerCard.style.maxWidth = StyleKeyword.None;
+            providerCard.style.alignSelf = Align.Stretch;
             _scroll.Content.Add(providerCard);
             var profileBar = AgentUi.WrapRow();
             providerCard.Add(profileBar);
             _profiles = AgentUi.Dropdown("Profile", Array.Empty<string>());
             _profiles.style.minWidth = 240;
             _profiles.style.flexGrow = 1;
+            _profiles.ValueFormatter = HumanProfileLabel;
+            _profiles.OptionFormatter = HumanProfileLabel;
+            _profiles.OptionDescriptionFormatter = label => label;
             _profiles.RegisterValueChangedCallback(_ => SelectProfileByLabel(_profiles.value));
             profileBar.Add(_profiles);
-            profileBar.Add(AgentUi.Button("＋ Add", "Add a provider profile.", AddProfile, 76));
-            profileBar.Add(AgentUi.Button("Remove", "Remove the selected provider profile.", RemoveProfile, 78));
+            profileBar.Add(AgentUi.Button("Add", "Add a provider profile.", AddProfile, 76,
+                icon: AgentIconKind.Add));
+            profileBar.Add(AgentUi.Button("Remove", "Remove the selected provider profile.", RemoveProfile, 112,
+                AgentUi.Danger, AgentUi.Text, AgentIconKind.Delete));
 
+            providerCard.Add(CreateSettingsGroupLabel("Endpoint"));
             _providerPreset = AgentUi.Dropdown("Provider preset",
                 new[] { "Custom" }.Concat(AgentProviderCatalog.Providers.Select(PresetLabel)));
             AgentTooltip.Attach(_providerPreset,
@@ -1089,33 +1449,58 @@ namespace YuzeToolkit.UnityAgent
             providerCard.Add(_protocol);
             _baseUrl = AgentUi.Field("Base URL", string.Empty, "API root URL, or the local Codex executable.");
             providerCard.Add(_baseUrl);
-            _model = new AgentEditableChoiceField("Default model", "Discover a model or type the exact id.");
+            providerCard.Add(CreateSettingsGroupLabel("Model"));
+            _model = AgentUi.Dropdown("Default model", Array.Empty<string>());
             _model.style.minWidth = 0;
-            _model.ChoiceSelected += value =>
+            _model.RegisterValueChangedCallback(evt =>
             {
                 var profile = SelectedProfile();
                 var preset = AgentProviderCatalog.FindProvider(profile);
                 if (preset == null) return;
-                ApplyModelPreset(AgentProviderCatalog.GetModel(preset.Id, value));
-            };
+                ApplyModelPreset(AgentProviderCatalog.GetModel(preset.Id, evt.newValue));
+            });
             providerCard.Add(_model);
+            var modelCatalogRow = AgentUi.WrapRow();
+            modelCatalogRow.style.marginTop = 4;
+            _modelSource = new Label("MODEL CATALOG · WAITING");
+            _modelSource.style.flexGrow = 1;
+            _modelSource.style.flexShrink = 1;
+            _modelSource.style.minWidth = 0;
+            AgentUi.ApplyTypography(_modelSource, AgentTypography.Caption);
+            _modelSource.style.color = AgentUi.TextSecondary;
+            AgentTooltip.Attach(_modelSource, () => _modelCatalogDetail);
+            modelCatalogRow.Add(_modelSource);
+            _refreshModels = AgentUi.Button("Refresh", "Refresh this provider's model catalog.",
+                () => RunUiTask(DiscoverModelsAsync), 96, AgentUi.Surface3, AgentUi.TextSecondary,
+                AgentIconKind.Refresh);
+            _refreshModels.style.flexShrink = 0;
+            modelCatalogRow.Add(_refreshModels);
+            providerCard.Add(modelCatalogRow);
             _effort = AgentUi.Dropdown("Default reasoning effort",
                 new[] { "default", "none", "low", "medium", "high", "xhigh" });
             providerCard.Add(_effort);
             _maxTokens = new AgentIntegerField("Max output tokens") { value = 4096 };
             providerCard.Add(_maxTokens);
+            providerCard.Add(CreateSettingsGroupLabel("Credentials"));
             _secretEnvironment = AgentUi.Field("API key environment variable", string.Empty,
                 "Portable environment variable name used to resolve the API key.");
             providerCard.Add(_secretEnvironment);
-            _sessionSecret = AgentUi.Field("Session API key", string.Empty,
-                "Memory-only API key. It is never written to settings or history.", true);
-            providerCard.Add(_sessionSecret);
+            _localSecret = AgentUi.Field("Local API key", string.Empty,
+                "Stored only in this machine's private secrets.json. The saved value is never displayed.", true);
+            providerCard.Add(_localSecret);
             var providerActions = AgentUi.WrapRow();
+            _localSecretActions = providerActions;
             providerActions.style.marginTop = 8;
-            providerActions.Add(AgentUi.Button("Use session key", "Apply the key to this Unity process.",
-                ApplySessionSecret, 122));
-            providerActions.Add(AgentUi.Button("Discover models", "Fetch models; built-in defaults remain available offline.",
-                () => RunUiTask(DiscoverModelsAsync), 126, AgentUi.Accent));
+            _localSecretStatus = new Label("NO LOCAL KEY SAVED");
+            _localSecretStatus.style.flexGrow = 1;
+            _localSecretStatus.style.minWidth = 150;
+            AgentUi.ApplyTypography(_localSecretStatus, AgentTypography.Caption);
+            _localSecretStatus.style.color = AgentUi.Muted;
+            providerActions.Add(_localSecretStatus);
+            providerActions.Add(AgentUi.Button("Save key", "Save this key only in the local secret store.",
+                SaveLocalSecret, 88, AgentUi.Accent, AgentUi.AccentForeground));
+            providerActions.Add(AgentUi.Button("Clear", "Remove the saved local key for this provider.",
+                ClearLocalSecret, 72, AgentUi.Danger, AgentUi.Text));
             providerCard.Add(providerActions);
 
             _codexBlock = AgentUi.Inset();
@@ -1136,6 +1521,7 @@ namespace YuzeToolkit.UnityAgent
             providerCard.Add(_codexBlock);
 
             var defaults = AgentUi.Card("Agent defaults", "Applied to new conversations. The workspace is always this Unity project.");
+            FlattenSettingsCard(defaults);
             _scroll.Content.Add(defaults);
             _permission = AgentUi.Dropdown("Default permission", new[]
             {
@@ -1154,27 +1540,33 @@ namespace YuzeToolkit.UnityAgent
             defaults.Add(_systemPrompt);
 
             var agentsCard = AgentUi.Card("AGENTS.md discovery", "Ordered highest priority first. Each root is portable across computers.");
+            FlattenSettingsCard(agentsCard);
             _scroll.Content.Add(agentsCard);
             _agentsRoots = new AgentPathListEditor("AGENTS.md roots", "Add AGENTS.md root", ShowPathError);
             agentsCard.Add(_agentsRoots);
 
             var skillsCard = AgentUi.Card("Skills discovery", "Configured separately from AGENTS.md. Point directly to a directory containing Skills.");
+            FlattenSettingsCard(skillsCard);
             _scroll.Content.Add(skillsCard);
             _skillRoots = new AgentPathListEditor("Skill roots", "Add Skill root", ShowPathError);
             skillsCard.Add(_skillRoots);
 
             var historyCard = AgentUi.Card("Conversation history", "Current persisted transcript location. Changing it migrates existing history.");
+            FlattenSettingsCard(historyCard);
             _scroll.Content.Add(historyCard);
             _history = new AgentPathLocationEditor(false, ShowPathError);
             historyCard.Add(_history);
 
             var groupsCard = AgentUi.Card("Conversation groups", "Groups appear in the chat sidebar. Conversations can be dragged onto a group.");
+            FlattenSettingsCard(groupsCard);
             _scroll.Content.Add(groupsCard);
             _groups = new VisualElement();
             groupsCard.Add(_groups);
-            groupsCard.Add(AgentUi.Button("＋ New group", "Create a conversation group.", AddGroup, 110));
+            groupsCard.Add(AgentUi.Button("New group", "Create a conversation group.", AddGroup, 120,
+                icon: AgentIconKind.Add));
 
             var fileCard = AgentUi.Card("Settings file", "The same JSON file can be edited outside Unity and reloaded here.");
+            FlattenSettingsCard(fileCard);
             _scroll.Content.Add(fileCard);
             var settingsPath = Path.Combine(AgentPaths.SettingsRoot, AgentPaths.SettingsFileName);
             var path = new Label(settingsPath);
@@ -1186,7 +1578,65 @@ namespace YuzeToolkit.UnityAgent
                 () => _showConfirmation("Reload settings?", "Discard unsaved changes in this page and reload settings.json?",
                     () => RunUiTask(ReloadAsync)), 128));
 
+            var navigationButtons = new List<AgentButton>();
+            void AddNavigation(string label, AgentIconKind icon, VisualElement target, bool selected = false)
+            {
+                AgentButton? button = null;
+                button = CreateSettingsNavigation(label, icon, () =>
+                {
+                    foreach (var candidate in navigationButtons)
+                        SetSettingsNavigationSelected(candidate, candidate == button);
+                    _scroll.ScrollTo(target);
+                });
+                navigationButtons.Add(button);
+                navigation.Add(button);
+                SetSettingsNavigationSelected(button, selected);
+            }
+            AddNavigation("Providers", AgentIconKind.Provider, providerCard, true);
+            AddNavigation("Agent defaults", AgentIconKind.Sliders, defaults);
+            AddNavigation("Instructions", AgentIconKind.Folder, agentsCard);
+            AddNavigation("History", AgentIconKind.History, historyCard);
+
             RunUiTask(InitializeAsync);
+        }
+
+        private static AgentButton CreateSettingsNavigation(string text, AgentIconKind icon, Action clicked)
+        {
+            var button = AgentUi.Button(text, text, clicked, 0, AgentUi.Transparent,
+                AgentUi.TextSecondary, icon);
+            button.style.height = 40;
+            button.style.flexGrow = 0;
+            button.style.justifyContent = Justify.FlexStart;
+            button.style.marginBottom = 4;
+            button.style.borderTopLeftRadius = 12;
+            button.style.borderTopRightRadius = 12;
+            button.style.borderBottomLeftRadius = 12;
+            button.style.borderBottomRightRadius = 12;
+            button.AddToClassList("unity-agent-settings-navigation-cell");
+            return button;
+        }
+
+        private static void SetSettingsNavigationSelected(AgentButton button, bool selected)
+        {
+            button.SetPalette(selected ? AgentUi.Active : AgentUi.Transparent,
+                selected ? AgentUi.Accent : AgentUi.TextSecondary);
+        }
+
+        private static Label CreateSettingsGroupLabel(string text)
+        {
+            var label = new Label(text);
+            AgentUi.ApplyTypography(label, AgentTypography.Caption);
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.color = AgentUi.TextSecondary;
+            label.style.marginTop = 12;
+            label.style.marginBottom = 2;
+            return label;
+        }
+
+        private static void FlattenSettingsCard(VisualElement card)
+        {
+            card.style.backgroundColor = AgentUi.Transparent;
+            AgentUi.SetBorder(card, AgentUi.Transparent, 0);
         }
 
         public void Tick()
@@ -1228,13 +1678,16 @@ namespace YuzeToolkit.UnityAgent
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 _showError("Model discovery failed", exception.Message +
-                    "\n\nCurated models remain available and you can type an exact model id.");
+                    "\n\nA curated fallback is shown when this provider has one. Use Refresh models to try again.");
             }
         }
 
         private async Task SaveAsync()
         {
             SaveSelectedProfileFields();
+            var missingModel = _editing.ProviderProfiles.FirstOrDefault(value => string.IsNullOrWhiteSpace(value.Model));
+            if (missingModel != null)
+                throw new InvalidOperationException($"Provider “{missingModel.Name}” has no selected model. Refresh its catalog or choose a curated fallback before saving.");
             _editing.PermissionMode = Enum.TryParse<AgentPermissionMode>(_permission.value, out var permission)
                 ? permission
                 : AgentPermissionMode.FullAccess;
@@ -1254,17 +1707,27 @@ namespace YuzeToolkit.UnityAgent
         private async Task DiscoverModelsAsync()
         {
             SaveSelectedProfileFields();
-            var result = await _host.DiscoverModelsAsync(SelectedProfile(), _lifetime.Token);
-            _model.SetChoices(result.Models.Select(value => value.Id));
-            if (string.IsNullOrWhiteSpace(_model.Value) && result.Models.Count > 0)
-                ApplyModelOption(result.Models[0]);
-            else
-                ApplyModelOption(result.Models.FirstOrDefault(value => value.Id == _model.Value));
-            _status.text = result.Models.Count == 0
-                ? "No models returned — enter an exact id"
-                : $"{result.Models.Count} models · {result.Source}";
-            if (!string.IsNullOrWhiteSpace(result.Warning))
-                _showError("Using curated model defaults", result.Warning);
+            _refreshModels.SetEnabled(false);
+            SetSettingsCatalogState("MODEL CATALOG · REFRESHING", AgentUi.Muted);
+            try
+            {
+                var result = await _host.DiscoverModelsAsync(SelectedProfile(), _lifetime.Token);
+                ApplySettingsModelCatalog(result.Models, _model.value);
+                SetSettingsDiscoveryState(result);
+                if (!string.IsNullOrWhiteSpace(result.Warning))
+                    _showError("Using curated model defaults", result.Warning);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                ApplySettingsCuratedCatalog(SelectedProfile(), _model.value);
+                SetSettingsCatalogState("MODEL CATALOG · FALLBACK — REFRESH AVAILABLE", AgentUi.Warning,
+                    exception.Message);
+                throw;
+            }
+            finally
+            {
+                _refreshModels.SetEnabled(true);
+            }
         }
 
         private Task DiscoverSettingsModelsOnceAsync(string profileId)
@@ -1279,15 +1742,8 @@ namespace YuzeToolkit.UnityAgent
             if (profile == null) return;
             var result = await _host.DiscoverModelsAsync(profile, _lifetime.Token);
             if (_selectedProfileId != profileId) return;
-            _model.SetChoices(result.Models.Select(value => value.Id));
-            if (string.IsNullOrWhiteSpace(_model.Value) && result.Models.Count > 0)
-                ApplyModelOption(result.Models[0]);
-            else
-                ApplyModelOption(result.Models.FirstOrDefault(value => value.Id == _model.Value));
-            _status.text = result.Models.Count == 0
-                ? "No models returned — enter an exact id"
-                : $"{result.Models.Count} models · {result.Source}";
-            AgentTooltip.Attach(_status, result.Warning);
+            ApplySettingsModelCatalog(result.Models, _model.value);
+            SetSettingsDiscoveryState(result);
         }
 
         private async Task ReloadAsync()
@@ -1357,7 +1813,7 @@ namespace YuzeToolkit.UnityAgent
             profile.BaseUrl = profile.Protocol == AgentProtocolIds.CodexAppServer && string.IsNullOrWhiteSpace(_baseUrl.value)
                 ? "codex"
                 : _baseUrl.value.Trim();
-            profile.Model = _model.Value.Trim();
+            profile.Model = _model.value;
             profile.ReasoningEffort = _effort.value == "default" ? string.Empty : _effort.value;
             profile.MaxOutputTokens = Math.Max(1, _maxTokens.value);
             profile.SecretEnvironmentVariable = profile.Protocol == AgentProtocolIds.CodexAppServer
@@ -1375,17 +1831,126 @@ namespace YuzeToolkit.UnityAgent
             _name.SetValueWithoutNotify(profile.Name);
             _protocol.SetValueWithoutNotify(profile.Protocol);
             _baseUrl.SetValueWithoutNotify(profile.BaseUrl);
-            _model.SetValueWithoutNotify(profile.Model);
-            _model.SetChoices(AgentProviderCatalog.GetModels(profile.ProviderPresetId).Select(value => value.Id));
+            ApplySettingsCuratedCatalog(profile, profile.Model);
             _effort.SetValueWithoutNotify(string.IsNullOrWhiteSpace(profile.ReasoningEffort)
                 ? "default"
                 : profile.ReasoningEffort);
             EnsureChoice(_effort, _effort.value);
             _maxTokens.SetValueWithoutNotify(profile.MaxOutputTokens);
             _secretEnvironment.SetValueWithoutNotify(profile.SecretEnvironmentVariable);
-            _sessionSecret.SetValueWithoutNotify(string.Empty);
+            _localSecret.SetValueWithoutNotify(string.Empty);
+            RefreshLocalSecretStatus();
             UpdateProtocolPresentation();
             if (profile.Protocol == AgentProtocolIds.CodexAppServer) RunUiTask(RefreshCodexAccountAsync);
+        }
+
+        private void ApplySettingsModelCatalog(IEnumerable<AgentModelOption> source, string preferred)
+        {
+            var options = source.GroupBy(value => value.Id, StringComparer.Ordinal)
+                .Select(value => value.First()).ToList();
+            var displayNames = options.ToDictionary(value => value.Id,
+                value => string.IsNullOrWhiteSpace(value.DisplayName) ? value.Id : value.DisplayName,
+                StringComparer.Ordinal);
+            _model.OptionFormatter = id => displayNames.TryGetValue(id, out var name) ? name : id;
+            _model.ValueFormatter = _model.OptionFormatter;
+            _model.OptionDescriptionFormatter = id =>
+                displayNames.TryGetValue(id, out var name) && !string.Equals(name, id, StringComparison.Ordinal)
+                    ? id
+                    : string.Empty;
+            _model.choices = options.Select(value => value.Id).ToList();
+            var selected = _model.choices.Contains(preferred)
+                ? preferred
+                : _model.choices.FirstOrDefault() ?? string.Empty;
+            _model.SetValueWithoutNotify(selected);
+            _model.SetEnabled(_model.choices.Count > 0);
+            ApplyModelOption(options.FirstOrDefault(value => value.Id == selected));
+        }
+
+        private void ApplySettingsCuratedCatalog(AgentProviderProfile profile, string preferred)
+        {
+            var models = AgentProviderCatalog.GetModels(profile.ProviderPresetId);
+            var displayNames = models.ToDictionary(value => value.Id,
+                value => string.IsNullOrWhiteSpace(value.DisplayName) ? value.Id : value.DisplayName,
+                StringComparer.Ordinal);
+            _model.OptionFormatter = id => displayNames.TryGetValue(id, out var name) ? name : id;
+            _model.ValueFormatter = _model.OptionFormatter;
+            _model.OptionDescriptionFormatter = id =>
+                displayNames.TryGetValue(id, out var name) && !string.Equals(name, id, StringComparison.Ordinal)
+                    ? id
+                    : string.Empty;
+            _model.choices = models.Select(value => value.Id).Distinct(StringComparer.Ordinal).ToList();
+            var selected = _model.choices.Contains(preferred)
+                ? preferred
+                : _model.choices.Contains(profile.Model)
+                    ? profile.Model
+                    : _model.choices.FirstOrDefault() ?? string.Empty;
+            _model.SetValueWithoutNotify(selected);
+            _model.SetEnabled(_model.choices.Count > 0);
+            ApplyModelPreset(models.FirstOrDefault(value => value.Id == selected));
+            SetSettingsCatalogState(_model.choices.Count == 0
+                    ? "MODEL CATALOG · UNAVAILABLE — REFRESH REQUIRED"
+                    : "MODEL CATALOG · CURATED FALLBACK — REFRESH AVAILABLE",
+                _model.choices.Count == 0 ? AgentUi.Error : AgentUi.Warning);
+        }
+
+        private void SetSettingsDiscoveryState(AgentModelDiscoveryResult discovery)
+        {
+            if (discovery.Models.Count == 0)
+            {
+                SetSettingsCatalogState("MODEL CATALOG · NO MODELS — REFRESH REQUIRED", AgentUi.Error,
+                    discovery.Warning);
+                return;
+            }
+            var fallback = discovery.Source != AgentModelDiscoverySource.Remote;
+            SetSettingsCatalogState(fallback
+                    ? "MODEL CATALOG · CURATED FALLBACK — REFRESH AVAILABLE"
+                    : $"MODEL CATALOG · REMOTE · {discovery.Models.Count}",
+                fallback ? AgentUi.Warning : AgentUi.Success, discovery.Warning);
+        }
+
+        private void SetSettingsCatalogState(string text, Color color, string tooltip = "")
+        {
+            var state = CatalogMenuState(text);
+            _modelSource.text = state switch
+            {
+                AgentChoiceMenuState.Loading => "Loading models...",
+                AgentChoiceMenuState.Error => "Models unavailable",
+                AgentChoiceMenuState.Warning => "Using curated models",
+                _ => "Models ready"
+            };
+            _modelSource.style.color = color;
+            _modelCatalogDetail = string.IsNullOrWhiteSpace(tooltip) ? text : tooltip;
+            _model.SetMenuStatus(state, HumanCatalogMessage(state),
+                () => RunUiTask(DiscoverModelsAsync));
+        }
+
+        private static string HumanCatalogMessage(AgentChoiceMenuState state) => state switch
+        {
+            AgentChoiceMenuState.Loading => "Loading the model catalog...",
+            AgentChoiceMenuState.Empty => "No models are available. Check the provider settings, then refresh.",
+            AgentChoiceMenuState.Error => "No models are available. Check the provider settings, then refresh.",
+            AgentChoiceMenuState.Warning => "Using curated fallback models.",
+            _ => string.Empty
+        };
+
+        private static AgentChoiceMenuState CatalogMenuState(string text)
+        {
+            if (text.IndexOf("WAIT", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("REFRESHING", StringComparison.OrdinalIgnoreCase) >= 0)
+                return AgentChoiceMenuState.Loading;
+            if (text.IndexOf("NO MODELS", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("UNAVAILABLE", StringComparison.OrdinalIgnoreCase) >= 0)
+                return AgentChoiceMenuState.Error;
+            return text.IndexOf("FALLBACK", StringComparison.OrdinalIgnoreCase) >= 0
+                ? AgentChoiceMenuState.Warning
+                : AgentChoiceMenuState.Ready;
+        }
+
+        private void RefreshLocalSecretStatus()
+        {
+            var saved = _host.Secrets.HasLocalSecret(SelectedProfile().Id);
+            _localSecretStatus.text = saved ? "LOCAL KEY · SAVED ON THIS MACHINE" : "LOCAL KEY · NOT SAVED";
+            _localSecretStatus.style.color = saved ? AgentUi.Success : AgentUi.Muted;
         }
 
         private void ApplyProviderPreset()
@@ -1403,7 +1968,7 @@ namespace YuzeToolkit.UnityAgent
         private void ApplyModelOption(AgentModelOption? option)
         {
             if (option == null) return;
-            _model.SetValue(option.Id);
+            _model.value = option.Id;
             var efforts = option.ReasoningEfforts.Count == 0
                 ? new[] { "default" }
                 : new[] { "default" }.Concat(option.ReasoningEfforts).Distinct(StringComparer.Ordinal).ToArray();
@@ -1434,7 +1999,7 @@ namespace YuzeToolkit.UnityAgent
                 if (string.IsNullOrWhiteSpace(_baseUrl.value) || LooksLikeHttpEndpoint(_baseUrl.value))
                     _baseUrl.value = "codex";
                 _secretEnvironment.value = string.Empty;
-                _sessionSecret.value = string.Empty;
+                _localSecret.value = string.Empty;
             }
             else if (_protocol.value == AgentProtocolIds.AnthropicMessages)
             {
@@ -1452,24 +2017,52 @@ namespace YuzeToolkit.UnityAgent
             UpdateProtocolPresentation();
         }
 
-        private void ApplySessionSecret()
+        private void SaveLocalSecret()
         {
             if (_protocol.value == AgentProtocolIds.CodexAppServer)
             {
                 _showError("Codex authentication", "Codex uses its local account login and does not accept an API key here.");
                 return;
             }
-            _host.Secrets.SetSessionSecret(SelectedProfile().Id, _sessionSecret.value);
-            _sessionSecret.value = string.Empty;
-            _status.text = "Session key applied in memory";
+            var secret = _localSecret.value;
+            if (string.IsNullOrWhiteSpace(secret))
+            {
+                _showError("Local API key", "Enter an API key before saving it.");
+                return;
+            }
+            _host.Secrets.SaveLocalSecret(SelectedProfile().Id, secret);
+            _localSecret.value = string.Empty;
+            RefreshLocalSecretStatus();
+            _status.text = "Local key saved";
+        }
+
+        private void ClearLocalSecret()
+        {
+            var profile = SelectedProfile();
+            if (!_host.Secrets.HasLocalSecret(profile.Id))
+            {
+                _localSecret.value = string.Empty;
+                RefreshLocalSecretStatus();
+                return;
+            }
+            _showConfirmation("Clear local API key?",
+                $"Remove the locally saved API key for “{profile.Name}”? Environment-based authentication is unchanged.",
+                () =>
+                {
+                    _host.Secrets.ClearLocalSecret(profile.Id);
+                    _localSecret.value = string.Empty;
+                    RefreshLocalSecretStatus();
+                    _status.text = "Local key cleared";
+                });
         }
 
         private void UpdateProtocolPresentation()
         {
             var codex = _protocol.value == AgentProtocolIds.CodexAppServer;
             _baseUrl.label = codex ? "Codex executable" : "Base URL";
-            _secretEnvironment.SetEnabled(!codex);
-            _sessionSecret.SetEnabled(!codex);
+            _secretEnvironment.style.display = codex ? DisplayStyle.None : DisplayStyle.Flex;
+            _localSecret.style.display = codex ? DisplayStyle.None : DisplayStyle.Flex;
+            _localSecretActions.style.display = codex ? DisplayStyle.None : DisplayStyle.Flex;
             _codexBlock.style.display = codex ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
@@ -1518,9 +2111,9 @@ namespace YuzeToolkit.UnityAgent
                 var collapsed = new AgentToggle("Collapsed") { value = group.IsCollapsed };
                 collapsed.RegisterValueChangedCallback(evt => group.IsCollapsed = evt.newValue);
                 row.Add(collapsed);
-                row.Add(AgentUi.IconButton("↑", "Move group up", () => MoveGroup(group, -1), 30));
-                row.Add(AgentUi.IconButton("↓", "Move group down", () => MoveGroup(group, 1), 30));
-                row.Add(AgentUi.IconButton("×", "Delete group", () => RemoveGroup(group), 30, AgentUi.Danger));
+                row.Add(AgentUi.IconButton(AgentIconKind.ChevronUp, "Move group up", () => MoveGroup(group, -1), 30));
+                row.Add(AgentUi.IconButton(AgentIconKind.ChevronDown, "Move group down", () => MoveGroup(group, 1), 30));
+                row.Add(AgentUi.IconButton(AgentIconKind.Delete, "Delete group", () => RemoveGroup(group), 30, AgentUi.Danger));
                 _groups.Add(row);
             }
             if (_editing.ConversationGroups.Count == 0)
@@ -1624,6 +2217,13 @@ namespace YuzeToolkit.UnityAgent
         private static string ProfileLabel(AgentProviderProfile profile) =>
             profile.Name + "  ·  " + profile.Protocol + "  ·  " +
             (profile.Id.Length <= 6 ? profile.Id : profile.Id.Substring(0, 6));
+
+        private static string HumanProfileLabel(string label)
+        {
+            if (string.IsNullOrWhiteSpace(label)) return "Provider profile";
+            var separator = label.IndexOf("  ·  ", StringComparison.Ordinal);
+            return separator < 0 ? label : label.Substring(0, separator);
+        }
     }
 
     internal sealed class AgentPathListEditor : VisualElement
@@ -1644,7 +2244,8 @@ namespace YuzeToolkit.UnityAgent
             Add(heading);
             _list = new VisualElement();
             Add(_list);
-            Add(AgentUi.Button("＋ " + _addLabel, "Add a lower-priority root.", AddItem, 150));
+            Add(AgentUi.Button(_addLabel, "Add a lower-priority root.", AddItem, 160,
+                icon: AgentIconKind.Add));
         }
 
         public void SetItems(IEnumerable<AgentPathLocation> items)
@@ -1689,9 +2290,9 @@ namespace YuzeToolkit.UnityAgent
                 priority.style.flexGrow = 1;
                 priority.style.unityFontStyleAndWeight = FontStyle.Bold;
                 top.Add(priority);
-                top.Add(AgentUi.IconButton("↑", "Raise priority", () => Move(index, -1), 30));
-                top.Add(AgentUi.IconButton("↓", "Lower priority", () => Move(index, 1), 30));
-                top.Add(AgentUi.IconButton("×", "Remove root", () => Remove(index), 30, AgentUi.Danger));
+                top.Add(AgentUi.IconButton(AgentIconKind.ChevronUp, "Raise priority", () => Move(index, -1), 30));
+                top.Add(AgentUi.IconButton(AgentIconKind.ChevronDown, "Lower priority", () => Move(index, 1), 30));
+                top.Add(AgentUi.IconButton(AgentIconKind.Delete, "Remove root", () => Remove(index), 30, AgentUi.Danger));
                 card.Add(top);
                 var editor = new AgentPathLocationEditor(true, _showError);
                 editor.SetValue(item);
@@ -1775,7 +2376,7 @@ namespace YuzeToolkit.UnityAgent
                 row.Add(_includeInBuild);
             }
             _preview = new Label();
-            _preview.style.fontSize = 10;
+            AgentUi.ApplyTypography(_preview, AgentTypography.Caption, false);
             _preview.style.color = AgentUi.Muted;
             _preview.style.whiteSpace = WhiteSpace.Normal;
             _preview.style.marginTop = 3;
@@ -1845,75 +2446,6 @@ namespace YuzeToolkit.UnityAgent
         }
     }
 
-    internal sealed class AgentEditableChoiceField : VisualElement
-    {
-        private readonly AgentTextField _field;
-        private readonly AgentButton _menuButton;
-        private readonly List<string> _choices = new();
-
-        public AgentEditableChoiceField(string label, string tooltip)
-        {
-            style.minWidth = 0;
-            style.flexDirection = FlexDirection.Row;
-            style.alignItems = Align.FlexEnd;
-            style.marginTop = 4;
-            style.marginBottom = 4;
-            _field = string.IsNullOrEmpty(label)
-                ? new AgentTextField(surface: false) { value = string.Empty }
-                : AgentUi.Field(label, string.Empty, tooltip);
-            if (string.IsNullOrEmpty(label)) AgentTooltip.Attach(_field, tooltip);
-            _field.style.flexGrow = 1;
-            _field.style.minWidth = 0;
-            _field.style.flexShrink = 1;
-            _field.style.marginTop = 0;
-            _field.style.marginBottom = 0;
-            _field.RegisterCallback<FocusOutEvent>(_ => ValueCommitted?.Invoke());
-            Add(_field);
-            _menuButton = AgentUi.IconButton("⌄", "Choose a discovered or built-in model", ShowMenu, 32);
-            _menuButton.style.marginBottom = 1;
-            Add(_menuButton);
-        }
-
-        public string Value => _field.value ?? string.Empty;
-        public event Action? ValueCommitted;
-        public event Action<string>? ChoiceSelected;
-        public void SetValue(string value) => _field.value = value ?? string.Empty;
-        public void SetValueWithoutNotify(string value) => _field.SetValueWithoutNotify(value ?? string.Empty);
-
-        public void SetChoices(IEnumerable<string> choices)
-        {
-            _choices.Clear();
-            _choices.AddRange(choices.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal));
-        }
-
-        public new void SetEnabled(bool value)
-        {
-            base.SetEnabled(value);
-            _field.SetEnabled(value);
-            _menuButton.SetEnabled(value);
-            style.opacity = value ? 1f : 0.42f;
-        }
-
-        private void ShowMenu()
-        {
-            var items = new List<AgentMenuItem>();
-            if (_choices.Count == 0)
-                items.Add(new AgentMenuItem("No discovered models — type an id", null,
-                    disabled: true));
-            foreach (var choice in _choices)
-            {
-                var captured = choice;
-                items.Add(new AgentMenuItem(captured, () =>
-                    {
-                        SetValue(captured);
-                        ChoiceSelected?.Invoke(captured);
-                        ValueCommitted?.Invoke();
-                    }, string.Equals(Value, captured, StringComparison.Ordinal)));
-            }
-            AgentPopupMenu.Show(_menuButton, items, Math.Max(220, Mathf.RoundToInt(worldBound.width)));
-        }
-    }
-
     internal sealed class AgentModalLayer : VisualElement
     {
         private readonly Label _title;
@@ -1924,24 +2456,31 @@ namespace YuzeToolkit.UnityAgent
 
         public AgentModalLayer()
         {
+            focusable = true;
             style.position = Position.Absolute;
             style.left = 0;
             style.right = 0;
             style.top = 0;
             style.bottom = 0;
-            style.backgroundColor = new Color(0f, 0f, 0f, 0.68f);
+            style.backgroundColor = AgentUi.Mask;
             style.alignItems = Align.Center;
             style.justifyContent = Justify.Center;
             style.display = DisplayStyle.None;
 
-            var dialog = AgentUi.RoundedPanel(12);
-            dialog.style.width = new Length(78, LengthUnit.Percent);
-            dialog.style.maxWidth = 540;
-            dialog.style.minWidth = 280;
-            dialog.style.paddingLeft = 18;
-            dialog.style.paddingRight = 18;
-            dialog.style.paddingTop = 16;
-            dialog.style.paddingBottom = 14;
+            style.paddingTop = 24;
+            style.paddingRight = 24;
+            style.paddingBottom = 24;
+            style.paddingLeft = 24;
+            var dialog = AgentUi.RoundedPanel(24);
+            dialog.style.width = new Length(100, LengthUnit.Percent);
+            dialog.style.maxWidth = 380;
+            dialog.style.maxHeight = new Length(100, LengthUnit.Percent);
+            dialog.style.minWidth = 0;
+            dialog.style.paddingLeft = 22;
+            dialog.style.paddingRight = 22;
+            dialog.style.paddingTop = 20;
+            dialog.style.paddingBottom = 18;
+            dialog.style.backgroundColor = AgentUi.PanelRaised;
             dialog.style.borderTopWidth = 1;
             dialog.style.borderBottomWidth = 1;
             dialog.style.borderLeftWidth = 1;
@@ -1952,14 +2491,18 @@ namespace YuzeToolkit.UnityAgent
             dialog.style.borderRightColor = AgentUi.BorderStrong;
             Add(dialog);
             _title = new Label();
-            _title.style.fontSize = 17;
-            _title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            AgentUi.ApplyTypography(_title, AgentTypography.PageTitle);
             dialog.Add(_title);
+            var body = AgentUi.Scroll(ScrollViewMode.Vertical);
+            body.style.flexShrink = 1;
+            body.style.minHeight = 0;
+            body.style.marginTop = 9;
+            body.style.marginBottom = 14;
+            dialog.Add(body);
             _message = new Label();
             _message.style.whiteSpace = WhiteSpace.Normal;
-            _message.style.marginTop = 9;
-            _message.style.marginBottom = 14;
-            dialog.Add(_message);
+            AgentUi.ApplyTypography(_message, AgentTypography.Body, false);
+            body.Add(_message);
             var buttons = new VisualElement();
             buttons.style.flexDirection = FlexDirection.Row;
             buttons.style.justifyContent = Justify.FlexEnd;
@@ -1968,10 +2511,17 @@ namespace YuzeToolkit.UnityAgent
             buttons.Add(_cancel);
             _confirm = AgentUi.Button("OK", "Confirm.", Confirm, 78, AgentUi.Accent);
             buttons.Add(_confirm);
+            RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode != KeyCode.Escape) return;
+                Hide();
+                evt.StopPropagation();
+            });
         }
 
         public void ShowError(string title, string message)
         {
+            if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(message)) return;
             _title.text = title;
             _message.text = message;
             _confirmed = null;
@@ -1980,10 +2530,12 @@ namespace YuzeToolkit.UnityAgent
             _confirm.HelpText = "Close this dialog.";
             style.display = DisplayStyle.Flex;
             BringToFront();
+            schedule.Execute(() => _confirm.Focus());
         }
 
         public void ShowConfirmation(string title, string message, Action confirmed)
         {
+            if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(message)) return;
             _title.text = title;
             _message.text = message;
             _confirmed = confirmed;
@@ -1992,6 +2544,7 @@ namespace YuzeToolkit.UnityAgent
             _confirm.HelpText = "Confirm this action.";
             style.display = DisplayStyle.Flex;
             BringToFront();
+            schedule.Execute(() => _confirm.Focus());
         }
 
         private void Confirm()
@@ -2100,7 +2653,7 @@ namespace YuzeToolkit.UnityAgent
             while (element != null && element != target)
             {
                 if (element is AgentButton || element is AgentTextField || element is AgentChoiceField ||
-                    element is AgentToggle || element is AgentIntegerField || element is AgentEditableChoiceField)
+                    element is AgentToggle || element is AgentIntegerField)
                     return true;
                 element = element.parent;
             }
@@ -2159,59 +2712,160 @@ namespace YuzeToolkit.UnityAgent
         }
     }
 
+    internal enum AgentTypography
+    {
+        Caption,
+        Control,
+        Body,
+        BodyStrong,
+        Composer,
+        PageTitle,
+        EmptyHero
+    }
+
     internal static class AgentUi
     {
-        public static readonly Color Background = new(0.047f, 0.055f, 0.063f);
-        public static readonly Color Sidebar = new(0.067f, 0.067f, 0.067f);
-        public static readonly Color Panel = new(0.092f, 0.098f, 0.105f);
-        public static readonly Color PanelInset = new(0.071f, 0.075f, 0.082f);
-        public static readonly Color Composer = new(0.155f, 0.155f, 0.155f);
-        public static readonly Color Input = new(0.057f, 0.061f, 0.067f);
-        public static readonly Color InputHover = new(0.075f, 0.080f, 0.088f);
-        public static readonly Color Popup = new(0.075f, 0.078f, 0.084f);
-        public static readonly Color Hover = new(1f, 1f, 1f, 0.065f);
-        public static readonly Color Border = new(0.18f, 0.19f, 0.21f);
-        public static readonly Color BorderStrong = new(0.27f, 0.28f, 0.30f);
-        public static readonly Color Text = new(0.91f, 0.91f, 0.91f);
-        public static readonly Color Muted = new(0.58f, 0.59f, 0.62f);
-        public static readonly Color Placeholder = new(0.43f, 0.44f, 0.47f);
-        public static readonly Color Accent = new(0.96f, 0.35f, 0.12f);
-        public static readonly Color Focus = new(1f, 0.43f, 0.20f);
-        public static readonly Color Send = new(0.94f, 0.94f, 0.94f);
-        public static readonly Color SendForeground = new(0.10f, 0.10f, 0.10f);
-        public static readonly Color Danger = new(0.58f, 0.16f, 0.16f);
-        public static readonly Color Selected = new(0.14f, 0.14f, 0.14f);
+        // Source-pinned DeepSeek Harness dark tokens. Editor and Runtime use this single table.
+        public static readonly Color Background = new Color32(21, 21, 23, 255);
+        public static readonly Color Sidebar = new Color32(27, 27, 28, 255);
+        public static readonly Color Surface1 = new Color32(35, 35, 36, 255);
+        public static readonly Color Surface2 = new Color32(44, 44, 46, 255);
+        public static readonly Color Surface3 = new Color32(53, 54, 56, 255);
+        public static readonly Color Panel = Surface1;
+        public static readonly Color PanelRaised = Surface2;
+        public static readonly Color PanelInset = Surface1;
+        public static readonly Color Composer = Surface2;
+        public static readonly Color Input = Surface1;
+        public static readonly Color InputHover = new(1f, 1f, 1f, 0.08f);
+        public static readonly Color Popup = Surface3;
+        public static readonly Color Hover = new(1f, 1f, 1f, 0.08f);
+        public static readonly Color Active = new(1f, 1f, 1f, 0.14f);
+        public static readonly Color Border1 = new(1f, 1f, 1f, 0.06f);
+        public static readonly Color Border2 = new(1f, 1f, 1f, 0.12f);
+        public static readonly Color Border3 = new(1f, 1f, 1f, 0.16f);
+        public static readonly Color Border = Border1;
+        public static readonly Color BorderStrong = Border2;
+        public static readonly Color Text = new Color32(249, 250, 251, 255);
+        public static readonly Color TextSecondary = new Color32(207, 211, 214, 255);
+        public static readonly Color TextTertiary = new Color32(173, 178, 184, 255);
+        public static readonly Color TextCaption = new Color32(129, 133, 140, 255);
+        public static readonly Color TextDimmed = new Color32(67, 69, 74, 255);
+        public static readonly Color Muted = TextTertiary;
+        public static readonly Color Placeholder = TextCaption;
+        public static readonly Color Accent = new Color32(96, 165, 250, 255);
+        public static readonly Color AccentForeground = Text;
+        public static readonly Color Focus = Accent;
+        public static readonly Color Success = new Color32(34, 197, 94, 255);
+        public static readonly Color Send = Accent;
+        public static readonly Color SendForeground = Text;
+        public static readonly Color Danger = new Color32(87, 12, 12, 255);
+        public static readonly Color Selected = Active;
         public static readonly Color Transparent = new(0f, 0f, 0f, 0f);
-        public static readonly Color UserMessage = new(0.16f, 0.16f, 0.17f);
-        public static readonly Color AssistantMessage = new(0.075f, 0.080f, 0.087f);
-        public static readonly Color ToolMessage = new(0.06f, 0.13f, 0.10f);
-        public static readonly Color ErrorPanel = new(0.24f, 0.07f, 0.08f);
-        public static readonly Color WarningPanel = new(0.23f, 0.16f, 0.05f);
-        public static readonly Color Warning = new(0.95f, 0.65f, 0.18f);
-        public static readonly Color Error = new(0.96f, 0.34f, 0.32f);
+        public static readonly Color UserMessage = Surface2;
+        public static readonly Color AssistantMessage = Surface1;
+        public static readonly Color ToolMessage = Surface1;
+        public static readonly Color ErrorPanel = new(0.34f, 0.047f, 0.047f, 0.72f);
+        public static readonly Color WarningPanel = new(0.153f, 0.141f, 0.122f, 1f);
+        public static readonly Color Warning = new Color32(221, 134, 41, 255);
+        public static readonly Color Error = new Color32(242, 90, 90, 255);
+        public static readonly Color Scrollbar1 = new Color32(60, 60, 61, 255);
+        public static readonly Color Scrollbar1Hover = new Color32(84, 85, 87, 255);
+        public static readonly Color Scrollbar2 = new Color32(84, 85, 87, 255);
+        public static readonly Color Scrollbar2Hover = new Color32(101, 103, 107, 255);
+        public static readonly Color Mask = new(0f, 0f, 0f, 0.5f);
+        public static readonly Color Selection = new(0.376f, 0.647f, 0.980f, 0.42f);
+
+        private static Font? _font;
+
+        public static void ApplyRoot(VisualElement root)
+        {
+            root.style.color = Text;
+            var font = ResolveFont();
+            if (font != null) root.style.unityFont = font;
+            ApplyTypography(root, AgentTypography.Body);
+        }
+
+        public static void ApplyTypography(VisualElement element, AgentTypography role, bool singleLine = true)
+        {
+            var size = 14;
+            var seat = 22;
+            var weight = FontStyle.Normal;
+            switch (role)
+            {
+                case AgentTypography.Caption:
+                    size = 12;
+                    seat = 18;
+                    break;
+                case AgentTypography.Control:
+                    size = 13;
+                    seat = 20;
+                    weight = FontStyle.Bold;
+                    break;
+                case AgentTypography.BodyStrong:
+                    weight = FontStyle.Bold;
+                    break;
+                case AgentTypography.Composer:
+                    size = 16;
+                    seat = 24;
+                    break;
+                case AgentTypography.PageTitle:
+                    size = 16;
+                    seat = 24;
+                    weight = FontStyle.Bold;
+                    break;
+                case AgentTypography.EmptyHero:
+                    size = 26;
+                    seat = 32;
+                    weight = FontStyle.Bold;
+                    break;
+            }
+            element.style.fontSize = size;
+            element.style.minHeight = seat;
+            element.style.unityFontStyleAndWeight = weight;
+            element.style.whiteSpace = singleLine ? WhiteSpace.NoWrap : WhiteSpace.Normal;
+            element.style.unityTextAlign = TextAnchor.MiddleLeft;
+        }
+
+        private static Font? ResolveFont()
+        {
+            if (_font != null) return _font;
+            var preferred = Application.platform switch
+            {
+                RuntimePlatform.OSXEditor or RuntimePlatform.OSXPlayer => new[]
+                    { "PingFang SC", "Hiragino Sans GB", "Arial Unicode MS", "Arial" },
+                RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsPlayer => new[]
+                    { "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", "Arial" },
+                _ => new[] { "Noto Sans CJK SC", "Noto Sans CJK", "DejaVu Sans", "Arial" }
+            };
+            var installed = new HashSet<string>(Font.GetOSInstalledFontNames(), StringComparer.OrdinalIgnoreCase);
+            var selected = preferred.FirstOrDefault(installed.Contains) ?? preferred[^1];
+            _font = Font.CreateDynamicFontFromOSFont(selected, 16);
+            return _font;
+        }
 
         public static AgentButton Button(string text, string tooltip, Action clicked, int width,
-            Color? background = null, Color? foreground = null)
+            Color? background = null, Color? foreground = null, AgentIconKind icon = AgentIconKind.None)
         {
-            var button = new AgentButton(text, tooltip, clicked, background ?? Panel, foreground ?? Text);
-            button.style.height = 32;
+            var surface = background ?? PanelRaised;
+            var content = foreground ?? (surface == Accent || surface == Send ? AccentForeground : Text);
+            var button = new AgentButton(text, tooltip, clicked, surface, content, icon);
+            button.style.height = 36;
             button.style.flexShrink = 0;
             if (width > 0) button.style.width = width; else button.style.flexGrow = 1;
             button.style.marginLeft = 3;
             button.style.marginRight = 3;
-            button.style.borderTopLeftRadius = 7;
-            button.style.borderTopRightRadius = 7;
-            button.style.borderBottomLeftRadius = 7;
-            button.style.borderBottomRightRadius = 7;
+            button.style.borderTopLeftRadius = 18;
+            button.style.borderTopRightRadius = 18;
+            button.style.borderBottomLeftRadius = 18;
+            button.style.borderBottomRightRadius = 18;
             return button;
         }
 
-        public static AgentButton IconButton(string text, string tooltip, Action clicked, int size,
+        public static AgentButton IconButton(AgentIconKind icon, string tooltip, Action clicked, int size,
             Color? background = null, Color? foreground = null)
         {
-            var button = Button(text, tooltip, clicked, size, background, foreground);
+            var button = Button(string.Empty, tooltip, clicked, size, background, foreground, icon);
             button.style.height = size;
-            button.style.fontSize = 16;
             button.style.paddingLeft = 0;
             button.style.paddingRight = 0;
             return button;
@@ -2224,6 +2878,7 @@ namespace YuzeToolkit.UnityAgent
                 value = value,
                 isPasswordField = password
             };
+            ApplyTypography(field, AgentTypography.Body);
             AgentTooltip.Attach(field, tooltip);
             field.style.marginTop = 4;
             field.style.marginBottom = 4;
@@ -2254,7 +2909,9 @@ namespace YuzeToolkit.UnityAgent
             AgentTooltip.Attach(field, tooltip);
             field.style.width = 120;
             field.style.flexGrow = 0;
-            field.style.flexShrink = 0;
+            field.style.flexShrink = 1;
+            field.style.minWidth = 52;
+            field.style.maxWidth = 220;
             field.style.marginLeft = 3;
             field.style.marginRight = 3;
             return field;
@@ -2282,7 +2939,8 @@ namespace YuzeToolkit.UnityAgent
         public static void StyleScroller(ScrollView scroll)
         {
             var scroller = scroll.verticalScroller;
-            scroller.style.width = 9;
+            ResetScrollVisuals(scroller);
+            scroller.style.width = 8;
             scroller.style.backgroundImage = StyleKeyword.None;
             scroller.style.backgroundColor = Transparent;
             scroller.style.marginTop = 2;
@@ -2312,7 +2970,7 @@ namespace YuzeToolkit.UnityAgent
             if (dragger != null)
             {
                 dragger.style.backgroundImage = StyleKeyword.None;
-                dragger.style.backgroundColor = BorderStrong;
+                dragger.style.backgroundColor = Scrollbar1;
                 dragger.style.borderTopWidth = 0;
                 dragger.style.borderRightWidth = 0;
                 dragger.style.borderBottomWidth = 0;
@@ -2321,10 +2979,10 @@ namespace YuzeToolkit.UnityAgent
                 dragger.style.borderTopRightRadius = 4;
                 dragger.style.borderBottomLeftRadius = 4;
                 dragger.style.borderBottomRightRadius = 4;
-                dragger.RegisterCallback<PointerEnterEvent>(_ => dragger.style.backgroundColor = Muted);
-                dragger.RegisterCallback<PointerLeaveEvent>(_ => dragger.style.backgroundColor = BorderStrong);
+                dragger.RegisterCallback<PointerEnterEvent>(_ => dragger.style.backgroundColor = Scrollbar1Hover);
+                dragger.RegisterCallback<PointerLeaveEvent>(_ => dragger.style.backgroundColor = Scrollbar1);
                 dragger.RegisterCallback<PointerDownEvent>(_ => dragger.style.backgroundColor = Focus);
-                dragger.RegisterCallback<PointerUpEvent>(_ => dragger.style.backgroundColor = Muted);
+                dragger.RegisterCallback<PointerUpEvent>(_ => dragger.style.backgroundColor = Scrollbar1Hover);
             }
             var draggerBorder = scroller.slider.Q<VisualElement>(className: "unity-base-slider__dragger-border");
             if (draggerBorder != null)
@@ -2338,27 +2996,38 @@ namespace YuzeToolkit.UnityAgent
             }
         }
 
+        private static void ResetScrollVisuals(VisualElement root)
+        {
+            root.style.backgroundImage = StyleKeyword.None;
+            root.style.backgroundColor = Transparent;
+            root.style.borderTopWidth = 0;
+            root.style.borderRightWidth = 0;
+            root.style.borderBottomWidth = 0;
+            root.style.borderLeftWidth = 0;
+            foreach (var child in root.Children()) ResetScrollVisuals(child);
+        }
+
         public static VisualElement Card(string title, string subtitle)
         {
-            var card = RoundedPanel(14);
+            var card = RoundedPanel(12);
             card.style.minWidth = 0;
             card.style.width = new Length(100, LengthUnit.Percent);
-            card.style.maxWidth = 1040;
+            card.style.maxWidth = 800;
             card.style.alignSelf = Align.Center;
-            card.style.marginBottom = 12;
-            card.style.paddingLeft = 15;
-            card.style.paddingRight = 15;
-            card.style.paddingTop = 13;
-            card.style.paddingBottom = 15;
+            card.style.marginBottom = 14;
+            card.style.paddingLeft = 18;
+            card.style.paddingRight = 18;
+            card.style.paddingTop = 16;
+            card.style.paddingBottom = 18;
             card.style.backgroundColor = Panel;
             SetBorder(card, Border, 1);
             var heading = new Label(title);
-            heading.style.fontSize = 16;
-            heading.style.unityFontStyleAndWeight = FontStyle.Bold;
+            ApplyTypography(heading, AgentTypography.BodyStrong);
             card.Add(heading);
             var help = new Label(subtitle);
             help.style.color = Muted;
             help.style.whiteSpace = WhiteSpace.Normal;
+            ApplyTypography(help, AgentTypography.Caption, false);
             help.style.marginTop = 2;
             help.style.marginBottom = 8;
             card.Add(help);

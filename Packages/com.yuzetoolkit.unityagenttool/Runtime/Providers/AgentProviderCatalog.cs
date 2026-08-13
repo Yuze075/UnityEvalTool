@@ -237,6 +237,7 @@ namespace YuzeToolkit.UnityAgent
         private static readonly string[] QwenEfforts =
             { "none", "minimal", "low", "medium", "high", "xhigh", "max" };
         private static readonly string[] MimoEfforts = { "none", "low", "medium", "high" };
+        private static readonly string[] KimiCodeEfforts = { "low", "high", "max" };
 
         private static readonly AgentWireCompatibility OpenAiCompatibility = new()
         {
@@ -446,6 +447,18 @@ namespace YuzeToolkit.UnityAgent
                     "https://platform.moonshot.ai/docs", true, false,
                     AgentWireCompatibility.ConservativeCustom,
                     Model("kimi-k2.5", "Kimi K2.5", 262_144, 0, 32_768, ReasoningAgent)),
+
+                Provider("kimi-code", "Kimi Code", AgentProtocolIds.OpenAiChat,
+                    "https://api.kimi.com/coding/v1/", "KIMI_CODE_API_KEY", "k3",
+                    "https://www.kimi.com/code/docs/en/", true, false,
+                    AgentWireCompatibility.ConservativeCustom,
+                    Model("k3", "Kimi K3", 1_048_576, 0, 32_768, ReasoningAgent,
+                        KimiCodeEfforts, "high"),
+                    Model("k3-256k", "Kimi K3 256K", 262_144, 0, 32_768, ReasoningAgent,
+                        KimiCodeEfforts, "high"),
+                    Model("kimi-for-coding", "Kimi K2.7 Code", 262_144, 0, 32_768, ReasoningAgent),
+                    Model("kimi-for-coding-highspeed", "Kimi K2.7 Code HighSpeed", 262_144, 0, 32_768,
+                        ReasoningAgent)),
 
                 Provider("glm", "Z.AI / GLM", AgentProtocolIds.OpenAiChat,
                     "https://api.z.ai/api/paas/v4/", "ZAI_API_KEY", "glm-5.2",

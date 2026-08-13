@@ -13,9 +13,13 @@ namespace YuzeToolkit
         private readonly Dictionary<string, Button> _buttons = new();
         private VisualElement? _layer;
         private VisualElement? _window;
+        private VisualElement? _tabBar;
         private VisualElement? _content;
+        private VisualElement? _resizeGrip;
         private IRuntimeConsoleTab? _activeTab;
         private TextField? _activeTextField;
+        private bool _collapsed;
+        private float _expandedHeight = 520f;
 
         public RuntimeConsoleView(IReadOnlyList<IRuntimeConsoleTab> tabs, GameObject eventSystemOwner)
         {
@@ -38,10 +42,33 @@ namespace YuzeToolkit
             layer.Add(_window);
             layer.RegisterCallback<GeometryChangedEvent>(OnLayerGeometryChanged);
 
-            var tabBar = new VisualElement { name = "runtime-console-tab-bar" };
-            tabBar.AddToClassList(RuntimeConsoleUss.TabBarClass);
-            tabBar.AddManipulator(new RuntimeConsoleDragManipulator(tabBar, _window));
-            _window.Add(tabBar);
+            var header = new VisualElement { name = "runtime-console-header" };
+            header.AddToClassList(RuntimeConsoleUss.HeaderClass);
+            header.AddManipulator(new RuntimeConsoleDragManipulator(header, _window));
+            var title = new Label("Runtime Console")
+            {
+                pickingMode = PickingMode.Ignore,
+                enableRichText = false
+            };
+            title.AddToClassList(RuntimeConsoleUss.TitleClass);
+            header.Add(title);
+            var dragHint = new Label("Drag to move") { pickingMode = PickingMode.Ignore };
+            dragHint.AddToClassList(RuntimeConsoleUss.DragHintClass);
+            header.Add(dragHint);
+            var collapse = new Button(ToggleCollapsed);
+            collapse.AddToClassList(RuntimeConsoleUss.CollapseButtonClass);
+            collapse.AddToClassList(RuntimeConsoleUss.HeaderActionSeatClass);
+            DisableKeyboardFocus(collapse);
+            RuntimeConsoleUi.AttachHelp(collapse, "Collapse or expand the Runtime Console.");
+            var collapseIcon = new VisualElement { pickingMode = PickingMode.Ignore };
+            collapseIcon.AddToClassList(RuntimeConsoleUss.CollapseIconClass);
+            collapse.Add(collapseIcon);
+            header.Add(collapse);
+            _window.Add(header);
+
+            _tabBar = new VisualElement { name = "runtime-console-tab-bar" };
+            _tabBar.AddToClassList(RuntimeConsoleUss.TabBarClass);
+            _window.Add(_tabBar);
 
             _content = new VisualElement { name = "runtime-console-content" };
             _content.AddToClassList(RuntimeConsoleUss.ContentClass);
@@ -52,26 +79,34 @@ namespace YuzeToolkit
                 var captured = tab;
                 var button = new Button(() => SetActiveTab(captured))
                 {
-                    text = tab.Title
+                    text = tab.Title,
+                    enableRichText = false
                 };
                 button.AddToClassList(RuntimeConsoleUss.TabButtonClass);
                 DisableKeyboardFocus(button);
                 RuntimeConsoleUi.AttachHelp(button, $"Show {tab.Title} tab.");
-                tabBar.Add(button);
+                _tabBar.Add(button);
                 _buttons[tab.Id] = button;
 
                 tab.SetVisible(false);
                 _content.Add(tab.Root);
             }
 
-            var resizeGrip = new VisualElement
+            _resizeGrip = new VisualElement
             {
                 name = "runtime-console-resize-grip"
             };
-            resizeGrip.AddToClassList(RuntimeConsoleUss.ResizeGripClass);
-            RuntimeConsoleUi.AttachHelp(resizeGrip, "Drag to resize the Runtime Console.");
-            resizeGrip.AddManipulator(new RuntimeConsoleResizeManipulator(resizeGrip, _window));
-            _window.Add(resizeGrip);
+            _resizeGrip.AddToClassList(RuntimeConsoleUss.ResizeGripClass);
+            var resizeLine = new VisualElement { pickingMode = PickingMode.Ignore };
+            resizeLine.AddToClassList(RuntimeConsoleUss.ResizeLineClass);
+            _resizeGrip.Add(resizeLine);
+            var resizeLineShort = new VisualElement { pickingMode = PickingMode.Ignore };
+            resizeLineShort.AddToClassList(RuntimeConsoleUss.ResizeLineClass);
+            resizeLineShort.AddToClassList(RuntimeConsoleUss.ResizeLineShortClass);
+            _resizeGrip.Add(resizeLineShort);
+            RuntimeConsoleUi.AttachHelp(_resizeGrip, "Drag to resize the Runtime Console.");
+            _resizeGrip.AddManipulator(new RuntimeConsoleResizeManipulator(_resizeGrip, _window));
+            _window.Add(_resizeGrip);
 
             SetActiveTab(_tabs[0]);
         }
@@ -83,10 +118,13 @@ namespace YuzeToolkit
             _layer = null;
             _window?.RemoveFromHierarchy();
             _window = null;
+            _tabBar = null;
             _content = null;
+            _resizeGrip = null;
             _activeTab = null;
             _activeTextField = null;
             _buttons.Clear();
+            _collapsed = false;
         }
 
         public void SetVisible(bool visible)
@@ -119,6 +157,26 @@ namespace YuzeToolkit
             }
         }
 
+        private void ToggleCollapsed()
+        {
+            if (_window == null || _tabBar == null || _content == null || _resizeGrip == null) return;
+
+            _collapsed = !_collapsed;
+            if (_collapsed)
+            {
+                _expandedHeight = Mathf.Max(RuntimeConsoleResizeManipulator.MinHeight, _window.resolvedStyle.height);
+                ReleaseInteractionFocus();
+            }
+
+            _window.EnableInClassList(RuntimeConsoleUss.CollapsedWindowClass, _collapsed);
+            _window.Q<VisualElement>(className: RuntimeConsoleUss.CollapseIconClass)?
+                .EnableInClassList(RuntimeConsoleUss.CollapseIconOpenClass, _collapsed);
+            _tabBar.style.display = _collapsed ? DisplayStyle.None : DisplayStyle.Flex;
+            _content.style.display = _collapsed ? DisplayStyle.None : DisplayStyle.Flex;
+            _resizeGrip.style.display = _collapsed ? DisplayStyle.None : DisplayStyle.Flex;
+            _window.style.height = _collapsed ? 44f : _expandedHeight;
+        }
+
         private void OnLayerGeometryChanged(GeometryChangedEvent evt)
         {
             ClampWindowToLayer();
@@ -132,11 +190,18 @@ namespace YuzeToolkit
             if (parentRect.width <= 0f || parentRect.height <= 0f) return;
 
             var maxWidth = Mathf.Max(RuntimeConsoleResizeManipulator.MinWidth, parentRect.width - RuntimeConsoleResizeManipulator.EdgePadding);
-            var maxHeight = Mathf.Max(RuntimeConsoleResizeManipulator.MinHeight, parentRect.height - RuntimeConsoleResizeManipulator.EdgePadding);
+            var minHeight = _collapsed ? 44f : RuntimeConsoleResizeManipulator.MinHeight;
+            var maxHeight = Mathf.Max(minHeight, parentRect.height - RuntimeConsoleResizeManipulator.EdgePadding);
             var width = Mathf.Clamp(_window.resolvedStyle.width, RuntimeConsoleResizeManipulator.MinWidth, maxWidth);
-            var height = Mathf.Clamp(_window.resolvedStyle.height, RuntimeConsoleResizeManipulator.MinHeight, maxHeight);
+            var height = Mathf.Clamp(_window.resolvedStyle.height, minHeight, maxHeight);
+            var left = Mathf.Clamp(_window.layout.xMin, 0f, Mathf.Max(0f, parentRect.width - width));
+            var bottom = Mathf.Clamp(parentRect.height - _window.layout.yMax, 0f,
+                Mathf.Max(0f, parentRect.height - height));
             _window.style.width = width;
             _window.style.height = height;
+            _window.style.left = left;
+            _window.style.bottom = bottom;
+            if (!_collapsed) _expandedHeight = height;
         }
 
         private void InstallInteractionPolicy(VisualElement root)

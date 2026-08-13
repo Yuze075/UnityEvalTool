@@ -5,12 +5,23 @@ using UnityEngine.UIElements;
 
 namespace YuzeToolkit
 {
+    public static class RuntimeConsoleDesignTokens
+    {
+        public static readonly Color TextPrimary = new Color32(249, 250, 251, 255);
+        public static readonly Color TextSecondary = new Color32(207, 211, 214, 255);
+        public static readonly Color TextCaption = new Color32(129, 133, 140, 255);
+        public static readonly Color Accent = new Color32(96, 165, 250, 255);
+        public static readonly Color Error = new Color32(242, 90, 90, 255);
+        public static readonly Color Warning = new Color32(221, 134, 41, 255);
+        public static readonly Color Success = new Color32(34, 197, 94, 255);
+    }
+
     public static class RuntimeConsoleUi
     {
-        public static readonly Color RunningColor = new(0.33f, 0.78f, 0.62f);
-        public static readonly Color StoppedColor = new(0.92f, 0.34f, 0.31f);
-        public static readonly Color WarningColor = new(0.95f, 0.68f, 0.26f);
-        public static readonly Color ErrorColor = new(0.96f, 0.36f, 0.34f);
+        public static readonly Color RunningColor = RuntimeConsoleDesignTokens.Success;
+        public static readonly Color StoppedColor = RuntimeConsoleDesignTokens.Error;
+        public static readonly Color WarningColor = RuntimeConsoleDesignTokens.Warning;
+        public static readonly Color ErrorColor = RuntimeConsoleDesignTokens.Error;
 
         public static Button CreateButton(string text, string tooltip, Action clicked, int width = 84)
         {
@@ -62,6 +73,7 @@ namespace YuzeToolkit
             toggle.focusable = false;
             toggle.tabIndex = -1;
             RuntimeConsoleUss.ApplyOwnedControl(toggle);
+            RuntimeConsoleUss.ApplyOwnedToggle(toggle);
             AttachHelp(toggle, tooltip);
             return toggle;
         }
@@ -94,7 +106,7 @@ namespace YuzeToolkit
 
         public static Label AddTitle(VisualElement parent, string text)
         {
-            var title = new Label(text);
+            var title = new Label(text) { enableRichText = false };
             title.AddToClassList(RuntimeConsoleUss.CardTitleClass);
             parent.Add(title);
             return title;
@@ -106,11 +118,11 @@ namespace YuzeToolkit
             row.AddToClassList(RuntimeConsoleUss.FieldRowClass);
             parent.Add(row);
 
-            var label = new Label(labelText);
+            var label = new Label(labelText) { enableRichText = false };
             label.AddToClassList(RuntimeConsoleUss.FieldLabelClass);
             row.Add(label);
 
-            var value = new Label("-");
+            var value = new Label("-") { enableRichText = false };
             value.AddToClassList(RuntimeConsoleUss.FieldValueClass);
             row.Add(value);
             return value;
@@ -123,7 +135,7 @@ namespace YuzeToolkit
             box.style.borderLeftColor = accentColor;
             box.style.backgroundColor = new Color(accentColor.r, accentColor.g, accentColor.b, 0.12f);
 
-            var label = new Label(text);
+            var label = new Label(text) { enableRichText = false };
             label.AddToClassList(RuntimeConsoleUss.LabelClass);
             label.style.whiteSpace = WhiteSpace.Normal;
             box.Add(label);
@@ -142,7 +154,6 @@ namespace YuzeToolkit
 
             target.RegisterCallback<TooltipEvent>(evt =>
             {
-                evt.tooltip = string.Empty;
                 evt.StopImmediatePropagation();
             }, TrickleDown.TrickleDown);
             target.RegisterCallback<PointerEnterEvent>(evt =>
@@ -168,7 +179,12 @@ namespace YuzeToolkit
             {
                 popup = new VisualElement { name = HelpPopupName, pickingMode = PickingMode.Ignore };
                 popup.AddToClassList(RuntimeConsoleUss.HelpPopupClass);
-                var label = new Label { name = HelpTextName, pickingMode = PickingMode.Ignore };
+                var label = new Label
+                {
+                    name = HelpTextName,
+                    pickingMode = PickingMode.Ignore,
+                    enableRichText = false
+                };
                 label.AddToClassList(RuntimeConsoleUss.HelpTextClass);
                 popup.Add(label);
                 root.Add(popup);

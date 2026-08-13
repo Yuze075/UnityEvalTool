@@ -15,6 +15,7 @@ namespace YuzeToolkit
         private const string SplitterClass = "yuzu-runtime-log-splitter";
         private const string SplitterHandleClass = "yuzu-runtime-log-splitter-handle";
         private const string DetailClass = "yuzu-runtime-log-detail";
+        private const string DetailHeaderClass = "yuzu-runtime-log-detail-header";
         private const string DetailTextClass = "yuzu-runtime-log-detail-text";
         private const string FilterButtonClass = "yuzu-runtime-log-filter-toggle";
         private const string FilterButtonActiveClass = "yuzu-runtime-log-filter-toggle-active";
@@ -30,6 +31,8 @@ namespace YuzeToolkit
         private const string RowWarningClass = "yuzu-runtime-log-row-warning";
         private const string RowErrorClass = "yuzu-runtime-log-row-error";
         private const string RowMessageClass = "yuzu-runtime-log-row-message";
+        private const string DetailEmptyClass = "yuzu-runtime-log-detail-empty";
+        private const string FilterIndicatorClass = "yuzu-runtime-log-filter-indicator";
 
         private readonly RuntimeLogStore _store = new();
         private readonly Dictionary<LogType, Button> _typeButtons = new();
@@ -37,6 +40,7 @@ namespace YuzeToolkit
         private readonly List<VisualElement> _rowElements = new();
         private RuntimeConsolePanView _list = null!;
         private RuntimeConsolePanView _detailPane = null!;
+        private Label _detailHeader = null!;
         private Label _detail = null!;
         private TextField _search = null!;
         private Button _collapse = null!;
@@ -83,18 +87,19 @@ namespace YuzeToolkit
             _collapse = new Button(() =>
             {
                 _collapseEnabled = !_collapseEnabled;
+                _collapse.text = _collapseEnabled ? "Group repeats: On" : "Group repeats: Off";
                 SyncFilterButton(_collapse, _collapseEnabled);
                 MarkDirty();
             })
             {
-                text = "Collapse"
+                text = "Group repeats: Off"
             };
             _collapse.focusable = false;
             _collapse.tabIndex = -1;
             _collapse.AddToClassList(ToolbarButtonClass);
             _collapse.AddToClassList(FilterButtonClass);
             _collapse.AddToClassList(CollapseButtonClass);
-            RuntimeConsoleUi.AttachHelp(_collapse, "Collapse identical log messages.");
+            RuntimeConsoleUi.AttachHelp(_collapse, "Group identical log messages into one row.");
             toolbar.Add(_collapse);
             SyncFilterButton(_collapse, _collapseEnabled);
 
@@ -111,8 +116,28 @@ namespace YuzeToolkit
             _search.style.minWidth = 88;
             _search.style.flexGrow = 1;
             _search.style.flexShrink = 1;
+            var searchIcon = new VisualElement { pickingMode = PickingMode.Ignore };
+            searchIcon.AddToClassList(RuntimeConsoleUss.SearchIconClass);
+            var searchIconHandle = new VisualElement { pickingMode = PickingMode.Ignore };
+            searchIconHandle.AddToClassList(RuntimeConsoleUss.SearchIconHandleClass);
+            searchIcon.Add(searchIconHandle);
+            _search.Insert(0, searchIcon);
+            var searchPlaceholder = new Label("Filter logs…")
+            {
+                pickingMode = PickingMode.Ignore,
+                enableRichText = false
+            };
+            searchPlaceholder.AddToClassList(RuntimeConsoleUss.SearchPlaceholderClass);
+            _search.Add(searchPlaceholder);
+            _search.value = string.Empty;
             RuntimeConsoleUi.AttachHelp(_search, "Filter logs by message or stack trace.");
-            _search.RegisterValueChangedCallback(_ => MarkDirty());
+            _search.RegisterValueChangedCallback(evt =>
+            {
+                searchPlaceholder.style.display = string.IsNullOrEmpty(evt.newValue)
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+                MarkDirty();
+            });
             toolbar.Add(_search);
 
             AddLogTypeButton(toolbar, LogType.Log, "Log");
@@ -130,10 +155,20 @@ namespace YuzeToolkit
             splitterHandle.AddToClassList(SplitterHandleClass);
             splitter.Add(splitterHandle);
 
-            _detail = new Label();
+            _detailHeader = new Label("No log selected")
+            {
+                enableRichText = false
+            };
+            _detailHeader.AddToClassList(DetailHeaderClass);
+            _detail = new Label("Select a log entry to inspect its full message and stack trace.")
+            {
+                enableRichText = false
+            };
             _detail.AddToClassList(DetailTextClass);
+            _detail.AddToClassList(DetailEmptyClass);
             _detailPane = RuntimeConsoleUi.CreatePanView();
             _detailPane.Root.AddToClassList(DetailClass);
+            _detailPane.Add(_detailHeader);
             _detailPane.Add(_detail);
             splitter.AddManipulator(new RuntimeLogDetailResizeManipulator(splitter, _list.Root, _detailPane.Root));
             Root.Add(splitter);
@@ -154,6 +189,9 @@ namespace YuzeToolkit
             button.AddToClassList(ToolbarButtonClass);
             button.AddToClassList(FilterButtonClass);
             button.AddToClassList(GetFilterClass(type));
+            var indicator = new VisualElement { pickingMode = PickingMode.Ignore };
+            indicator.AddToClassList(FilterIndicatorClass);
+            button.Insert(0, indicator);
             RuntimeConsoleUi.AttachHelp(button, $"Show {label} entries.");
             SetFilterLabel(button, type, 0);
             _typeButtons[type] = button;
@@ -165,7 +203,7 @@ namespace YuzeToolkit
         {
             _store.Clear();
             _selected = null;
-            _detail.text = string.Empty;
+            ShowEmptyDetail();
             _detailPane.ResetOffset();
             MarkDirty();
         }
@@ -234,7 +272,7 @@ namespace YuzeToolkit
             row.userData = entry;
             _rowElements.Add(row);
 
-            var message = new Label(FormatMessage(entry, count));
+            var message = new Label(FormatMessage(entry, count)) { enableRichText = false };
             message.AddToClassList(RowMessageClass);
             row.Add(message);
 
@@ -252,7 +290,9 @@ namespace YuzeToolkit
         private void Select(DebugLogEntry entry)
         {
             _selected = entry;
+            _detailHeader.text = $"[{entry.Time:HH:mm:ss}] {FormatLogType(entry.Type)} · {DetailSummary(entry.Message)}";
             _detail.text = FormatDetail(entry);
+            _detail.RemoveFromClassList(DetailEmptyClass);
             _detailPane.ResetOffset();
             _detailPane.Refresh();
             RefreshSelection();
@@ -267,6 +307,28 @@ namespace YuzeToolkit
                 else
                     row.RemoveFromClassList(RowSelectedClass);
             }
+        }
+
+        private void ShowEmptyDetail()
+        {
+            _detailHeader.text = "No log selected";
+            _detail.text = "Select a log entry to inspect its full message and stack trace.";
+            _detail.AddToClassList(DetailEmptyClass);
+        }
+
+        private static string FormatLogType(LogType type) => type switch
+        {
+            LogType.Warning => "WARNING",
+            LogType.Error or LogType.Exception or LogType.Assert => "ERROR",
+            _ => "LOG"
+        };
+
+        private static string DetailSummary(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return "Selected entry";
+            var firstLineEnd = message.IndexOfAny(new[] { '\r', '\n' });
+            var firstLine = firstLineEnd >= 0 ? message[..firstLineEnd] : message;
+            return firstLine.Length <= 72 ? firstLine : firstLine[..69] + "...";
         }
 
         private static bool IsError(DebugLogEntry entry) =>

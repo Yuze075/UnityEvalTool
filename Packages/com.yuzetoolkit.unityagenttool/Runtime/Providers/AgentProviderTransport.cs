@@ -106,6 +106,7 @@ namespace YuzeToolkit.UnityAgent
             IReadOnlyDictionary<string, string> headers)
         {
             var request = new HttpRequestMessage(method, uri);
+            request.Headers.TryAddWithoutValidation("User-Agent", "UnityAgentTool/0.1.0");
             foreach (var pair in headers)
             {
                 if (pair.Key.IndexOf('\r') >= 0 || pair.Key.IndexOf('\n') >= 0 ||

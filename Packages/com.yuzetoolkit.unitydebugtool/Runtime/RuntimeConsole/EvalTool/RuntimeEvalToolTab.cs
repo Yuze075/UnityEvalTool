@@ -11,8 +11,6 @@ namespace YuzeToolkit
     internal sealed class RuntimeEvalToolTab : RuntimeConsoleTabBase
     {
         private const string Endpoint = "http://127.0.0.1:2347/mcp";
-        private static readonly Color DisabledColor = new(0.4f, 0.44f, 0.5f);
-
         private Button _enabledSwitch = null!;
         private Button _reconnect = null!;
         private Label _connection = null!;
@@ -41,7 +39,7 @@ namespace YuzeToolkit
             _connection.text = !running ? "Disabled" : connected ? "Connected" : "Reconnecting";
             _connection.style.color = connected
                 ? RuntimeConsoleUi.RunningColor
-                : running ? RuntimeConsoleUi.WarningColor : DisabledColor;
+                : running ? RuntimeConsoleUi.WarningColor : RuntimeConsoleDesignTokens.TextCaption;
             _phase.text = status.Phase;
             _canEval.text = connected && status.CanEval
                 ? string.Equals(status.Phase, "CompilationFailed", StringComparison.Ordinal) ? "Repair" : "Ready"
@@ -49,7 +47,7 @@ namespace YuzeToolkit
             _canEval.style.color = connected && status.CanEval
                 ? RuntimeConsoleUi.RunningColor
                 : RuntimeConsoleUi.WarningColor;
-            _busyReason.text = string.IsNullOrWhiteSpace(status.BusyReason) ? "—" : status.BusyReason;
+            _busyReason.text = string.IsNullOrWhiteSpace(status.BusyReason) ? "Not busy" : status.BusyReason;
             _playMode.text = status.IsPlaying
                 ? status.IsPaused ? "Play Mode / Paused" : "Play Mode"
                 : status.IsUpdating ? "Edit Mode / Importing" : "Edit Mode";
@@ -128,10 +126,7 @@ namespace YuzeToolkit
 
         private static void SetSwitchStyle(Button button, bool enabled)
         {
-            button.text = enabled ? "●  Enabled" : "○  Disabled";
-            button.AddToClassList(RuntimeConsoleUss.SwitchClass);
-            button.EnableInClassList(RuntimeConsoleUss.SwitchOnClass, enabled);
-            button.EnableInClassList(RuntimeConsoleUss.SwitchOffClass, !enabled);
+            RuntimeConsoleUss.ApplySwitch(button, enabled ? "Enabled" : "Disabled", enabled);
         }
     }
 }
