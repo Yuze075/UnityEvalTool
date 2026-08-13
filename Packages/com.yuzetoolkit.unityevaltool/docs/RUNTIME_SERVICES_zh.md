@@ -1,6 +1,6 @@
 # Editor 与 Player 注册
 
-UnityEvalTool 2 不再让 Unity 自己监听 MCP 或 CLI。电脑级 Broker 必须已安装并运行；
+UnityEvalTool 不再让 Unity 自己监听 MCP 或 CLI。电脑级 Broker 必须已安装并运行；
 Editor 和非 WebGL Player 都主动向它注册。
 
 ## Editor

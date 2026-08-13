@@ -1,11 +1,11 @@
-# UnityEvalTool 2
+# UnityEvalTool
 
 [![Unity 2022.3+](https://img.shields.io/badge/Unity-2022.3%2B-222?logo=unity)](https://unity.com/releases/editor/archive)
 [![npm](https://img.shields.io/badge/npm-%40yuzetoolkit%2Funityevaltool-CB3837?logo=npm)](https://www.npmjs.com/package/@yuzetoolkit/unityevaltool)
 [![Broker](https://img.shields.io/badge/Broker-127.0.0.1%3A2347-4b7bec)](Broker/README.md)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-[中文说明](README_zh.md) · [Unity package](Packages/com.yuzetoolkit.unityevaltool/README.md) · [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_2.md)
+[中文说明](README_zh.md) · [Unity package](Packages/com.yuzetoolkit.unityevaltool/README.md) · [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
 
 UnityEvalTool connects every local Unity Editor or Player to one computer-level Broker. AI agents and terminal users talk to the Broker instead of depending on a listener inside a Unity script domain. Compilation, assembly reload, process exit and a stalled Unity main thread therefore remain visible even while eval is temporarily unavailable.
 
@@ -86,7 +86,7 @@ The server exposes only three tools:
 2. `unity_connect` selects an exact `instanceId` from a known registry revision and returns a workflow-local opaque handle.
 3. `eval` executes in the selected Unity. It rejects calls made before discovery and selection, and rejects calls while Unity cannot safely eval.
 
-Do not retry an interrupted mutating `eval`: the response explicitly reports when execution may already have occurred. See the [protocol specification](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_2.md) for the state model, errors and wait semantics.
+Do not retry an interrupted mutating `eval`: the response explicitly reports when execution may already have occurred. See the [protocol specification](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md) for the state model, errors and wait semantics.
 
 ## Service management
 

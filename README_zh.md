@@ -1,6 +1,6 @@
-# UnityEvalTool 2
+# UnityEvalTool
 
-[English](README.md) · [Unity 包说明](Packages/com.yuzetoolkit.unityevaltool/README_zh.md) · [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_2.md)
+[English](README.md) · [Unity 包说明](Packages/com.yuzetoolkit.unityevaltool/README_zh.md) · [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
 
 UnityEvalTool 让电脑上的所有 Unity Editor 或 Player 主动连接同一个电脑级 Broker。AI Agent 和终端不再依赖 Unity 脚本域内部的监听器，因此即使 Unity 正在编译、程序集重载、进程退出或主线程卡住，外部仍然能看到准确状态并等待恢复。
 
@@ -81,7 +81,7 @@ MCP 只提供三个工具：
 2. `unity_connect`：使用已知注册表版本精确选择 `instanceId`，返回当前工作流专用的不透明 handle。
 3. `eval`：在选中的 Unity 中执行；没有先查询和连接，或 Unity 当前不可安全执行时会明确拒绝。
 
-被中断的修改型 `eval` 不可自动重试；协议会明确告诉调用方是否可能已经执行。完整状态、等待语义和错误码见 [Broker 2.0 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_2.md)。
+被中断的修改型 `eval` 不可自动重试；协议会明确告诉调用方是否可能已经执行。完整状态、等待语义和错误码见 [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)。
 
 ## 服务管理
 

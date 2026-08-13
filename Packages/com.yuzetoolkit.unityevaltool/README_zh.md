@@ -1,11 +1,11 @@
-# UnityEvalTool 2
+# UnityEvalTool
 
 UnityEvalTool 通过一个电脑级 Broker，让 AI Agent 和终端用户操作 Unity。Unity
 不再自己监听 MCP 端口，也不再额外开启随机 CLI 端口。每个 Editor 或 Player
 只向 Broker 建立一条经过认证的 WebSocket；MCP 与 CLI 共同通过它中转，并继续
 使用现有的 PuerTS eval、helper tool 与命令解析系统。
 
-[English](README.md) · [协议](docs/BROKER_PROTOCOL_2.md) · [Helper 模块](docs/HELPER_MODULES_zh.md)
+[English](README.md) · [协议](docs/BROKER_PROTOCOL.md) · [Helper 模块](docs/HELPER_MODULES_zh.md)
 
 ## 组成
 

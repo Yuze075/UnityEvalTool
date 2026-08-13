@@ -32,7 +32,7 @@ unity service status
 
 Connect a Streamable HTTP MCP client to `http://127.0.0.1:2347/mcp`. Read the generated token from `~/.unityevaltool/auth.json` and send it as `Authorization: Bearer <token>`.
 
-The MCP tools are `unity_status`, `unity_connect` and `eval`. Discovery and selection are mandatory before eval. See the [full documentation](https://github.com/Yuze075/UnityEvalTool#readme) and [protocol specification](https://github.com/Yuze075/UnityEvalTool/blob/main/Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_2.md).
+The MCP tools are `unity_status`, `unity_connect` and `eval`. Discovery and selection are mandatory before eval. See the [full documentation](https://github.com/Yuze075/UnityEvalTool#readme) and [protocol specification](https://github.com/Yuze075/UnityEvalTool/blob/main/Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md).
 
 ## Service
 

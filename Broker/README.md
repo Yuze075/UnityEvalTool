@@ -1,7 +1,7 @@
 # UnityEvalTool Broker
 
 This directory contains the .NET NativeAOT Broker/CLI and npm release pipeline for
-UnityEvalTool 2.x. The Unity Package Manager package lives separately under
+UnityEvalTool. The Unity Package Manager package lives separately under
 `Packages/com.yuzetoolkit.unityevaltool`.
 
 The installed `unity` executable owns all runtime behavior: the localhost Broker,

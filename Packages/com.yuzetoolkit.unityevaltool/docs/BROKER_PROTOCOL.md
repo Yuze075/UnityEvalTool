@@ -1,4 +1,4 @@
-# UnityEvalTool Broker Protocol 2.0
+# UnityEvalTool Broker Protocol
 
 This document defines the stable boundary between the computer-level UnityEvalTool Broker and Unity clients. The Broker owns discovery, status, selection, waiting and routing. Unity owns PuerTS eval sessions, tool registration and CLI command parsing.
 

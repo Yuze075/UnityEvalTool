@@ -1,4 +1,4 @@
-# UnityEvalTool 2 architecture
+# UnityEvalTool architecture
 
 ## Process boundary
 

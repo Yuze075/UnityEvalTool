@@ -1,6 +1,6 @@
 # Editor and Player registration
 
-UnityEvalTool 2 has no Unity-hosted MCP or CLI listener. The computer-level Broker must be
+UnityEvalTool has no Unity-hosted MCP or CLI listener. The computer-level Broker must be
 installed and running. Both Editor and non-WebGL Player processes register outbound to it.
 
 ## Editor

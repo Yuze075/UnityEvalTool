@@ -14,6 +14,8 @@ namespace YuzeToolkit
 {
     public sealed class UnityBrokerClient : IDisposable
     {
+        public const string EditorEnabledPreferenceKey = nameof(YuzeToolkit) + ".Broker.Enabled";
+
         private static readonly Lazy<UnityBrokerClient> LazyShared = new(() => new UnityBrokerClient());
         private readonly object _syncRoot = new();
         private readonly SemaphoreSlim _sendGate = new(1, 1);
@@ -39,6 +41,11 @@ namespace YuzeToolkit
         public bool IsConnected
         {
             get { lock (_syncRoot) return _isConnected; }
+        }
+
+        public bool IsRunning
+        {
+            get { lock (_syncRoot) return _runTask != null; }
         }
 
         public BrokerClientIdentity Identity
