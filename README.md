@@ -2,45 +2,60 @@
 
 [![Unity 2022.3+](https://img.shields.io/badge/Unity-2022.3%2B-222?logo=unity)](https://unity.com/releases/editor/archive)
 [![npm](https://img.shields.io/badge/npm-%40yuzetoolkit%2Funityevaltool-CB3837?logo=npm)](https://www.npmjs.com/package/@yuzetoolkit/unityevaltool)
-[![Broker](https://img.shields.io/badge/Broker-127.0.0.1%3A2347-4b7bec)](Broker/README.md)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-[中文说明](README_zh.md) · [UnityEvalTool package](Packages/com.yuzetoolkit.unityevaltool/README.md) · [UnityDebugTool package](Packages/com.yuzetoolkit.unitydebugtool/README.md) · [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
+**English** | [简体中文](README_zh.md)
 
-UnityEvalTool connects every local Unity Editor or Player to one computer-level Broker. AI agents and terminal users talk to the Broker instead of depending on a listener inside a Unity script domain. Compilation, assembly reload, process exit and a stalled Unity main thread therefore remain visible even while eval is temporarily unavailable; failed compilation keeps MCP/CLI available in repair mode through the last successfully loaded assemblies.
+UnityEvalTool lets AI agents and terminal users inspect and operate local Unity Editor and
+Player processes. A native, computer-level Broker provides the MCP endpoint and the
+`unity` CLI, while a Unity Package Manager package registers each Unity process with that
+Broker. Compilation, Domain Reload, process replacement, and temporary disconnection are
+reported explicitly instead of being hidden behind an in-Editor network listener.
 
-The repository also ships UnityDebugTool, a UI Toolkit runtime debug panel and console that exposes the same tool model to players, developers and AI agents.
+The repository also contains the optional UnityDebugTool package, which adds an in-game
+debug panel and runtime console on top of the same tool model.
 
-## Repository layout
+## What you install
 
-```text
-UnityEvalTool
-├── Packages/
-│   ├── com.yuzetoolkit.unityevaltool/   # Broker client, MCP eval and CLI runtime
-│   └── com.yuzetoolkit.unitydebugtool/  # Runtime debug UI and console
-├── Broker/
-│   ├── src/                             # C# NativeAOT Broker and CLI
-│   └── npm/                             # npm entry and native platform packages
-├── Roslyn/                              # Source generator solution and tests
-└── .github/workflows/
-    └── release.yml                      # Six-platform build and release matrix
-```
+| Component | Purpose | Required |
+|---|---|---|
+| `com.yuzetoolkit.unityevaltool` | Unity-side Broker client, status reporting, PuerTS eval sessions, CLI commands, and helper modules | Yes |
+| `@yuzetoolkit/unityevaltool` | Native Broker, MCP server, `unity` CLI, and current-user background service | Yes |
+| `com.yuzetoolkit.unitydebugtool` | Runtime debug windows, performance/system HUDs, log console, command line, and tool catalog | No |
 
-Each package owns its package-specific setup and API documentation. This README covers the combined repository, Broker and release workflow.
+Supported Broker/CLI platforms are macOS, Linux, and Windows on x64 and arm64. The Unity
+packages require Unity 2022.3 or newer. Installing the Broker requires Node.js 18 or newer
+and npm. WebGL is not a supported Broker target.
 
-## Installation
+## Install
 
-### 1. Install the Unity packages
+### 1. Prepare the PuerTS backend
 
-#### UnityEvalTool
+UnityEvalTool requires `com.tencent.puerts.core` 3.0.2 and exactly one compatible PuerTS
+JavaScript backend. The tested combination is `com.tencent.puerts.quickjs` 3.0.2 with its
+matching core package. A supported V8 backend and core from the same PuerTS release may be
+used instead. Do not install QuickJS and V8 backends together.
 
-UnityEvalTool requires `com.tencent.puerts.core` 3.0.2 and exactly one PuerTS JavaScript backend. This repository is validated with `com.tencent.puerts.quickjs` 3.0.2; alternatively use one supported V8 backend/core pair from the same PuerTS release. Do not install multiple backends at once. Then add UnityEvalTool with Unity Package Manager's **Add package from git URL** command:
+For the tested setup, download `PuerTS_Core_3.0.2.tar.gz` and
+`PuerTS_Quickjs_3.0.2.tar.gz` from the official
+[PuerTS Unity 3.0.2 release](https://github.com/Tencent/puerts/releases/tag/Unity_v3.0.2).
+Extract both archives, then use Package Manager's **Add package from disk** command to
+select `package.json` first in the extracted `core` directory and then in `quickjs`.
+The [official PuerTS installation guide](https://github.com/Tencent/puerts/blob/Unity_v3.0.2/doc/unity/en/install.md)
+also covers alternative backends.
+
+The UnityEvalTool package declares the core dependency, but it deliberately does not choose
+a JavaScript backend for your project.
+
+### 2. Add the UnityEvalTool package
+
+In Unity, open **Window > Package Manager**, choose **Add package from git URL**, and enter:
 
 ```text
 https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
 ```
 
-Or add it to `Packages/manifest.json`:
+The equivalent `Packages/manifest.json` dependency is:
 
 ```json
 {
@@ -50,32 +65,13 @@ Or add it to `Packages/manifest.json`:
 }
 ```
 
-When this repository is embedded at `Game/UnityEvalTool` in a Unity project, consume the
-working tree directly instead of copying the package:
+If you are developing against a local clone, use Package Manager's **Add package from
+disk** command and select
+`Packages/com.yuzetoolkit.unityevaltool/package.json` inside that clone.
 
-```json
-"com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
-```
+### 3. Install the Broker and CLI
 
-#### UnityDebugTool
-
-Repository tag `v2.0.2` contains UnityDebugTool package version `1.0.1`, which depends on
-UnityEvalTool `2.0.2`. Install UnityEvalTool first, then add the optional runtime debug UI package:
-
-```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
-```
-
-For an embedded development checkout, reference both working-tree packages:
-
-```json
-"com.yuzetoolkit.unitydebugtool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unitydebugtool",
-"com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
-```
-
-UnityDebugTool usage, prefab setup, modules and APIs are documented in its [package README](Packages/com.yuzetoolkit.unitydebugtool/README.md).
-
-### 2. Install the Broker and CLI
+Install the native package globally, then explicitly install its current-user service:
 
 ```bash
 npm install --global @yuzetoolkit/unityevaltool
@@ -83,91 +79,163 @@ unity service install
 unity doctor
 ```
 
-The npm package installs the native `unity` executable for macOS, Linux or Windows on x64
-and arm64. Service setup is an explicit second step because modern npm versions may block
-dependency lifecycle scripts. `unity service install` creates and starts a current-user
-service, never a system-wide privileged daemon. Check that it succeeds before running
-`unity doctor`; do not disable npm's install-script security policy.
+The service runs only for the current user: a LaunchAgent on macOS, a systemd user unit on
+Linux, or a Scheduled Task on Windows. It does not require a system-wide privileged daemon.
+Service setup is an explicit command because npm dependency lifecycle scripts may be
+disabled; verify that `unity service install` succeeds before continuing.
+
+### 4. Verify the Unity connection
+
+Open a project containing the UnityEvalTool package and wait for Unity to finish compiling.
+Then run:
+
+```bash
+unity doctor
+unity list
+unity connect <instance-id> -- Runtime getState
+```
+
+`unity doctor` should report a reachable Broker. `unity list` should show the open Editor
+with its project path and current phase; substitute that row's ID in the final command.
+The final command proves that Broker-to-Unity
+execution works. You can also open **YuzeToolkit > UnityEvalTool** in the Editor to inspect
+registration, connection state, and eval availability. If no instance appears, check
+`unity service status`, confirm that the package compiled successfully, and make sure
+another process is not using loopback port `2347`.
 
 ## CLI quick start
 
+Run `unity` from a Unity project directory to select the matching Editor automatically, or
+connect to an ID returned by `unity list`:
+
 ```bash
-unity list
-unity                         # Select the Unity matching the current directory
-unity connect <instance-id>   # Enter that Unity's interactive console
-unity Runtime getState        # Run one existing Unity-side CLI command
+unity
+unity connect <instance-id>
+unity Runtime getState
 unity eval-js --code "return 1 + 2;"
-unity service status
+unity tools
 ```
 
-The interactive console keeps the existing Unity-side command parser. Broker commands are `:status`, `:wait`, `:switch`, `:help` and `:quit`.
+The first two commands open an interactive console. Within it, `:status`, `:wait`,
+`:switch`, `:help`, and `:quit` control the Broker connection. Other input is forwarded to
+Unity's command parser. Run `unity --help` or `unity <command> --help` for the installed
+CLI's complete command syntax.
 
-## MCP configuration
+## MCP setup
 
-The Streamable HTTP endpoint is `http://127.0.0.1:2347/mcp`. The first install creates `~/.unityevaltool/auth.json`. Configure the MCP client to send its `token` as:
+The Broker exposes a Streamable HTTP MCP endpoint at:
+
+```text
+http://127.0.0.1:2347/mcp
+```
+
+The first Broker start creates `~/.unityevaltool/auth.json` with current-user-only
+permissions. Read its `token` and configure your MCP client to send:
 
 ```text
 Authorization: Bearer <token>
 ```
 
-The server exposes only three tools:
+MCP client configuration formats differ. Use the endpoint as the server URL and add the
+authorization value as an HTTP header; do not commit the token to source control.
 
-1. `unity_status` discovers Unity instances and can wait for readiness or a new compilation cycle to finish.
-2. `unity_connect` selects an exact `instanceId` from a known registry revision and returns a workflow-local opaque handle.
-3. `eval` executes in the selected Unity. It rejects calls made before discovery and selection, and rejects calls while Unity cannot safely eval.
+The server exposes three MCP tools, used in this order:
 
-Do not retry an interrupted mutating `eval`: the response explicitly reports when execution may already have occurred. See the [protocol specification](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md) for the state model, errors and wait semantics.
+1. `unity_status` discovers Unity instances and reports their current state.
+2. `unity_connect` selects an exact `instanceId` from a known `registryRevision` and
+   returns an opaque, workflow-local connection handle.
+3. `eval` runs JavaScript in the selected Unity when its state permits evaluation.
 
-## Service management
+A minimal `eval` program is:
+
+```javascript
+async function execute() {
+  return 1 + 2;
+}
+```
+
+Reuse a valid handle across Domain Reload and registry changes in the same Unity process.
+Reconnect only when the handle expires, becomes invalid, or the Unity process is replaced.
+Never automatically retry a mutating `eval` whose connection was interrupted after
+dispatch; its result can be outcome-unknown. See [Advanced usage](Packages/com.yuzetoolkit.unityevaltool/docs/ADVANCED_USAGE.md)
+and the [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md).
+
+## Optional runtime debug UI
+
+Install UnityDebugTool after UnityEvalTool with **Add package from git URL**:
+
+```text
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
+```
+
+Then place `Runtime/Core/Prefabs/DebugPanel.prefab` from that package in a scene or a
+persistent prefab. The panel is not created automatically. Its modules, default keys,
+prefab rules, and APIs are documented in the
+[UnityDebugTool package README](Packages/com.yuzetoolkit.unitydebugtool/README.md).
+
+The default keys are `F8` for Runtime Console, `F9` for Debug Windows, and `F10` for the
+Performance and System Information HUDs.
+
+## Security boundary
+
+The Broker binds only to `127.0.0.1:2347`, rejects non-loopback access, and authenticates
+Unity, CLI, and MCP traffic with the per-user token. Supported non-WebGL release Players
+that include UnityEvalTool intentionally register with the Broker and retain authenticated
+arbitrary-JavaScript evaluation; this behavior is not limited to Development Builds and
+does not depend on UnityDebugTool. Decide deliberately whether that capability belongs in
+your shipped product. See [Editor and Player registration](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES.md).
+
+## Service management and uninstall
 
 ```bash
-unity service install
 unity service status
 unity service start
 unity service stop
 unity service restart
-unity service uninstall
 ```
 
-The service uses a LaunchAgent on macOS, a systemd user unit on Linux, and a current-user Scheduled Task on Windows. The Broker binds loopback port 2347 only and fails explicitly if that port is already owned by another process.
-
-To uninstall, remove the current-user service while the `unity` executable still exists,
-verify that this first command succeeds, and only then remove the npm package. npm does not
-run uninstall lifecycle scripts:
+When uninstalling, remove the service while the `unity` executable still exists. Confirm
+that the first command succeeds before removing the npm package:
 
 ```bash
 unity service uninstall
 npm uninstall --global @yuzetoolkit/unityevaltool
 ```
 
-## Development and release
+npm does not automatically run the service-uninstall helper.
+
+## Build and package from source
+
+Source builds require the exact .NET SDK selected by `global.json` (currently 10.0.300),
+Node.js 22, and the NativeAOT toolchain for the host OS and architecture. From a clone of
+this repository, package the current platform and the platform-independent npm entry with:
 
 ```bash
-dotnet build Broker/UnityEvalTool.Broker.slnx -c Release
-dotnet test Roslyn/UnityEvalToolRoslyn.sln -c Release
 cd Broker
-node --input-type=module -e "import { resolveAndValidateVersion } from './npm/scripts/version.mjs'; console.log(resolveAndValidateVersion(process.cwd()));"
 node npm/scripts/pack-platform.mjs
 node npm/scripts/pack-root.mjs
 ```
 
-Broker, Roslyn and both Unity packages are ordinary source folders in this repository. No
-source archive is required and package development does not download an auxiliary zip.
-`version.json` is the release version authority; CI verifies the Broker, Unity package,
-runtime constant and npm package metadata before building six NativeAOT platform packages
-plus the platform-independent npm entry package. Publishing is deliberately gated behind
-an explicit workflow input. All seven npm packages trust only GitHub Actions from
-`Yuze075/UnityEvalTool`'s `release.yml`; the publish job uses short-lived OIDC credentials
-instead of a repository npm token. See [Broker/README.md](Broker/README.md) for package
-internals and the release checklist.
+The generated `.tgz` files are written to `Broker/artifacts/npm/`. Native packages for all
+six OS/architecture combinations must be built on matching hosts. Detailed build, test,
+version-validation, and artifact paths are in the [Broker build guide](Broker/README.md);
+the source-generator build is documented in [Roslyn/README.md](Roslyn/README.md).
 
-When this tree is embedded under `Game/UnityEvalTool` in RelicLight, ordinary RelicLight
-contributors publish only the parent RelicLight repository to CNB. They do not need this
-repository's GitHub remote, GitHub write access or a second checkout. Only a machine that
-maintains both repositories explicitly enables the parent repository's mirror hooks; those
-hooks reconcile the complete tree and publish GitHub only after CNB has accepted the exact
-RelicLight source commit. A GitHub failure is retained as recoverable pending state and is
-never reported as though the already-successful CNB update had been rolled back.
+These commands only build local artifacts. How those artifacts are distributed or
+published is intentionally left to each maintainer's own registry and automation setup.
+
+## Documentation
+
+- [UnityEvalTool package](Packages/com.yuzetoolkit.unityevaltool/README.md)
+- [UnityDebugTool package](Packages/com.yuzetoolkit.unitydebugtool/README.md)
+- [Advanced usage](Packages/com.yuzetoolkit.unityevaltool/docs/ADVANCED_USAGE.md)
+- [Helper module reference](Packages/com.yuzetoolkit.unityevaltool/docs/HELPER_MODULES.md)
+- [Editor and Player registration](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES.md)
+- [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
+- [Architecture](Packages/com.yuzetoolkit.unityevaltool/docs/PROJECT_DESIGN.md)
+- [Broker build and packaging](Broker/README.md)
+- [Roslyn source generator](Roslyn/README.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

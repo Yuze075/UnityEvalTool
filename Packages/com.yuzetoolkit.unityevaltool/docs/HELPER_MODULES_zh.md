@@ -1,10 +1,11 @@
 # Helper 参考
 
-[README](../README_zh.md) | [English](HELPER_MODULES.md) | [Runtime 服务](RUNTIME_SERVICES_zh.md) | [项目设计](PROJECT_DESIGN_zh.md) | [高级说明](ADVANCED_USAGE_zh.md)
+[English](HELPER_MODULES.md) | **简体中文** | [Package README](../README_zh.md) | [Runtime 服务](RUNTIME_SERVICES_zh.md) | [项目架构](PROJECT_DESIGN_zh.md) | [进阶使用](ADVANCED_USAGE_zh.md)
 
 [![Runtime](https://img.shields.io/badge/Runtime-6%20modules-2ecc71)](#runtime-helpers)
 [![Editor](https://img.shields.io/badge/Editor-9%20modules-3498db)](#editor-helpers)
-[![Tool](https://img.shields.io/badge/Broker%20MCP-3%20tools-orange)](../README_zh.md#mcp-固定流程)
+[![Catalog](https://img.shields.io/badge/Tool%20catalog-1%20module-8e44ad)](#tool-目录)
+[![Tool](https://img.shields.io/badge/Broker%20MCP-3%20tools-orange)](../../../README_zh.md#mcp-配置)
 
 完成 `unity_status` 和 `unity_connect` 后，Broker 的 `eval` 会在选中的 Unity 内运行。Agent 在这个 eval 中从 `tools://` 和 `tools://<Tool/Path>` import helper module。内置 module 从带 `[EvalTool(name, description)]` 的 partial C# class 生成；source generator 会为它们生成 `IEvalTool` 元数据。每个 C# module 导出语义函数，每次调用都会确认 tool 仍处于启用状态，再通过 PuerTS 调用 C# public 实例方法，并把返回值交给 Unity 侧 executor 格式化。项目和其他包的 JavaScript 扩展需要通过 `tools://UnityEval` 显式加载。
 
@@ -25,12 +26,26 @@ async function execute() {
 
 | 分类 | 模块 |
 |---|---|
+| Tool 目录 | `tools://UnityEval` |
 | Runtime helpers | `tools://Runtime`, `tools://Runtime/Objects`, `tools://Runtime/Components`, `tools://Runtime/Diagnostics`, `tools://Runtime/Reflection`, `tools://Runtime/Inspect` |
 | Editor helpers | `tools://Editor`, `tools://Editor/Assets`, `tools://Editor/Importers`, `tools://Editor/Scenes`, `tools://Editor/Prefabs`, `tools://Editor/Serialized`, `tools://Editor/Project`, `tools://Editor/Pipeline`, `tools://Editor/Validation` |
 
 Runtime helper 可在 Editor 或 Runtime/Player 中运行，前提是底层 Unity API 可用。Editor helper 依赖 `UnityEditor`，在 Runtime/Player 中会明确失败。
 
 生成 helper 函数使用位置参数，例如 `const assets = await import('tools://Editor/Assets'); assets.find('t:Prefab', 20, ['Assets'])`。生成的 C# module 会暴露 `functions[].description`、有序的 `functions[].parameters`、显式声明的 safety flags、`conditionalRequiresConfirmation` 等条件安全提示，也会导出 `isEnabled()` 用于读取当前启用状态。
+
+## Tool 目录
+
+### `tools://UnityEval`
+
+用于检查目录、管理启用状态，以及获取 JavaScript Tool 编写指导。
+
+| 函数 | 用途 | 安全 |
+|---|---|---|
+| `listTools(refresh?)` | 列出已注册的 C# 与 loader-backed JavaScript Tool。 | 只读 |
+| `getToolDetails(name, refresh?)` | 返回一个 Tool 路径的完整 metadata。 | 只读 |
+| `setToolEnabled(name, enabled)` | 启用或停用 C# / JavaScript Tool；Editor 中按 Tool 路径持久化。 | 修改 Editor 状态 |
+| `getJsToolAuthoringPrompt()` | 返回当前 loader-backed JavaScript Tool 编写契约。 | 只读 |
 
 ## Runtime Helpers
 

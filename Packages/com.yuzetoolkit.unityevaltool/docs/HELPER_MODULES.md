@@ -1,10 +1,11 @@
 # Helper Reference
 
-[README](../README.md) | [中文](HELPER_MODULES_zh.md) | [Runtime services](RUNTIME_SERVICES.md) | [Project design](PROJECT_DESIGN.md) | [Advanced notes](ADVANCED_USAGE.md)
+**English** | [简体中文](HELPER_MODULES_zh.md) | [Package README](../README.md) | [Runtime services](RUNTIME_SERVICES.md) | [Architecture](PROJECT_DESIGN.md) | [Advanced usage](ADVANCED_USAGE.md)
 
 [![Runtime](https://img.shields.io/badge/Runtime-6%20modules-2ecc71)](#runtime-helpers)
 [![Editor](https://img.shields.io/badge/Editor-9%20modules-3498db)](#editor-helpers)
-[![Tool](https://img.shields.io/badge/Broker%20MCP-3%20tools-orange)](../README.md#mcp-workflow)
+[![Catalog](https://img.shields.io/badge/Tool%20catalog-1%20module-8e44ad)](#tool-catalog)
+[![Tool](https://img.shields.io/badge/Broker%20MCP-3%20tools-orange)](../../../README.md#mcp-setup)
 
 After `unity_status` and `unity_connect`, the Broker `eval` tool runs inside the selected Unity. Within that eval, agents import helper modules from `tools://` and `tools://<Tool/Path>`. Built-in modules are generated from partial C# classes marked with `[EvalTool(name, description)]`; the source generator emits their `IEvalTool` metadata. Each C# module exports semantic functions that validate the tool is enabled, call public C# instance methods through PuerTS, and leave final result formatting to the Unity-side executor. Project and package JavaScript extensions are loaded explicitly through `tools://UnityEval`.
 
@@ -25,12 +26,26 @@ async function execute() {
 
 | Category | Modules |
 |---|---|
+| Tool catalog | `tools://UnityEval` |
 | Runtime helpers | `tools://Runtime`, `tools://Runtime/Objects`, `tools://Runtime/Components`, `tools://Runtime/Diagnostics`, `tools://Runtime/Reflection`, `tools://Runtime/Inspect` |
 | Editor helpers | `tools://Editor`, `tools://Editor/Assets`, `tools://Editor/Importers`, `tools://Editor/Scenes`, `tools://Editor/Prefabs`, `tools://Editor/Serialized`, `tools://Editor/Project`, `tools://Editor/Pipeline`, `tools://Editor/Validation` |
 
 Runtime helpers can run in Editor or Runtime/Player when the underlying Unity API is available. Editor helpers require `UnityEditor` and fail clearly in Runtime/Player.
 
 Generated helper functions use positional arguments, such as `const assets = await import('tools://Editor/Assets'); assets.find('t:Prefab', 20, ['Assets'])`. Each generated C# module exposes `functions[].description`, ordered `functions[].parameters`, declared safety flags, conditional safety hints such as `conditionalRequiresConfirmation`, and `isEnabled()` for the current enabled state.
+
+## Tool Catalog
+
+### `tools://UnityEval`
+
+Catalog inspection, enabled-state management, and JavaScript Tool authoring guidance.
+
+| Function | Purpose | Safety |
+|---|---|---|
+| `listTools(refresh?)` | List registered C# and loader-backed JavaScript Tools. | Read-only |
+| `getToolDetails(name, refresh?)` | Return complete metadata for one Tool path. | Read-only |
+| `setToolEnabled(name, enabled)` | Enable or disable one C# or JavaScript Tool; Editor state persists by Tool path. | Mutates Editor state |
+| `getJsToolAuthoringPrompt()` | Return the current loader-backed JavaScript Tool authoring contract. | Read-only |
 
 ## Runtime Helpers
 

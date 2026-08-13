@@ -1,5 +1,7 @@
 # 进阶使用
 
+[English](ADVANCED_USAGE.md) | **简体中文** | [Package README](../README_zh.md)
+
 ## Eval 契约
 
 Broker 的 `eval` 工具继续接收原有 Unity 侧程序：

@@ -1,5 +1,7 @@
 # Advanced usage
 
+**English** | [简体中文](ADVANCED_USAGE_zh.md) | [Package README](../README.md)
+
 ## Eval contract
 
 The Broker `eval` tool accepts the same Unity-side program as before:

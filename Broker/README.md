@@ -1,38 +1,122 @@
-# UnityEvalTool Broker
+# UnityEvalTool Broker build and packaging
 
-This directory contains the .NET NativeAOT Broker/CLI and npm release pipeline for
-UnityEvalTool. The Unity Package Manager package lives separately under
-`Packages/com.yuzetoolkit.unityevaltool`.
+**English** | [简体中文](README_zh.md) | [User guide](../README.md)
 
-The installed `unity` executable owns all runtime behavior: the localhost Broker,
-MCP endpoint, Unity registration, CLI routing, and current-user service management.
-The npm JavaScript files only select and launch the native package for the current
-platform.
+`Broker` contains the C# NativeAOT Broker and `unity` CLI, their tests, and the scripts
+that assemble npm packages. This document describes reproducible local build and packaging
+only. Publishing and registry automation are intentionally outside its scope.
 
-Supported release RIDs:
+## Prerequisites
 
-- `osx-arm64`, `osx-x64`
-- `win-arm64`, `win-x64`
-- `linux-arm64`, `linux-x64`
+- The exact .NET SDK selected by [`global.json`](../global.json), currently `10.0.300`.
+  Roll-forward is disabled.
+- Node.js 22 for repository build and packaging scripts. The installed npm entry package
+  supports Node.js 18 or newer at runtime.
+- The NativeAOT build toolchain for the target operating system and architecture.
 
-Build the current platform package with:
+Build each native package on a matching host. Setting a target name does not turn the
+script into a supported cross-OS toolchain.
+
+Supported targets are:
+
+| npm platform | npm architecture | .NET RID |
+|---|---|---|
+| `darwin` | `arm64` | `osx-arm64` |
+| `darwin` | `x64` | `osx-x64` |
+| `linux` | `arm64` | `linux-arm64` |
+| `linux` | `x64` | `linux-x64` |
+| `win32` | `arm64` | `win-arm64` |
+| `win32` | `x64` | `win-x64` |
+
+## Validate committed versions
+
+[`version.json`](../version.json) is the source of truth for the UnityEvalTool/Broker/npm
+version, the independently versioned UnityDebugTool package, and the protocol version. The
+packaging scripts reject mismatches across package manifests, Broker properties, runtime
+constants, protocol constants, and npm optional dependencies.
+
+From the repository root:
 
 ```bash
+cd Broker
+node --input-type=module -e "import { resolveAndValidateVersion } from './npm/scripts/version.mjs'; console.log(resolveAndValidateVersion(process.cwd()));"
+```
+
+This command validates committed metadata; it does not edit or inject a version.
+
+## Build and test
+
+From the repository root:
+
+```bash
+dotnet build Broker/UnityEvalTool.Broker.slnx -c Release
+dotnet test Broker/tests/UnityEvalTool.Broker.Tests/UnityEvalTool.Broker.Tests.csproj -c Release --no-build
+```
+
+The first command builds the Broker solution. The second runs the Broker tests against
+that Release build.
+
+The source generator has its own solution:
+
+```bash
+dotnet test Roslyn/UnityEvalToolRoslyn.sln -c Release --artifacts-path <temporary-output-directory>
+```
+
+See the [Roslyn guide](../Roslyn/README.md) for analyzer deployment and byte comparison.
+
+## Package the current native platform
+
+From the repository root:
+
+```bash
+cd Broker
 node npm/scripts/pack-platform.mjs
 ```
 
-Build the platform-independent entry package with:
+By default the script uses the host's `process.platform` and `process.arch`. It:
+
+1. validates every committed version boundary;
+2. runs `dotnet publish` as a self-contained Release NativeAOT executable;
+3. stages the executable, license, and generated platform manifest; and
+4. runs `npm pack --ignore-scripts`.
+
+Output paths use the selected target:
+
+```text
+Broker/artifacts/publish/<rid>/
+Broker/artifacts/npm/<platform>-<arch>/
+Broker/artifacts/npm/yuzetoolkit-unityevaltool-<platform>-<arch>-<version>.tgz
+```
+
+For a matching host whose detected values need to be supplied explicitly, the script reads
+`UNITY_EVAL_TOOL_PLATFORM` (`darwin`, `linux`, or `win32`) and
+`UNITY_EVAL_TOOL_ARCH` (`arm64` or `x64`). These variables choose package metadata and the
+RID; they do not install a cross-compilation toolchain.
+
+## Package the npm entry
+
+The platform-independent entry package selects the matching optional native dependency and
+provides service-management helpers:
 
 ```bash
+cd Broker
 node npm/scripts/pack-root.mjs
 ```
 
-NativeAOT platform packages are built on matching GitHub Actions runners. Publishing
-is a separate, explicit step and must not be performed merely to validate packaging.
+Outputs are:
+
+```text
+Broker/artifacts/npm/root/
+Broker/artifacts/npm/yuzetoolkit-unityevaltool-<version>.tgz
+```
+
+The artifacts directory may contain tarballs from earlier local builds. Identify the
+current output by its package name and committed version instead of treating every `.tgz`
+in the directory as part of one build.
 
 ## Package set
 
-Every version is released as one entry package and six optional native packages:
+A complete multi-platform set contains one entry package and six native packages:
 
 - `@yuzetoolkit/unityevaltool`
 - `@yuzetoolkit/unityevaltool-darwin-arm64`
@@ -42,27 +126,25 @@ Every version is released as one entry package and six optional native packages:
 - `@yuzetoolkit/unityevaltool-win32-arm64`
 - `@yuzetoolkit/unityevaltool-win32-x64`
 
-Publish all six native packages before the entry package. This prevents users from
-installing an entry version whose matching native dependency is not available yet.
+The scripts produce local `.tgz` files only. They do not contact an npm registry, create a
+source-control tag, or create a hosted release. Maintainers choose and configure their own
+distribution process.
 
-## Release checklist
+## Source layout
 
-1. Keep `version.json`, UnityEvalTool, Broker and npm versions identical. UnityDebugTool
-   has its own SemVer in `debugPackageVersion`, but its UnityEvalTool dependency must match.
-2. Build `Broker/UnityEvalTool.Broker.slnx` and run its tests in Release configuration.
-3. Run `release.yml` with `publish=false`; the workflow verifies all seven artifacts,
-   starts every packed native executable, and installs the Linux entry/native tarball pair
-   before running `unity --help` and `unity doctor`.
-4. Inspect the retained artifacts when additional platform-specific verification is needed.
-5. Configure every npm package's Trusted Publisher for repository
-   `Yuze075/UnityEvalTool`, workflow `release.yml`, and `npm publish` permission. The
-   workflow uses GitHub OIDC and does not require an `NPM_TOKEN` secret.
-6. Run the workflow with `publish=true`; only the publish job receives `id-token: write`,
-   and npm verifies the repository/workflow identity before accepting an artifact.
-7. Publish native packages first, entry package last, then create the matching
-   `v<version>` GitHub release and attach all seven tarballs.
+```text
+Broker/
+├── src/UnityEvalTool.Broker/       # Native Broker, MCP server, CLI, service commands
+├── tests/UnityEvalTool.Broker.Tests/ # Broker tests
+├── npm/root/                       # Platform-independent npm package source
+├── npm/scripts/                    # Version validation and pack scripts
+└── artifacts/                      # Ignored local build and package output
+```
 
-Do not replace a published npm version. A failed publish job may be retried with the exact
-retained artifacts: preflight verifies each existing npm tarball by SHA-1 and publishes only
-the missing packages. If the artifacts are rebuilt or their bytes differ after any package in
-the set was published, advance the version for the whole set.
+The installed native executable owns the Broker, MCP, CLI routing, Unity registration, and
+current-user service behavior. JavaScript in the entry npm package only selects and starts
+the matching native package and exposes explicit service helpers.
+
+## License
+
+[MIT](../LICENSE)

@@ -1,5 +1,7 @@
 # UnityEvalTool architecture
 
+**English** | [简体中文](PROJECT_DESIGN_zh.md) | [Package README](../README.md)
+
 ## Process boundary
 
 ```text
@@ -18,7 +20,7 @@ and CLI command parsing.
 | Area | Source | Responsibility |
 |---|---|---|
 | Native Broker | Repository `Broker/src/UnityEvalTool.Broker` | Port 2347, registry, MCP tools, CLI, service management |
-| npm release | Repository `Broker/npm` | Platform selection, explicit user-service helpers, per-RID packages |
+| npm packaging | Repository `Broker/npm` | Platform selection, explicit user-service helpers, per-RID packages |
 | Unity transport | `Runtime/Broker` | Authenticated registration, heartbeat, routed requests, sessions |
 | Editor lifecycle | `Editor/Broker` | Stable process identity, compile/reload state, Broker startup |
 | Eval engine | `Runtime/Core` and `Runtime/Tools` | PuerTS execution and generated helper modules |

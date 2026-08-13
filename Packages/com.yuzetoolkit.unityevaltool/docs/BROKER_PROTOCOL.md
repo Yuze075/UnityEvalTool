@@ -1,5 +1,7 @@
 # UnityEvalTool Broker Protocol
 
+**English** | [简体中文](BROKER_PROTOCOL_zh.md) | [Package README](../README.md)
+
 This document defines the stable boundary between the computer-level UnityEvalTool Broker and Unity clients. The Broker owns discovery, status, selection, waiting and routing. Unity owns PuerTS eval sessions, tool registration and CLI command parsing.
 
 ## Endpoints
@@ -48,7 +50,7 @@ new Broker process from accidentally inheriting sessions that it no longer owns.
 
 Unity publishes `unity/status` events. A status contains independent transport and main-thread observations plus:
 
-- `phase`: `Starting`, `Ready`, `Importing`, `Compiling`, `CompilationFailed`, `Reloading`, `PlayModeTransition`, `MainThreadStalled`, `Exiting`, `Exited`, or `Incompatible`
+- `phase`: `Starting`, `Ready`, `Importing`, `Compiling`, `CompilationFailed`, `Reloading`, `PlayModeTransition`, `MainThreadStalled`, or `Exiting`
 - `canEval`
 - `busyReason`
 - `mainThreadTick`

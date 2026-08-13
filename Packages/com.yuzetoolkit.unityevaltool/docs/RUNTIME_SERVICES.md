@@ -1,7 +1,10 @@
 # Editor and Player registration
 
+**English** | [简体中文](RUNTIME_SERVICES_zh.md) | [Package README](../README.md)
+
 UnityEvalTool has no Unity-hosted MCP or CLI listener. The computer-level Broker must be
-installed and running. Both Editor and non-WebGL Player processes register outbound to it.
+installed and running. Editor and supported non-WebGL Player processes register outbound
+to it.
 
 ## Editor
 
@@ -27,7 +30,8 @@ this UnityEvalTool runtime client. Trust is bounded to the local user's loopback
 its user-only token; projects embedding this package must preserve that contract unless
 they deliberately fork the product design.
 
-WebGL is excluded because it cannot use the required local ClientWebSocket/service model.
+WebGL is not a supported Broker target because the local ClientWebSocket/current-user
+service model is unavailable there.
 
 ## Public runtime surface
 

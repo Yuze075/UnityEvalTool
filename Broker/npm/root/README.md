@@ -1,6 +1,12 @@
 # @yuzetoolkit/unityevaltool
 
-Native C# Broker, MCP server and `unity` CLI for [UnityEvalTool](https://github.com/Yuze075/UnityEvalTool).
+**English** | [简体中文](README_zh.md) | [Full documentation](https://github.com/Yuze075/UnityEvalTool#readme)
+
+Native C# Broker, Streamable HTTP MCP server, and `unity` CLI for
+[UnityEvalTool](https://github.com/Yuze075/UnityEvalTool). The npm entry package selects a
+matching native package for macOS, Linux, or Windows on x64 or arm64.
+
+The Unity-side UPM package must also be installed in every Unity project you want to use.
 
 ## Install
 
@@ -10,61 +16,78 @@ unity service install
 unity doctor
 ```
 
-The npm install selects the matching NativeAOT package for macOS, Linux or Windows on
-x64 or arm64. Service setup is intentionally explicit because modern npm versions may
-block dependency lifecycle scripts. `unity service install` creates and starts a
-current-user background service bound to `127.0.0.1:2347`; check its exit status before
-continuing. Do not bypass npm's script policy.
+`unity service install` creates and starts a current-user background service bound to
+`127.0.0.1:2347`: a LaunchAgent on macOS, a systemd user unit on Linux, or a Scheduled Task
+on Windows. It does not install a privileged system service. Service setup is explicit
+because npm dependency lifecycle scripts may be disabled; check the command's exit status.
 
-The Unity-side package must also be installed in each project:
+Add the Unity-side package through Unity Package Manager:
 
 ```text
 https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
 ```
 
-## CLI
+Open the Unity project, wait for compilation, then run `unity list`. Seeing that Editor is
+the first end-to-end registration check; `unity doctor` alone checks Broker health.
+
+## CLI quick start
 
 ```bash
 unity list
-unity
-unity connect <instance-id>
-unity Runtime getState
+unity                         # Select by the current project directory
+unity connect <instance-id>   # Select an exact Unity instance
+unity Runtime getState        # Execute one Unity-side command
 unity eval-js --code "return 1 + 2;"
-unity service status
+unity tools
 ```
+
+`unity` and `unity connect` open an interactive console. Its Broker controls are `:status`,
+`:wait`, `:switch`, `:help`, and `:quit`; other input is sent to Unity's command parser.
 
 ## MCP
 
-Connect a Streamable HTTP MCP client to `http://127.0.0.1:2347/mcp`. Read the generated token from `~/.unityevaltool/auth.json` and send it as `Authorization: Bearer <token>`.
+Connect a Streamable HTTP MCP client to:
 
-The MCP tools are `unity_status`, `unity_connect` and `eval`. Discovery and selection are mandatory before eval. See the [full documentation](https://github.com/Yuze075/UnityEvalTool#readme) and [protocol specification](https://github.com/Yuze075/UnityEvalTool/blob/main/Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md).
+```text
+http://127.0.0.1:2347/mcp
+```
 
-## Service
+The Broker creates `~/.unityevaltool/auth.json` on first start. Read its `token` and send:
+
+```text
+Authorization: Bearer <token>
+```
+
+Do not commit the token. The MCP workflow is always
+`unity_status` → `unity_connect` → `eval`; discovery and explicit selection are mandatory.
+See the [user guide](https://github.com/Yuze075/UnityEvalTool#readme) and
+[protocol specification](https://github.com/Yuze075/UnityEvalTool/blob/main/Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md).
+
+## Service management
 
 ```bash
-unity service install
+unity service status
 unity service start
 unity service stop
 unity service restart
-unity service status
 unity service uninstall
 ```
 
-The service is installed for the current user only: LaunchAgent on macOS, systemd user unit on Linux, and Scheduled Task on Windows.
+The Broker accepts loopback traffic only and fails explicitly when port `2347` is occupied.
 
 ## Uninstall
 
-npm does not run uninstall lifecycle scripts. Remove the current-user service while the
-`unity` executable still exists, check that the command succeeds, and only then remove the
-global package:
+npm does not automatically run the service-uninstall helper. Remove the current-user
+service while the `unity` executable still exists, verify that it succeeds, and only then
+remove the global package:
 
 ```bash
 unity service uninstall
 npm uninstall --global @yuzetoolkit/unityevaltool
 ```
 
-If the first command fails, resolve the reported service error before running the second.
-`npm run service:install` and `npm run service:uninstall` inside the package are explicit
-helpers, not automatic lifecycle scripts.
+If the first command fails, resolve the reported service error before continuing.
 
-License: MIT.
+## License
+
+[MIT](https://github.com/Yuze075/UnityEvalTool/blob/main/LICENSE)

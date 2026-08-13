@@ -1,7 +1,9 @@
 # Editor 与 Player 注册
 
+[English](RUNTIME_SERVICES.md) | **简体中文** | [Package README](../README_zh.md)
+
 UnityEvalTool 不再让 Unity 自己监听 MCP 或 CLI。电脑级 Broker 必须已安装并运行；
-Editor 和非 WebGL Player 都主动向它注册。
+Editor 和受支持的非 WebGL Player 都主动向它注册。
 
 ## Editor
 
@@ -24,7 +26,8 @@ UnityDebugTool UI Package 不会删除 UnityEvalTool 的 Player runtime client�
 当前用户的 loopback Broker 与仅该用户可读的 token；集成本 Package 的项目除非明确改变
 产品设计，否则应完整保留这条链路。
 
-WebGL 无法使用本地 ClientWebSocket/用户服务模型，因此被明确排除。
+WebGL 不是受支持的 Broker 目标，因为该平台无法使用本地 ClientWebSocket/
+当前用户服务模型。
 
 ## 公共运行时接口
 

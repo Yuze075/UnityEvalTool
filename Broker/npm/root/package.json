@@ -29,7 +29,8 @@
   },
   "files": [
     "bin",
-    "scripts"
+    "scripts",
+    "README_zh.md"
   ],
   "scripts": {
     "service:install": "node scripts/install-service.js",

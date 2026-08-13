@@ -1,8 +1,8 @@
 # UnityDebugTool
 
-基于 UI Toolkit 的 Unity 运行时 Debug 面板，依赖 `UnityEvalTool`，用于同时服务人类调试和 AI 调试。
+[English](README.md) | **简体中文** | [仓库使用指南](../../README_zh.md)
 
-[仓库总览](../../README_zh.md) · [English](README.md)
+基于 UI Toolkit 的 Unity 运行时 Debug 面板，依赖 `UnityEvalTool`，用于同时服务人类调试和 AI 调试。
 
 ## 安装
 
@@ -12,11 +12,8 @@
 https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
 ```
 
-仓库放在项目的 `Game/UnityEvalTool` 时，开发期间直接引用本地工作树：
-
-```json
-"com.yuzetoolkit.unitydebugtool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unitydebugtool"
-```
+如果使用本地源码 checkout，选择 Package Manager 的 **Add package from disk**，然后
+选中 checkout 中的 `Packages/com.yuzetoolkit.unitydebugtool/package.json`。
 
 需要在 Scene 或常驻 prefab 中放置 `Runtime/Core/Prefabs/DebugPanel.prefab` 才会启用 UI；本包不会自动创建面板。
 

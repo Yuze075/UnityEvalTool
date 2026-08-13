@@ -1,8 +1,8 @@
 # UnityDebugTool
 
-Runtime UI Toolkit debug panel for Unity projects using `UnityEvalTool`.
+**English** | [简体中文](README_zh.md) | [Repository guide](../../README.md)
 
-[Repository overview](../../README.md) · [中文](README_zh.md)
+Runtime UI Toolkit debug panel for Unity projects using `UnityEvalTool`.
 
 ## Installation
 
@@ -12,11 +12,8 @@ Install `com.yuzetoolkit.unityevaltool` first, then add this package with Unity 
 https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
 ```
 
-For a repository embedded at `Game/UnityEvalTool`, use the local working tree:
-
-```json
-"com.yuzetoolkit.unitydebugtool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unitydebugtool"
-```
+For a local source checkout, use Package Manager's **Add package from disk** command and
+select `Packages/com.yuzetoolkit.unitydebugtool/package.json` inside that checkout.
 
 Place `Runtime/Core/Prefabs/DebugPanel.prefab` in a scene or persistent prefab to enable the UI. The package does not create a panel automatically.
 

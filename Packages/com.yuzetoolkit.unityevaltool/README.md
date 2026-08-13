@@ -1,89 +1,99 @@
-# UnityEvalTool
+# UnityEvalTool package
 
-UnityEvalTool lets AI agents and terminal users operate Unity through one computer-level
-Broker. Unity no longer hosts an MCP listener or a separate CLI port. Each Editor or
-Player registers one authenticated WebSocket with the Broker; MCP and CLI operations are
-routed through that connection and execute through the existing PuerTS eval/tool system.
+**English** | [简体中文](README_zh.md) | [Repository guide](../../README.md)
 
-[中文](README_zh.md) · [Protocol](docs/BROKER_PROTOCOL.md) · [Helper modules](docs/HELPER_MODULES.md)
+`com.yuzetoolkit.unityevaltool` is the Unity-side half of UnityEvalTool. It registers each
+supported Editor or Player with the computer-level Broker, reports lifecycle state, hosts
+persistent PuerTS eval sessions, exposes helper modules, and preserves the existing
+Unity-side CLI command grammar.
 
-## Components
+Install and first-use instructions for both the Unity package and the required Broker/CLI
+are in the [repository guide](../../README.md). This page describes the Unity package
+itself.
 
-- Unity Package Manager package `com.yuzetoolkit.unityevaltool`: registration client,
-  compilation/reload status monitor, PuerTS eval sessions, helper tools, and Unity-side
-  CLI command parser.
-- npm package `@yuzetoolkit/unityevaltool`: installs the native `unity` command and a
-  current-user background service bound to `127.0.0.1:2347`.
-- Native platform packages: macOS, Windows, and Linux on x64 and arm64. JavaScript is
-  only the npm launcher; the Broker and CLI are C# NativeAOT.
+## Requirements
 
-## Install
+- Unity 2022.3 or newer.
+- `com.tencent.puerts.core` 3.0.2.
+- Exactly one compatible PuerTS JavaScript backend. The tested combination is
+  `com.tencent.puerts.quickjs` 3.0.2 with matching core 3.0.2; a supported V8/core pair
+  from the same PuerTS release may be used instead.
+- The `@yuzetoolkit/unityevaltool` Broker/CLI installed and running on the computer.
 
-UnityEvalTool requires `com.tencent.puerts.core` and exactly one PuerTS backend. This
-repository is validated with `com.tencent.puerts.quickjs` 3.0.2 and its matching core
-3.0.2; a supported V8 backend/core pair from the same PuerTS release is an alternative.
-Add this Unity package through Package Manager, then install the computer-level package:
+Do not install multiple PuerTS backends in one Unity project.
 
-```bash
-npm install --global @yuzetoolkit/unityevaltool
-unity service install
-unity doctor
-```
+## Add the package
 
-Use this Git URL in Unity Package Manager:
+Use Unity Package Manager's **Add package from git URL** command:
 
 ```text
 https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
 ```
 
-Service installation is deliberately explicit because modern npm versions may block
-dependency lifecycle scripts. `unity service install` installs and starts a current-user
-LaunchAgent (macOS), systemd user unit (Linux), or Scheduled Task (Windows). It never
-requires an administrator service. Use
-`unity service status|start|stop|restart|uninstall` for explicit management.
+For a local source checkout, use **Add package from disk** and select this package's
+`package.json`.
 
-The Broker creates `~/.unityevaltool/auth.json` with user-only permissions. MCP clients
-connect to `http://127.0.0.1:2347/mcp` and must send its token as
-`Authorization: Bearer <token>`. Unity and CLI authenticate with the same local token.
+## Editor lifecycle
 
-## MCP workflow
+The primary Editor process starts its Broker client automatically after script loading.
+Asset Import Workers are excluded. Open **YuzeToolkit > UnityEvalTool** to inspect and
+control registration for the current process. The window reports the installed Broker,
+connection state, Unity phase, eval availability, compilation counters, and registered
+tool catalog.
 
-The Broker exposes exactly three tools:
+The Editor reports importing, compilation, compilation failure, assembly reload, play-mode
+transition, and main-thread responsiveness independently of eval. During Domain Reload,
+the Broker retains the Unity instance and valid selection handles; the same process
+reconnects with a new connection epoch and VM generation. A failed compilation keeps the
+last successfully loaded assemblies available as repair mode.
 
-1. `unity_status`: list all Unity processes and their state. It can wait for `ready` or
-   `compilation-complete` by `instanceId` before selection, or by `connectionHandle`
-   afterward. Both waits may return `CompilationFailed`; always inspect `phase`,
-   `canEval`, and compiler counts.
-2. `unity_connect`: select the exact `instanceId` using the `registryRevision` returned
-   by the preceding status snapshot. It returns an opaque, workflow-scoped handle.
-3. `eval`: execute the existing `async function execute() { ... }` contract in the
-   selected Unity. It requires the handle and is rejected while Unity is busy.
+## Player lifecycle and security
 
-Agents must complete status and connect before eval. Handles are not globally selected,
-survive registry changes and Domain Reload for the same Unity process, expire when idle,
-and are invalidated if that process is replaced. Registry changes alone do not require a
-new handle. An interrupted eval is never retried automatically.
+Supported non-WebGL Players start a hidden `DontDestroyOnLoad` Broker client and register
+using the executable directory as their project path. Release Players intentionally retain
+the same authenticated arbitrary-JavaScript eval surface as the Editor. This is not gated
+by Development Build and is independent of the optional UnityDebugTool package.
 
-Unity reports `Ready`, `Importing`, `Compiling`, `CompilationFailed`, `Reloading`,
-`PlayModeTransition`, and exit/connectivity state independently of eval. This lets an
-agent wait in the Broker even while Unity's scripting domain does not exist. When
-compilation fails, eval and CLI remain available in repair mode through the last
-successfully loaded assemblies so the agent can read errors, edit code, and refresh again.
+The trust boundary is the current user's loopback Broker and per-user authentication token.
+If that capability is not appropriate for a shipped product, exclude or alter the package
+as an explicit product decision. WebGL is not a supported Broker target.
 
-## CLI
+Lifecycle details and public connection APIs are documented in
+[Editor and Player registration](docs/RUNTIME_SERVICES.md).
 
-```bash
-unity list
-unity                         # auto-select by current project path, enter a console
-unity connect <instance-id>   # select explicitly, enter a console
-unity Runtime getState        # auto-select and execute once
-unity connect <id> -- Editor getCompilationState
-unity eval-js --code "return 1 + 2;"
+## MCP execution contract
+
+The computer-level Broker exposes `unity_status`, `unity_connect`, and `eval`. The `eval`
+tool executes a program with this shape inside the selected Unity session:
+
+```javascript
+async function execute() {
+  const runtime = await import('tools://Runtime');
+  return runtime.getState();
+}
 ```
 
-Inside the interactive console, `:status`, `:wait`, `:switch`, `:help`, and `:quit` are
-Broker commands. Every other line is forwarded unchanged to Unity's
-`EvalCliCommandService`, preserving the DebugTool and helper command workflow.
+Use `tools://` to discover root modules and `tools://<Tool/Path>` to import a module. The
+built-in roots are `Runtime`, `Runtime/Objects`, `Runtime/Components`,
+`Runtime/Diagnostics`, `Runtime/Inspect`, `Runtime/Reflection`, `UnityEval`, and the
+Editor-only `Editor` hierarchy. Prefer these semantic helpers over direct `CS.*` interop.
+
+- [Helper module reference](docs/HELPER_MODULES.md)
+- [Advanced sessions, compilation, and errors](docs/ADVANCED_USAGE.md)
+- [Broker protocol](docs/BROKER_PROTOCOL.md)
+- [Architecture](docs/PROJECT_DESIGN.md)
+
+## Extending the tool catalog
+
+Define a partial C# class with `[EvalTool]`, mark exported methods with `[EvalFunction]`,
+and let the bundled Roslyn analyzer generate its `IEvalTool` metadata. Every function must
+declare an explicit safety level. Tool registration validates paths, callable sub-tools,
+JavaScript export names, parameters, and safety metadata before making a module visible.
+
+Loader-backed JavaScript tools can be registered through `EvalToolRegistry` and inspected
+or enabled through `tools://UnityEval`. Use `getJsToolAuthoringPrompt()` on that module for
+the current authoring contract. Return JSON-serializable primitives, lists, dictionaries,
+or data composed from those types whenever possible.
 
 ## Fixed local endpoints
 
@@ -91,19 +101,19 @@ Broker commands. Every other line is forwarded unchanged to Unity's
 |---|---|
 | `http://127.0.0.1:2347/health` | Broker health |
 | `http://127.0.0.1:2347/mcp` | MCP Streamable HTTP |
-| `ws://127.0.0.1:2347/unity` | Unity registration and routing |
-| `ws://127.0.0.1:2347/cli` | Native CLI consoles |
+| `ws://127.0.0.1:2347/unity` | Authenticated Unity registration and routing |
+| `ws://127.0.0.1:2347/cli` | Authenticated native CLI consoles |
 
-The Broker binds loopback only and fails explicitly if port 2347 is occupied. It does
-not expose a LAN mode or silently choose a different port.
+The Broker binds loopback only, authenticates every connection with the current user's
+token, and fails explicitly if port `2347` is unavailable.
 
-Non-WebGL release Players intentionally keep the same authenticated arbitrary-JavaScript
-eval surface as the Editor; this is not gated by Development Build and does not depend on
-the optional UnityDebugTool UI package. See [Editor and Player registration](docs/RUNTIME_SERVICES.md).
+## Build from source
 
-## Development and release
+This UPM package is consumed directly from the `Packages/com.yuzetoolkit.unityevaltool`
+source directory; there is no separate Unity-package archive script. The native Broker and
+npm packaging sources live at the repository root. See the
+[Broker build guide](../../Broker/README.md) and [Roslyn generator guide](../../Roslyn/README.md).
 
-The NativeAOT source and npm pipeline live in the repository-level `Broker` directory.
-The release matrix builds six RID-specific packages and one entry package. Run the
-current-platform packaging checks from that directory; publishing is a separate explicit
-action.
+## License
+
+[MIT](LICENSE)

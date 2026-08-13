@@ -1,41 +1,59 @@
 # UnityEvalTool
 
-[English](README.md) · [UnityEvalTool 包说明](Packages/com.yuzetoolkit.unityevaltool/README_zh.md) · [UnityDebugTool 包说明](Packages/com.yuzetoolkit.unitydebugtool/README_zh.md) · [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
+[![Unity 2022.3+](https://img.shields.io/badge/Unity-2022.3%2B-222?logo=unity)](https://unity.com/releases/editor/archive)
+[![npm](https://img.shields.io/badge/npm-%40yuzetoolkit%2Funityevaltool-CB3837?logo=npm)](https://www.npmjs.com/package/@yuzetoolkit/unityevaltool)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-UnityEvalTool 让电脑上的所有 Unity Editor 或 Player 主动连接同一个电脑级 Broker。AI Agent 和终端不再依赖 Unity 脚本域内部的监听器，因此即使 Unity 正在编译、程序集重载、进程退出或主线程卡住，外部仍然能看到准确状态并等待恢复；编译失败时 MCP/CLI 会通过上一次成功加载的程序集继续提供 repair mode。
+[English](README.md) | **简体中文**
 
-仓库同时提供 UnityDebugTool：一个基于 UI Toolkit 的运行时调试面板与控制台，让玩家、开发者和 AI Agent 共享同一套 Tool 模型。
+UnityEvalTool 让 AI Agent 和终端用户检查、操作本机的 Unity Editor 与 Player。
+原生的电脑级 Broker 提供 MCP 端点和 `unity` CLI，Unity Package Manager
+包则让每个 Unity 进程向 Broker 注册。编译、Domain Reload、进程替换和临时断线
+都会被明确报告，不再被 Unity Editor 内部的网络监听器遮蔽。
 
-## 仓库结构
+仓库还包含可选的 UnityDebugTool Package，它在同一套 Tool 模型上增加游戏内
+Debug 面板和 Runtime Console。
 
-```text
-UnityEvalTool
-├── Packages/
-│   ├── com.yuzetoolkit.unityevaltool/   # Broker 客户端、MCP eval 与 CLI runtime
-│   └── com.yuzetoolkit.unitydebugtool/  # 运行时调试 UI 与控制台
-├── Broker/
-│   ├── src/                             # C# NativeAOT Broker 与 CLI
-│   └── npm/                             # npm 入口包与原生平台包
-├── Roslyn/                              # Source Generator 解决方案与测试
-└── .github/workflows/
-    └── release.yml                      # 六平台构建与发布
-```
+## 需要安装的组件
 
-每个 Package 的安装细节和 API 由自己的 README 说明；本文档负责完整仓库、Broker 与发布流程。
+| 组件 | 用途 | 是否必需 |
+|---|---|---|
+| `com.yuzetoolkit.unityevaltool` | Unity 侧 Broker Client、状态报告、PuerTS eval session、CLI 命令和 helper module | 是 |
+| `@yuzetoolkit/unityevaltool` | 原生 Broker、MCP Server、`unity` CLI 和当前用户后台服务 | 是 |
+| `com.yuzetoolkit.unitydebugtool` | Runtime Debug 窗口、性能/系统 HUD、日志控制台、命令行和 Tool 目录 | 否 |
+
+Broker/CLI 支持 macOS、Linux 和 Windows 的 x64 与 arm64。Unity Package 需要
+Unity 2022.3 或更高版本。安装 Broker 需要 Node.js 18 或更高版本与 npm。WebGL 不是
+受支持的 Broker 目标。
 
 ## 安装
 
-### 1. 安装 Unity Packages
+### 1. 准备 PuerTS backend
 
-#### UnityEvalTool
+UnityEvalTool 需要 `com.tencent.puerts.core` 3.0.2，以及且仅需一个兼容的 PuerTS
+JavaScript backend。已验证的组合是 `com.tencent.puerts.quickjs` 3.0.2 和与之
+匹配的 core Package；也可使用同一 PuerTS 发行系列中受支持的 V8 backend/core。
+不得同时安装 QuickJS 与 V8 backend。
 
-UnityEvalTool 需要 `com.tencent.puerts.core` 3.0.2 与且仅需一个 PuerTS JavaScript backend。本仓库已验证 `com.tencent.puerts.quickjs` 3.0.2；也可使用同一 PuerTS 发布系列中一组受支持的 V8 backend/core。不要同时安装多个 backend。然后在 Unity Package Manager 中选择 **Add package from git URL**，填入：
+如果使用已验证组合，从官方
+[PuerTS Unity 3.0.2 Release](https://github.com/Tencent/puerts/releases/tag/Unity_v3.0.2)
+下载 `PuerTS_Core_3.0.2.tar.gz` 和 `PuerTS_Quickjs_3.0.2.tar.gz`。解压两个归档，
+然后使用 Package Manager 的 **Add package from disk**，先选择已解压 `core` 目录中的
+`package.json`，再选择 `quickjs` 中的 `package.json`。
+[PuerTS 官方安装指南](https://github.com/Tencent/puerts/blob/Unity_v3.0.2/doc/unity/en/install.md)
+也说明了其它 backend 的安装方式。
+
+UnityEvalTool Package 会声明 core 依赖，但不会替项目选择 JavaScript backend。
+
+### 2. 添加 UnityEvalTool Package
+
+在 Unity 中打开 **Window > Package Manager**，选择 **Add package from git URL**，输入：
 
 ```text
 https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
 ```
 
-也可以修改 `Packages/manifest.json`：
+对应的 `Packages/manifest.json` 依赖是：
 
 ```json
 {
@@ -45,32 +63,12 @@ https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unit
 }
 ```
 
-如果本仓库源码放在 Unity 项目的 `Game/UnityEvalTool`，开发时直接引用工作树，
-无需复制 Package：
+如果要直接针对本地 clone 开发，使用 Package Manager 的 **Add package from disk**，
+选择 clone 中的 `Packages/com.yuzetoolkit.unityevaltool/package.json`。
 
-```json
-"com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
-```
+### 3. 安装 Broker 与 CLI
 
-#### UnityDebugTool
-
-仓库 tag `v2.0.2` 内含 UnityDebugTool package `1.0.1`，它依赖 UnityEvalTool `2.0.2`。
-先安装 UnityEvalTool，再添加可选的运行时调试 UI 包：
-
-```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
-```
-
-仓库嵌入项目开发时，直接引用两个工作树 Package：
-
-```json
-"com.yuzetoolkit.unitydebugtool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unitydebugtool",
-"com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
-```
-
-UnityDebugTool 的 prefab 配置、模块和 API 见它自己的 [Package README](Packages/com.yuzetoolkit.unitydebugtool/README_zh.md)。
-
-### 2. 安装 Broker 与 CLI
+全局安装原生 npm Package，然后显式安装当前用户服务：
 
 ```bash
 npm install --global @yuzetoolkit/unityevaltool
@@ -78,85 +76,154 @@ unity service install
 unity doctor
 ```
 
-npm package 会安装 macOS、Linux、Windows x64/arm64 的原生 `unity` 可执行文件。
-现代 npm 可能阻止 dependency lifecycle script，因此服务安装是明确的第二步；
-`unity service install` 只创建当前用户服务，不创建系统级特权服务。确认它成功后再运行
-`unity doctor`，不要关闭 npm 的 install-script 安全策略。
+该服务只为当前用户运行：macOS 使用 LaunchAgent，Linux 使用 systemd user unit，
+Windows 使用计划任务。它不需要系统级特权 daemon。由于 npm 可能禁用 dependency
+lifecycle script，服务安装是一条明确命令；继续前应确认 `unity service install` 成功。
+
+### 4. 验证 Unity 连接
+
+打开一个已安装 UnityEvalTool Package 的项目，等待 Unity 编译完成，然后执行：
+
+```bash
+unity doctor
+unity list
+unity connect <instance-id> -- Runtime getState
+```
+
+`unity doctor` 应报告 Broker 可连接；`unity list` 应列出打开的 Editor、项目路径和
+当前 phase；把该行 ID 替换到最后一条命令中。最后一条命令用于证明 Broker 到 Unity 的端到端
+执行可用。也可以在 Editor 中
+打开 **YuzeToolkit > UnityEvalTool**，检查注册、连接状态和 eval 可用性。如果没有实例，
+请检查 `unity service status`，确认 Package 已成功编译，并确认 loopback 端口 `2347`
+未被其它进程占用。
 
 ## CLI 快速使用
 
+在 Unity 项目目录中执行 `unity` 可自动选中匹配的 Editor；也可使用
+`unity list` 返回的 ID 显式连接：
+
 ```bash
-unity list
-unity                         # 按当前目录自动选择 Unity，进入控制台
-unity connect <instance-id>   # 选择一个 Unity，进入控制台
-unity Runtime getState        # 执行一次现有 Unity CLI 命令
+unity
+unity connect <instance-id>
+unity Runtime getState
 unity eval-js --code "return 1 + 2;"
-unity service status
+unity tools
 ```
 
-交互控制台继续复用 Unity 侧原有命令解析器。`:status`、`:wait`、`:switch`、`:help` 和 `:quit` 是 Broker 自己的控制命令。
+前两条命令会进入交互控制台。其中 `:status`、`:wait`、`:switch`、`:help` 和
+`:quit` 用于控制 Broker 连接，其它输入会转发给 Unity 命令解析器。执行
+`unity --help` 或 `unity <command> --help` 可查看已安装 CLI 的完整语法。
 
 ## MCP 配置
 
-Streamable HTTP 地址固定为 `http://127.0.0.1:2347/mcp`。第一次安装会生成 `~/.unityevaltool/auth.json`。把其中的 `token` 配置成 MCP 请求头：
+Broker 提供以下 Streamable HTTP MCP 端点：
+
+```text
+http://127.0.0.1:2347/mcp
+```
+
+Broker 首次启动时会以仅当前用户可读的权限创建 `~/.unityevaltool/auth.json`。
+读取其中的 `token`，让 MCP Client 发送：
 
 ```text
 Authorization: Bearer <token>
 ```
 
-MCP 只提供三个工具：
+不同 MCP Client 的配置格式不同。将上述端点设为 Server URL，将认证值加入
+HTTP Header；不要把 token 提交到版本控制。
 
-1. `unity_status`：发现全部 Unity，并等待其可执行或等待一次新的编译周期结束。
-2. `unity_connect`：使用已知注册表版本精确选择 `instanceId`，返回当前工作流专用的不透明 handle。
-3. `eval`：在选中的 Unity 中执行；没有先查询和连接，或 Unity 当前不可安全执行时会明确拒绝。
+MCP Server 只提供三个工具，必须按此顺序使用：
 
-被中断的修改型 `eval` 不可自动重试；协议会明确告诉调用方是否可能已经执行。完整状态、等待语义和错误码见 [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)。
+1. `unity_status` 发现 Unity 实例并报告当前状态。
+2. `unity_connect` 使用已知 `registryRevision` 中的准确 `instanceId` 进行选择，
+   并返回仅属于当前工作流的不透明 handle。
+3. `eval` 在已选择且状态允许的 Unity 中执行 JavaScript。
 
-## 服务管理
+最小 `eval` 程序如下：
+
+```javascript
+async function execute() {
+  return 1 + 2;
+}
+```
+
+同一 Unity 进程发生 Domain Reload 或 registry 变化后应继续复用有效 handle；只有
+handle 过期、失效或 Unity 进程被替换时才重新连接。修改型 `eval` 如果在派发后
+连接中断，不得自动重试，因为其结果可能不确定。详见[进阶使用](Packages/com.yuzetoolkit.unityevaltool/docs/ADVANCED_USAGE_zh.md)
+和 [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_zh.md)。
+
+## 可选的 Runtime Debug UI
+
+安装 UnityEvalTool 后，使用 **Add package from git URL** 添加 UnityDebugTool：
+
+```text
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
+```
+
+然后把该 Package 中的 `Runtime/Core/Prefabs/DebugPanel.prefab` 放入 Scene 或常驻
+Prefab。面板不会自动创建。模块、默认快捷键、Prefab 规则和 API 详见
+[UnityDebugTool Package README](Packages/com.yuzetoolkit.unitydebugtool/README_zh.md)。
+
+默认快捷键为：`F8` 打开 Runtime Console，`F9` 打开 Debug Windows，`F10` 打开
+Performance 与 System Information HUD。
+
+## 安全边界
+
+Broker 只绑定 `127.0.0.1:2347`，拒绝非 loopback 访问，并使用当前用户 token 认证
+Unity、CLI 与 MCP 流量。包含 UnityEvalTool 的、受支持的非 WebGL Release Player 会有意
+向 Broker 注册，并保留经认证的任意 JavaScript eval 能力；它不仅限于 Development Build，
+也不依赖 UnityDebugTool。请明确决定发行的产品中是否应包含该能力。详见
+[Editor 与 Player 注册](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES_zh.md)。
+
+## 服务管理与卸载
 
 ```bash
-unity service install
 unity service status
 unity service start
 unity service stop
 unity service restart
-unity service uninstall
 ```
 
-macOS 使用 LaunchAgent，Linux 使用 systemd user unit，Windows 使用当前用户计划任务。Broker 只绑定 loopback 的 2347 端口；端口被占用时会明确失败，不会偷偷更换端口。
-
-卸载时必须趁 `unity` 可执行文件仍然存在先移除当前用户服务，确认第一条命令成功后再卸载 npm package。
-npm 不会执行 uninstall lifecycle script：
+卸载时，必须趁 `unity` 可执行文件仍存在时先移除服务。确认第一条命令成功后，
+再移除 npm Package：
 
 ```bash
 unity service uninstall
 npm uninstall --global @yuzetoolkit/unityevaltool
 ```
 
-## 开发与发布
+npm 不会自动执行服务卸载 helper。
+
+## 从源码构建与打包
+
+源码构建需要 `global.json` 选定的精确 .NET SDK（当前为 10.0.300）、Node.js 22，
+以及当前操作系统和架构所需的 NativeAOT 工具链。在该仓库 clone 中执行：
 
 ```bash
-dotnet build Broker/UnityEvalTool.Broker.slnx -c Release
-dotnet test Roslyn/UnityEvalToolRoslyn.sln -c Release
 cd Broker
-node --input-type=module -e "import { resolveAndValidateVersion } from './npm/scripts/version.mjs'; console.log(resolveAndValidateVersion(process.cwd()));"
 node npm/scripts/pack-platform.mjs
 node npm/scripts/pack-root.mjs
 ```
 
-Broker、Roslyn 与两个 Unity Package 都以普通源码目录存放在该仓库中，不再依赖源码压缩包，
-Package 开发也不会临时下载辅助源码。`version.json` 是发布版本的唯一来源；CI 会先验证
-Broker、Unity Package、运行时常量和 npm metadata 版本一致，再构建六个 NativeAOT
-平台包和一个平台无关入口包。发布必须显式开启；7 个 npm 包只信任
-`Yuze075/UnityEvalTool` 仓库的 `release.yml`，发布 Job 使用短期 OIDC 身份，不保存 npm
-长期写入令牌，也不会在普通构建中自动发生。更完整的打包与发布检查见
-[Broker/README.md](Broker/README.md)。
+生成的 `.tgz` 位于 `Broker/artifacts/npm/`。六种操作系统/架构原生包必须在
+与目标匹配的主机上构建。完整的构建、测试、版本校验与产物路径见
+[Broker 构建指南](Broker/README_zh.md)；Source Generator 构建见 [Roslyn/README_zh.md](Roslyn/README_zh.md)。
 
-当这棵源码以 `Game/UnityEvalTool` 嵌入 RelicLight 时，一般 RelicLight 开发者只需把父仓库推送到
-CNB，不需要配置本仓库的 GitHub remote、GitHub 写权限或第二份 checkout。只有同时维护两个仓库的
-电脑才显式启用父仓库镜像 hook；hook 会对账完整源码树，并且只在 CNB 已接受准确的 RelicLight source
-commit 后更新 GitHub。若后续 GitHub 更新失败，系统会保留可恢复的待发布状态，不会假装已经成功的
-CNB 更新被回滚。
+上述命令只会生成本地产物。产物如何分发或发布，由维护者自行选择 Registry
+和自动化配置，不属于本项目的打包流程。
+
+## 文档
+
+- [UnityEvalTool Package](Packages/com.yuzetoolkit.unityevaltool/README_zh.md)
+- [UnityDebugTool Package](Packages/com.yuzetoolkit.unitydebugtool/README_zh.md)
+- [进阶使用](Packages/com.yuzetoolkit.unityevaltool/docs/ADVANCED_USAGE_zh.md)
+- [Helper module 参考](Packages/com.yuzetoolkit.unityevaltool/docs/HELPER_MODULES_zh.md)
+- [Editor 与 Player 注册](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES_zh.md)
+- [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_zh.md)
+- [项目架构](Packages/com.yuzetoolkit.unityevaltool/docs/PROJECT_DESIGN_zh.md)
+- [Broker 构建与打包](Broker/README_zh.md)
+- [Roslyn Source Generator](Roslyn/README_zh.md)
+- [变更记录](CHANGELOG_zh.md)
 
 ## 许可证
 
