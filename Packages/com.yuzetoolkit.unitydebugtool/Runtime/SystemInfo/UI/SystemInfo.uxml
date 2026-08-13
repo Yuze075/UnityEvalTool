@@ -1,0 +1,5 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <ui:VisualElement name="unity-debug-tool-system-info-hud" class="yuzu-debug-system-info-hud">
+        <ui:VisualElement name="system-info-lines" class="yuzu-debug-system-info-lines" />
+    </ui:VisualElement>
+</ui:UXML>

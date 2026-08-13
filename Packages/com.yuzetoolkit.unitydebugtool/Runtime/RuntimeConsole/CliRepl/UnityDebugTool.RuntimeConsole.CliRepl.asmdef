@@ -1,0 +1,18 @@
+{
+  "name": "UnityDebugTool.RuntimeConsole.CliRepl",
+  "rootNamespace": "YuzeToolkit",
+  "references": [
+    "UnityDebugTool.RuntimeConsole",
+    "UnityEvalTool",
+    "UnityEvalTool.CLI"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

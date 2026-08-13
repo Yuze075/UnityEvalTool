@@ -1,0 +1,16 @@
+{
+  "name": "UnityDebugTool.RuntimeConsole.Log",
+  "rootNamespace": "YuzeToolkit",
+  "references": [
+    "UnityDebugTool.RuntimeConsole"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

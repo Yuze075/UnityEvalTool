@@ -1,0 +1,170 @@
+.yuzu-debug-performance-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    flex-direction: column;
+}
+
+.yuzu-debug-performance-layer .yuzu-debug-label {
+    color: rgba(255, 255, 255, 0.86);
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+    -unity-font-style: normal;
+    white-space: normal;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-performance-graph-hud {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    align-items: flex-end;
+    flex-direction: column;
+    width: 200px;
+    max-width: 200px;
+}
+
+.yuzu-debug-hud-panel {
+    background-color: rgba(0, 0, 0, 0.22);
+    padding: 3px 7px 3px 5px;
+    margin-bottom: 4px;
+    align-self: flex-end;
+    flex-shrink: 1;
+    overflow: hidden;
+}
+
+.yuzu-debug-performance-panel {
+    background-color: rgba(0, 0, 0, 0.18);
+    min-width: 200px;
+    max-width: 200px;
+    border-radius: 4px;
+}
+
+.yuzu-debug-fps-panel {
+    padding-bottom: 2px;
+}
+
+.yuzu-debug-ram-panel {
+    padding-top: 5px;
+}
+
+.yuzu-debug-audio-panel {
+    padding-top: 4px;
+}
+
+.yuzu-debug-hud-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-fps-metrics {
+    align-items: flex-start;
+}
+
+.yuzu-debug-stacked-metric {
+    margin-right: 7px;
+    align-items: flex-end;
+}
+
+.yuzu-debug-fps-stack {
+    align-items: flex-end;
+    margin-left: 8px;
+    flex-grow: 1;
+}
+
+.yuzu-debug-fps-current {
+    flex-direction: row;
+    align-items: center;
+}
+
+.yuzu-debug-hud-label {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 11px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-left;
+    margin: 0 4px 0 0;
+    white-space: nowrap;
+}
+
+.yuzu-debug-hud-value {
+    color: rgba(255, 255, 255, 0.86);
+    -unity-font-style: bold;
+    -unity-text-align: middle-right;
+    margin: 0 0 0 2px;
+    white-space: nowrap;
+}
+
+.yuzu-debug-hud-value-large {
+    font-size: 18px;
+}
+
+.yuzu-debug-fps-unit {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.86);
+    margin-left: 1px;
+    margin-right: 0;
+}
+
+.yuzu-debug-metric-left {
+    -unity-text-align: middle-left;
+}
+
+.yuzu-debug-metric-good {
+    color: rgb(53, 173, 159);
+}
+
+.yuzu-debug-ram-label {
+    flex-grow: 1;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.86);
+}
+
+.yuzu-debug-ram-reserved {
+    color: rgb(254, 228, 64);
+    font-size: 13px;
+}
+
+.yuzu-debug-ram-allocated {
+    color: rgb(241, 91, 181);
+    font-size: 13px;
+}
+
+.yuzu-debug-ram-mono {
+    color: rgb(0, 187, 249);
+    font-size: 13px;
+}
+
+.yuzu-debug-ram-unit {
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 13px;
+    margin-left: 1px;
+    margin-right: 0;
+}
+
+.yuzu-debug-hud-graph {
+    border-bottom-color: rgba(255, 255, 255, 0.22);
+    border-bottom-width: 1px;
+    flex-grow: 1;
+    flex-shrink: 1;
+    margin-top: 2px;
+    margin-bottom: 1px;
+    align-self: stretch;
+}
+
+.yuzu-debug-graph-slot {
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+.yuzu-debug-panel-footer {
+    -unity-text-align: middle-left;
+    align-self: stretch;
+    margin-top: 0;
+    border-top-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.22);
+}

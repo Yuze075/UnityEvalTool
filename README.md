@@ -5,16 +5,19 @@
 [![Broker](https://img.shields.io/badge/Broker-127.0.0.1%3A2347-4b7bec)](Broker/README.md)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-[中文说明](README_zh.md) · [Unity package](Packages/com.yuzetoolkit.unityevaltool/README.md) · [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
+[中文说明](README_zh.md) · [UnityEvalTool package](Packages/com.yuzetoolkit.unityevaltool/README.md) · [UnityDebugTool package](Packages/com.yuzetoolkit.unitydebugtool/README.md) · [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
 
 UnityEvalTool connects every local Unity Editor or Player to one computer-level Broker. AI agents and terminal users talk to the Broker instead of depending on a listener inside a Unity script domain. Compilation, assembly reload, process exit and a stalled Unity main thread therefore remain visible even while eval is temporarily unavailable.
+
+The repository also ships UnityDebugTool, a UI Toolkit runtime debug panel and console that exposes the same tool model to players, developers and AI agents.
 
 ## Repository layout
 
 ```text
 UnityEvalTool
 ├── Packages/
-│   └── com.yuzetoolkit.unityevaltool/   # Unity Package Manager package
+│   ├── com.yuzetoolkit.unityevaltool/   # Broker client, MCP eval and CLI runtime
+│   └── com.yuzetoolkit.unitydebugtool/  # Runtime debug UI and console
 ├── Broker/
 │   ├── src/                             # C# NativeAOT Broker and CLI
 │   └── npm/                             # npm entry and native platform packages
@@ -23,9 +26,13 @@ UnityEvalTool
     └── release.yml                      # Six-platform build and release matrix
 ```
 
+Each package owns its package-specific setup and API documentation. This README covers the combined repository, Broker and release workflow.
+
 ## Installation
 
-### 1. Install the Unity package
+### 1. Install the Unity packages
+
+#### UnityEvalTool
 
 UnityEvalTool requires `com.tencent.puerts.core` 3.0.0 and one PuerTS JavaScript backend. Add the package with Unity Package Manager's **Add package from git URL** command:
 
@@ -49,6 +56,23 @@ working tree directly instead of copying the package:
 ```json
 "com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
 ```
+
+#### UnityDebugTool
+
+Install UnityEvalTool first, then add the optional runtime debug UI package:
+
+```text
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#main
+```
+
+For an embedded development checkout, reference both working-tree packages:
+
+```json
+"com.yuzetoolkit.unitydebugtool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unitydebugtool",
+"com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
+```
+
+UnityDebugTool usage, prefab setup, modules and APIs are documented in its [package README](Packages/com.yuzetoolkit.unitydebugtool/README.md).
 
 ### 2. Install the Broker and CLI
 
@@ -112,7 +136,7 @@ node npm/scripts/pack-platform.mjs
 node npm/scripts/pack-root.mjs
 ```
 
-Broker, Roslyn and the Unity package are ordinary source folders in this repository. No
+Broker, Roslyn and both Unity packages are ordinary source folders in this repository. No
 source archive is required and package development does not download an auxiliary zip.
 `version.json` is the release version authority; CI verifies the Broker, Unity package,
 runtime constant and npm package metadata before building six NativeAOT platform packages

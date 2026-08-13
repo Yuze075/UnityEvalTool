@@ -1,0 +1,371 @@
+.yuzu-debug-console-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.yuzu-runtime-console {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    width: 980px;
+    height: 520px;
+    min-width: 320px;
+    min-height: 260px;
+    flex-direction: column;
+    background-color: rgba(8, 14, 22, 0.86);
+    border-top-color: rgba(255, 255, 255, 0.16);
+    border-right-color: rgba(255, 255, 255, 0.16);
+    border-bottom-color: rgba(255, 255, 255, 0.16);
+    border-left-color: rgba(255, 255, 255, 0.16);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.yuzu-runtime-console-tab-bar {
+    min-height: 32px;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    padding-left: 8px;
+    padding-right: 28px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    border-bottom-width: 1px;
+}
+
+.yuzu-runtime-console-tab-button {
+    min-height: 24px;
+    max-width: 128px;
+    min-width: 0;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+    background-color: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.7);
+    border-top-color: rgba(255, 255, 255, 0.1);
+    border-right-color: rgba(255, 255, 255, 0.1);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+    border-left-color: rgba(255, 255, 255, 0.1);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 3px;
+    flex-grow: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.yuzu-runtime-console-tab-button:hover {
+    background-color: rgba(53, 173, 159, 0.18);
+    color: rgba(255, 255, 255, 0.9);
+    border-top-color: rgba(53, 173, 159, 0.58);
+    border-right-color: rgba(53, 173, 159, 0.58);
+    border-bottom-color: rgba(53, 173, 159, 0.58);
+    border-left-color: rgba(53, 173, 159, 0.58);
+}
+
+.yuzu-runtime-console-tab-button-active {
+    background-color: rgba(53, 173, 159, 0.28);
+    color: rgba(255, 255, 255, 0.94);
+    border-top-color: rgba(53, 173, 159, 0.9);
+    border-right-color: rgba(53, 173, 159, 0.9);
+    border-bottom-color: rgba(53, 173, 159, 0.9);
+    border-left-color: rgba(53, 173, 159, 0.9);
+    -unity-font-style: bold;
+}
+
+.yuzu-runtime-console-content {
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.yuzu-runtime-console-tab-root {
+    flex-grow: 1;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.yuzu-runtime-console-page {
+    flex-grow: 1;
+    min-height: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.yuzu-runtime-console-pan-view {
+    flex-grow: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.yuzu-runtime-console-pan-content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    flex-direction: column;
+    flex-shrink: 0;
+    padding-right: 12px;
+}
+
+.yuzu-runtime-console-pan-scrollbar {
+    position: absolute;
+    top: 6px;
+    right: 4px;
+    bottom: 6px;
+    width: 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.yuzu-runtime-console-pan-scrollbar-thumb {
+    position: absolute;
+    left: 1px;
+    right: 1px;
+    min-height: 30px;
+    background-color: rgba(53, 173, 159, 0.56);
+    border-top-color: rgba(255, 255, 255, 0.18);
+    border-right-color: rgba(255, 255, 255, 0.18);
+    border-bottom-color: rgba(255, 255, 255, 0.18);
+    border-left-color: rgba(255, 255, 255, 0.18);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 4px;
+}
+
+.yuzu-runtime-console-pan-scrollbar:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.yuzu-runtime-console-pan-scrollbar-thumb:hover,
+.yuzu-runtime-console-pan-scrollbar-thumb-active {
+    background-color: rgba(69, 205, 188, 0.86);
+    border-top-color: rgba(255, 255, 255, 0.32);
+    border-right-color: rgba(255, 255, 255, 0.32);
+    border-bottom-color: rgba(255, 255, 255, 0.32);
+    border-left-color: rgba(255, 255, 255, 0.32);
+}
+
+.yuzu-debug-label {
+    min-height: 20px;
+    margin: 0;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 12px;
+    -unity-font-style: normal;
+    -unity-text-align: middle-left;
+    white-space: normal;
+}
+
+.yuzu-debug-label-muted {
+    color: rgba(255, 255, 255, 0.58);
+}
+
+.yuzu-runtime-console-toolbar {
+    min-height: 30px;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    padding-left: 6px;
+    padding-right: 6px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+}
+
+.yuzu-runtime-console-button {
+    min-height: 24px;
+    margin-left: 0;
+    margin-right: 6px;
+    padding-left: 8px;
+    padding-right: 8px;
+    background-color: rgba(53, 173, 159, 0.24);
+    color: rgba(255, 255, 255, 0.92);
+    border-top-color: rgba(255, 255, 255, 0.14);
+    border-right-color: rgba(255, 255, 255, 0.14);
+    border-bottom-color: rgba(255, 255, 255, 0.14);
+    border-left-color: rgba(255, 255, 255, 0.14);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.yuzu-runtime-console-button:hover {
+    background-color: rgba(53, 173, 159, 0.38);
+}
+
+.yuzu-runtime-console-button:active {
+    background-color: rgba(53, 173, 159, 0.18);
+}
+
+.yuzu-runtime-console-card {
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    margin-bottom: 8px;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 7px;
+    padding-bottom: 8px;
+    background-color: rgba(0, 0, 0, 0.18);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.1);
+    border-right-color: rgba(255, 255, 255, 0.1);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+    border-left-color: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.yuzu-runtime-console-card-title {
+    min-height: 20px;
+    margin-bottom: 6px;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.yuzu-runtime-console-field-row {
+    min-height: 22px;
+    flex-direction: row;
+    align-items: flex-start;
+    margin-bottom: 2px;
+}
+
+.yuzu-runtime-console-field-label {
+    width: 148px;
+    margin-right: 10px;
+    color: rgba(255, 255, 255, 0.58);
+    white-space: nowrap;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.yuzu-runtime-console-field-value {
+    flex-grow: 1;
+    min-width: 0;
+    color: rgba(255, 255, 255, 0.88);
+    white-space: normal;
+}
+
+.yuzu-runtime-console-message {
+    margin-top: 4px;
+    margin-bottom: 4px;
+    padding-left: 7px;
+    padding-right: 7px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    border-left-width: 3px;
+    border-radius: 2px;
+}
+
+.yuzu-runtime-console-resize-grip {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 18px;
+    height: 18px;
+    background-color: rgba(53, 173, 159, 0.34);
+    border-bottom-left-radius: 3px;
+    border-bottom-color: rgba(255, 255, 255, 0.16);
+    border-left-color: rgba(255, 255, 255, 0.16);
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+}
+
+.yuzu-runtime-console .unity-base-field {
+    min-height: 26px;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    padding: 0;
+}
+
+.yuzu-runtime-console .unity-base-text-field,
+.yuzu-runtime-console .unity-base-text-field__input {
+    --unity-cursor-color: rgb(255, 255, 255);
+    --unity-selection-color: rgba(53, 173, 159, 0.45);
+}
+
+.yuzu-runtime-console .unity-base-field__label {
+    min-width: 148px;
+    margin: 0 10px 0 0;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.58);
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+}
+
+.yuzu-runtime-console .unity-base-text-field__input,
+.yuzu-runtime-console .unity-enum-field__input,
+.yuzu-runtime-console .unity-integer-field__input {
+    min-height: 22px;
+    background-color: rgba(0, 0, 0, 0.28);
+    color: rgba(255, 255, 255, 0.9);
+    border-top-color: rgba(255, 255, 255, 0.12);
+    border-right-color: rgba(255, 255, 255, 0.12);
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+    border-left-color: rgba(255, 255, 255, 0.12);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 2px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.yuzu-runtime-console .unity-base-text-field__input:focus,
+.yuzu-runtime-console .unity-enum-field__input:focus,
+.yuzu-runtime-console .unity-integer-field__input:focus {
+    background-color: rgba(0, 0, 0, 0.38);
+    border-top-color: rgba(69, 205, 188, 0.82);
+    border-right-color: rgba(69, 205, 188, 0.82);
+    border-bottom-color: rgba(69, 205, 188, 0.82);
+    border-left-color: rgba(69, 205, 188, 0.82);
+}
+
+.yuzu-runtime-console .unity-toggle {
+    margin: 2px 8px 2px 0;
+    color: rgba(255, 255, 255, 0.86);
+}
+
+.yuzu-runtime-console .unity-toggle__checkmark {
+    min-width: 16px;
+    min-height: 16px;
+    margin: 2px 6px 2px 0;
+    background-color: rgba(0, 0, 0, 0.28);
+    border-top-color: rgba(255, 255, 255, 0.12);
+    border-right-color: rgba(255, 255, 255, 0.12);
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+    border-left-color: rgba(255, 255, 255, 0.12);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 2px;
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0.9);
+}

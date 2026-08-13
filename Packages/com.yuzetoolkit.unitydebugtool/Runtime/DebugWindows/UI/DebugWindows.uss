@@ -1,0 +1,869 @@
+.yuzu-debug-debug-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window {
+    width: 600px;
+    min-width: 360px;
+    max-width: 92%;
+    max-height: 88%;
+    margin: 8px 0 0 8px;
+    align-self: flex-start;
+    flex-grow: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    max-height: 100%;
+    background-color: rgba(8, 14, 22, 0.92);
+    border-top-color: rgba(255, 255, 255, 0.2);
+    border-right-color: rgba(255, 255, 255, 0.2);
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+    border-left-color: rgba(255, 255, 255, 0.2);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* Foldouts own their complete visual hierarchy. Keep these selectors separate from data Toggle fields. */
+.yuzu-debug-debug-layer .yuzu-debug-foldout {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 0 4px 0;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout {
+    margin: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle {
+    width: 100%;
+    min-width: 0;
+    min-height: 28px;
+    margin: 0;
+    padding: 3px 7px;
+    background-color: rgba(255, 255, 255, 0.035);
+    color: rgba(255, 255, 255, 0.9);
+    border-left-color: rgba(53, 173, 159, 0.28);
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+    border-left-width: 2px;
+    border-bottom-width: 1px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:hover {
+    background-color: rgba(53, 173, 159, 0.12);
+    border-left-color: rgba(69, 205, 188, 0.72);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:focus {
+    background-color: rgba(53, 173, 159, 0.14);
+    border-left-color: rgb(69, 205, 188);
+}
+
+/* Match Unity's focused Foldout label state directly so selection never recolors the title. */
+.unity-foldout__toggle > .unity-toggle__input:focus:enabled > .unity-label {
+    color: rgba(255, 255, 255, 0.96);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:active {
+    background-color: rgba(35, 133, 122, 0.24);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:disabled {
+    background-color: rgba(255, 255, 255, 0.02);
+    color: rgba(255, 255, 255, 0.42);
+    border-left-color: rgba(255, 255, 255, 0.12);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header {
+    min-height: 32px;
+    margin: 0;
+    padding: 4px 10px;
+    background-color: rgba(0, 0, 0, 0.42);
+    color: rgba(255, 255, 255, 0.96);
+    border-left-width: 0;
+    border-bottom-color: rgba(255, 255, 255, 0.11);
+    border-bottom-width: 1px;
+    -unity-font-style: bold;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header:hover {
+    background-color: rgba(53, 173, 159, 0.11);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header:focus {
+    background-color: rgba(53, 173, 159, 0.14);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header:active {
+    background-color: rgba(35, 133, 122, 0.24);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header:disabled {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle > .unity-toggle__input {
+    min-width: 0;
+    min-height: 20px;
+    margin: 0;
+    padding: 0;
+    flex-grow: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle .unity-foldout__checkmark {
+    width: 14px;
+    min-width: 14px;
+    height: 14px;
+    min-height: 14px;
+    margin: 0 7px 0 0;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0.88);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:hover .unity-foldout__checkmark {
+    -unity-background-image-tint-color: rgb(69, 205, 188);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:focus .unity-foldout__checkmark {
+    -unity-background-image-tint-color: rgb(69, 205, 188);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:disabled .unity-foldout__checkmark {
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0.38);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle .unity-toggle__label {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -unity-text-overflow-position: end;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header .unity-toggle__label {
+    color: rgba(255, 255, 255, 0.96);
+    font-size: 13px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:disabled .unity-toggle__label,
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header:disabled .unity-toggle__label {
+    color: rgba(255, 255, 255, 0.42);
+}
+
+/* Every nested content branch accumulates a compact indent and guide line. */
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__content {
+    width: auto;
+    min-width: 0;
+    margin-left: 9px;
+    padding: 3px 0 2px 8px;
+    align-self: stretch;
+    border-left-color: rgba(53, 173, 159, 0.24);
+    border-left-width: 1px;
+}
+
+/* The window Foldout is a shell, not a content hierarchy level. */
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .unity-foldout__content {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    max-height: 100%;
+    margin-left: 0;
+    padding: 0;
+    border-left-width: 0;
+    overflow: hidden;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-content {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 6px 10px 10px 10px;
+    flex-direction: column;
+    align-items: stretch;
+    overflow: hidden;
+}
+
+/* Shared text primitives. */
+.yuzu-debug-debug-layer .yuzu-debug-label {
+    min-width: 0;
+    min-height: 24px;
+    margin: 0;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 12px;
+    -unity-font-style: normal;
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -unity-text-overflow-position: end;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-label-muted {
+    width: 156px;
+    min-width: 156px;
+    margin-right: 8px;
+    color: rgba(255, 255, 255, 0.68);
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-mini-value {
+    min-width: 0;
+    color: rgba(255, 255, 255, 0.9);
+    -unity-text-align: middle-left;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+/* Rows own vertical rhythm; their children do not add a second set of vertical margins. */
+.yuzu-debug-debug-layer .yuzu-debug-row,
+.yuzu-debug-debug-layer .yuzu-debug-inline-group,
+.yuzu-debug-debug-layer .yuzu-debug-slider-row {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 28px;
+    margin: 1px 0;
+    flex-grow: 0;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-row,
+.yuzu-debug-debug-layer .yuzu-debug-slider-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-row {
+    overflow: hidden;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group {
+    overflow: hidden;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-column {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-label {
+    width: 176px;
+    min-width: 176px;
+    margin-right: 8px;
+    color: rgba(255, 255, 255, 0.88);
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-column > .yuzu-debug-label {
+    margin-bottom: 2px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-field,
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-row,
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-mini-value,
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-slider-row,
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-progress,
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-preview {
+    min-width: 0;
+    max-width: 100%;
+    margin-top: 0;
+    margin-bottom: 0;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+/* Data fields are intentionally scoped by yuzu-debug-field so Foldout Toggles are never restyled. */
+.yuzu-debug-debug-layer .yuzu-debug-field {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 28px;
+    margin: 1px 0;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.9);
+    flex-grow: 0;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field > .unity-base-field__label,
+.yuzu-debug-debug-layer .yuzu-debug-slider > .unity-base-field__label {
+    width: 156px;
+    min-width: 156px;
+    margin: 0 8px 0 0;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.68);
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -unity-text-overflow-position: end;
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-field {
+    width: auto;
+    margin: 0;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-field > .unity-base-field__label {
+    width: 60px;
+    min-width: 60px;
+    margin-right: 6px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field-no-label > .unity-base-field__label {
+    display: none;
+    width: 0;
+    min-width: 0;
+    margin: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group .yuzu-debug-field-no-label {
+    min-width: 0;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-field__input,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-composite-field__input {
+    min-width: 0;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-text-field__input,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-enum-field__input {
+    min-width: 0;
+    min-height: 24px;
+    padding: 2px 6px;
+    background-color: rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 0.92);
+    border-top-color: rgba(255, 255, 255, 0.14);
+    border-right-color: rgba(255, 255, 255, 0.14);
+    border-bottom-color: rgba(255, 255, 255, 0.14);
+    border-left-color: rgba(255, 255, 255, 0.14);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 3px;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-text-field__input:hover,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-enum-field__input:hover {
+    background-color: rgba(0, 0, 0, 0.36);
+    border-top-color: rgba(255, 255, 255, 0.24);
+    border-right-color: rgba(255, 255, 255, 0.24);
+    border-bottom-color: rgba(255, 255, 255, 0.24);
+    border-left-color: rgba(255, 255, 255, 0.24);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-text-field__input:focus,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-enum-field__input:focus {
+    background-color: rgba(0, 0, 0, 0.4);
+    border-top-color: rgb(53, 173, 159);
+    border-right-color: rgb(53, 173, 159);
+    border-bottom-color: rgb(53, 173, 159);
+    border-left-color: rgb(53, 173, 159);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-text-field__input:disabled,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-enum-field__input:disabled {
+    background-color: rgba(0, 0, 0, 0.18);
+    color: rgba(255, 255, 255, 0.48);
+    border-top-color: rgba(255, 255, 255, 0.08);
+    border-right-color: rgba(255, 255, 255, 0.08);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    border-left-color: rgba(255, 255, 255, 0.08);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-composite-field__field {
+    min-width: 0;
+    margin: 0 2px 0 0;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-composite-field__field > .unity-base-field__label {
+    width: 18px;
+    min-width: 18px;
+    margin-right: 3px;
+    color: rgba(255, 255, 255, 0.58);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle > .unity-toggle__input {
+    min-width: 0;
+    min-height: 24px;
+    margin: 0;
+    flex-grow: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle .unity-toggle__checkmark {
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    min-height: 16px;
+    margin: 4px 6px 4px 0;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-top-color: rgba(255, 255, 255, 0.16);
+    border-right-color: rgba(255, 255, 255, 0.16);
+    border-bottom-color: rgba(255, 255, 255, 0.16);
+    border-left-color: rgba(255, 255, 255, 0.16);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 3px;
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0.92);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:hover .unity-toggle__checkmark {
+    border-top-color: rgba(69, 205, 188, 0.72);
+    border-right-color: rgba(69, 205, 188, 0.72);
+    border-bottom-color: rgba(69, 205, 188, 0.72);
+    border-left-color: rgba(69, 205, 188, 0.72);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:focus .unity-toggle__checkmark {
+    border-top-color: rgb(69, 205, 188);
+    border-right-color: rgb(69, 205, 188);
+    border-bottom-color: rgb(69, 205, 188);
+    border-left-color: rgb(69, 205, 188);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:checked .unity-toggle__checkmark {
+    background-color: rgba(53, 173, 159, 0.3);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:disabled .unity-toggle__checkmark {
+    background-color: rgba(0, 0, 0, 0.16);
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0.42);
+}
+
+/* Buttons stretch when vertical and become compact action cells inside inline rows. */
+.yuzu-debug-debug-layer .yuzu-debug-button {
+    min-width: 0;
+    min-height: 26px;
+    max-width: 100%;
+    margin: 2px 0;
+    padding: 3px 10px;
+    align-self: stretch;
+    background-color: rgba(53, 173, 159, 0.3);
+    color: rgba(255, 255, 255, 0.94);
+    border-top-color: rgba(69, 205, 188, 0.5);
+    border-right-color: rgba(69, 205, 188, 0.5);
+    border-bottom-color: rgba(69, 205, 188, 0.5);
+    border-left-color: rgba(69, 205, 188, 0.5);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 3px;
+    flex-grow: 0;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-button {
+    min-width: 46px;
+    min-height: 24px;
+    margin: 0 0 0 6px;
+    padding: 2px 8px;
+    align-self: center;
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button:hover,
+.yuzu-debug-debug-layer .yuzu-debug-button:focus {
+    background-color: rgba(53, 173, 159, 0.48);
+    border-top-color: rgb(69, 205, 188);
+    border-right-color: rgb(69, 205, 188);
+    border-bottom-color: rgb(69, 205, 188);
+    border-left-color: rgb(69, 205, 188);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button:active {
+    background-color: rgba(35, 133, 122, 0.46);
+    border-top-color: rgb(53, 173, 159);
+    border-right-color: rgb(53, 173, 159);
+    border-bottom-color: rgb(53, 173, 159);
+    border-left-color: rgb(53, 173, 159);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button:disabled {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.42);
+    border-top-color: rgba(255, 255, 255, 0.08);
+    border-right-color: rgba(255, 255, 255, 0.08);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    border-left-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Sliders share the field label grid but keep a fixed, readable value column. */
+.yuzu-debug-debug-layer .yuzu-debug-slider-row {
+    overflow: hidden;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider {
+    width: auto;
+    min-width: 0;
+    min-height: 28px;
+    margin: 0;
+    padding: 0;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider .unity-base-slider__input {
+    min-width: 0;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider .unity-base-slider__drag-container {
+    min-width: 80px;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider .unity-base-slider__tracker {
+    height: 14px;
+    margin-top: -7px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 3px;
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    overflow: hidden;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider .unity-base-slider__dragger {
+    width: 8px;
+    height: 18px;
+    margin-top: -9px;
+    background-color: rgba(255, 255, 255, 0.94);
+    border-radius: 3px;
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:hover .unity-base-slider__tracker,
+.yuzu-debug-debug-layer .yuzu-debug-slider:focus .unity-base-slider__tracker {
+    background-color: rgba(53, 173, 159, 0.16);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:focus .unity-base-slider__dragger {
+    background-color: rgb(69, 205, 188);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:disabled .unity-base-slider__dragger {
+    background-color: rgba(255, 255, 255, 0.42);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:disabled .unity-base-slider__tracker {
+    background-color: rgba(0, 0, 0, 0.18);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:disabled .yuzu-debug-slider-filler {
+    background-color: rgba(53, 173, 159, 0.34);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider-filler {
+    height: 100%;
+    background-color: rgb(53, 173, 159);
+    border-radius: 3px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider-value {
+    width: 48px;
+    min-width: 48px;
+    margin-left: 8px;
+    color: rgba(255, 255, 255, 0.86);
+    -unity-text-align: middle-right;
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+/* Progress and previews align to the same content edges as fields and full-width buttons. */
+.yuzu-debug-debug-layer .yuzu-debug-progress {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 24px;
+    margin: 2px 0;
+    flex-grow: 0;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-progress .unity-progress-bar__background {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-top-color: rgba(255, 255, 255, 0.1);
+    border-right-color: rgba(255, 255, 255, 0.1);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+    border-left-color: rgba(255, 255, 255, 0.1);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 3px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-progress .unity-progress-bar__progress {
+    background-color: rgb(53, 173, 159);
+    border-radius: 3px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-progress .unity-progress-bar__title {
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 12px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-preview {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 112px;
+    margin: 4px 0 6px 0;
+    flex-direction: row;
+    align-items: center;
+    flex-grow: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-preview > .yuzu-debug-label {
+    width: 156px;
+    min-width: 156px;
+    margin-right: 8px;
+    color: rgba(255, 255, 255, 0.68);
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-image {
+    width: 220px;
+    min-width: 0;
+    max-width: 100%;
+    height: 104px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-top-color: rgba(255, 255, 255, 0.14);
+    border-right-color: rgba(255, 255, 255, 0.14);
+    border-bottom-color: rgba(255, 255, 255, 0.14);
+    border-left-color: rgba(255, 255, 255, 0.14);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 3px;
+    flex-grow: 0;
+    flex-shrink: 1;
+}
+
+/* Semantic, compact debug controls. */
+.yuzu-debug-debug-layer .yuzu-debug-section {
+    min-height: 24px;
+    margin: 7px 0 3px 0;
+    padding: 4px 0 2px 0;
+    color: rgba(142, 174, 174, 0.92);
+    font-size: 11px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-left;
+    border-bottom-color: rgba(255, 255, 255, 0.09);
+    border-bottom-width: 1px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-content > .yuzu-debug-section.yuzu-debug-first-section {
+    margin-top: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-readonly-label,
+.yuzu-debug-debug-layer .yuzu-debug-state-label {
+    min-width: 0;
+    min-height: 26px;
+    margin: 1px 0;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.86);
+    -unity-text-align: middle-left;
+    flex-grow: 0;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-tag {
+    width: auto;
+    min-width: 30px;
+    min-height: 26px;
+    margin: 1px 6px 1px 0;
+    padding: 0;
+    color: rgba(174, 191, 195, 0.82);
+    -unity-text-align: middle-center;
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-state-label,
+.yuzu-debug-debug-layer .yuzu-debug-inline-group-row > .yuzu-debug-readonly-label {
+    width: auto;
+    min-width: 72px;
+    margin-right: 8px;
+    flex-grow: 0;
+    flex-shrink: 0;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-state-button {
+    min-width: 62px;
+    background-color: rgba(115, 124, 133, 0.22);
+    border-top-color: rgba(160, 169, 178, 0.34);
+    border-right-color: rgba(160, 169, 178, 0.34);
+    border-bottom-color: rgba(160, 169, 178, 0.34);
+    border-left-color: rgba(160, 169, 178, 0.34);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-segmented-row {
+    min-width: 0;
+    min-height: 28px;
+    margin: 1px 0;
+    flex-direction: row;
+    align-items: center;
+    flex-grow: 0;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-segmented-row > .yuzu-debug-label {
+    width: 48px;
+    min-width: 48px;
+    margin-right: 8px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-segment-button {
+    width: 38px;
+    min-width: 38px;
+    margin: 0 4px 0 0;
+    padding: 2px 4px;
+    background-color: rgba(115, 124, 133, 0.22);
+    border-top-color: rgba(160, 169, 178, 0.34);
+    border-right-color: rgba(160, 169, 178, 0.34);
+    border-bottom-color: rgba(160, 169, 178, 0.34);
+    border-left-color: rgba(160, 169, 178, 0.34);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-tone-success,
+.yuzu-debug-debug-layer .yuzu-debug-tone-green {
+    color: rgb(94, 238, 150);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button.yuzu-debug-tone-success,
+.yuzu-debug-debug-layer .yuzu-debug-button.yuzu-debug-tone-green {
+    background-color: rgba(38, 153, 96, 0.42);
+    border-top-color: rgba(94, 238, 150, 0.72);
+    border-right-color: rgba(94, 238, 150, 0.72);
+    border-bottom-color: rgba(94, 238, 150, 0.72);
+    border-left-color: rgba(94, 238, 150, 0.72);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-tone-danger,
+.yuzu-debug-debug-layer .yuzu-debug-tone-red {
+    color: rgb(255, 105, 112);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button.yuzu-debug-tone-danger,
+.yuzu-debug-debug-layer .yuzu-debug-button.yuzu-debug-tone-red {
+    background-color: rgba(176, 48, 58, 0.44);
+    border-top-color: rgba(255, 105, 112, 0.76);
+    border-right-color: rgba(255, 105, 112, 0.76);
+    border-bottom-color: rgba(255, 105, 112, 0.76);
+    border-left-color: rgba(255, 105, 112, 0.76);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-tone-blue {
+    color: rgb(91, 174, 255);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button.yuzu-debug-tone-blue {
+    background-color: rgba(47, 104, 174, 0.44);
+    border-top-color: rgba(91, 174, 255, 0.76);
+    border-right-color: rgba(91, 174, 255, 0.76);
+    border-bottom-color: rgba(91, 174, 255, 0.76);
+    border-left-color: rgba(91, 174, 255, 0.76);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-tone-yellow {
+    color: rgb(245, 211, 92);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button.yuzu-debug-tone-yellow {
+    background-color: rgba(164, 126, 35, 0.44);
+    border-top-color: rgba(245, 211, 92, 0.76);
+    border-right-color: rgba(245, 211, 92, 0.76);
+    border-bottom-color: rgba(245, 211, 92, 0.76);
+    border-left-color: rgba(245, 211, 92, 0.76);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-tone-pink {
+    color: rgb(244, 133, 207);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button.yuzu-debug-tone-pink {
+    background-color: rgba(159, 66, 132, 0.44);
+    border-top-color: rgba(244, 133, 207, 0.76);
+    border-right-color: rgba(244, 133, 207, 0.76);
+    border-bottom-color: rgba(244, 133, 207, 0.76);
+    border-left-color: rgba(244, 133, 207, 0.76);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-tone-white {
+    color: rgb(242, 242, 242);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button.yuzu-debug-tone-white {
+    background-color: rgba(214, 214, 214, 0.24);
+    border-top-color: rgba(242, 242, 242, 0.68);
+    border-right-color: rgba(242, 242, 242, 0.68);
+    border-bottom-color: rgba(242, 242, 242, 0.68);
+    border-left-color: rgba(242, 242, 242, 0.68);
+}

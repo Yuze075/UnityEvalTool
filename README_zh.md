@@ -1,15 +1,18 @@
 # UnityEvalTool
 
-[English](README.md) · [Unity 包说明](Packages/com.yuzetoolkit.unityevaltool/README_zh.md) · [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
+[English](README.md) · [UnityEvalTool 包说明](Packages/com.yuzetoolkit.unityevaltool/README_zh.md) · [UnityDebugTool 包说明](Packages/com.yuzetoolkit.unitydebugtool/README_zh.md) · [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
 
 UnityEvalTool 让电脑上的所有 Unity Editor 或 Player 主动连接同一个电脑级 Broker。AI Agent 和终端不再依赖 Unity 脚本域内部的监听器，因此即使 Unity 正在编译、程序集重载、进程退出或主线程卡住，外部仍然能看到准确状态并等待恢复。
+
+仓库同时提供 UnityDebugTool：一个基于 UI Toolkit 的运行时调试面板与控制台，让玩家、开发者和 AI Agent 共享同一套 Tool 模型。
 
 ## 仓库结构
 
 ```text
 UnityEvalTool
 ├── Packages/
-│   └── com.yuzetoolkit.unityevaltool/   # Unity Package Manager 包
+│   ├── com.yuzetoolkit.unityevaltool/   # Broker 客户端、MCP eval 与 CLI runtime
+│   └── com.yuzetoolkit.unitydebugtool/  # 运行时调试 UI 与控制台
 ├── Broker/
 │   ├── src/                             # C# NativeAOT Broker 与 CLI
 │   └── npm/                             # npm 入口包与原生平台包
@@ -18,9 +21,13 @@ UnityEvalTool
     └── release.yml                      # 六平台构建与发布
 ```
 
+每个 Package 的安装细节和 API 由自己的 README 说明；本文档负责完整仓库、Broker 与发布流程。
+
 ## 安装
 
-### 1. 安装 Unity 包
+### 1. 安装 Unity Packages
+
+#### UnityEvalTool
 
 UnityEvalTool 需要 `com.tencent.puerts.core` 3.0.0 和一个 PuerTS JavaScript backend。在 Unity Package Manager 中选择 **Add package from git URL**，填入：
 
@@ -44,6 +51,23 @@ https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unit
 ```json
 "com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
 ```
+
+#### UnityDebugTool
+
+先安装 UnityEvalTool，再添加可选的运行时调试 UI 包：
+
+```text
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#main
+```
+
+仓库嵌入项目开发时，直接引用两个工作树 Package：
+
+```json
+"com.yuzetoolkit.unitydebugtool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unitydebugtool",
+"com.yuzetoolkit.unityevaltool": "file:../Game/UnityEvalTool/Packages/com.yuzetoolkit.unityevaltool"
+```
+
+UnityDebugTool 的 prefab 配置、模块和 API 见它自己的 [Package README](Packages/com.yuzetoolkit.unitydebugtool/README_zh.md)。
 
 ### 2. 安装 Broker 与 CLI
 
@@ -107,7 +131,7 @@ node npm/scripts/pack-platform.mjs
 node npm/scripts/pack-root.mjs
 ```
 
-Broker、Roslyn 与 Unity Package 都以普通源码目录存放在该仓库中，不再依赖源码压缩包，
+Broker、Roslyn 与两个 Unity Package 都以普通源码目录存放在该仓库中，不再依赖源码压缩包，
 Package 开发也不会临时下载辅助源码。`version.json` 是发布版本的唯一来源；CI 会先验证
 Broker、Unity Package、运行时常量和 npm metadata 版本一致，再构建六个 NativeAOT
 平台包和一个平台无关入口包。发布必须显式开启并提供 npm 凭据，不会在普通构建中自动发生。

@@ -1,0 +1,58 @@
+.yuzu-runtime-cli-history {
+    flex-grow: 1;
+    min-height: 0;
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.yuzu-runtime-cli-history .yuzu-runtime-console-pan-content {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.yuzu-runtime-cli-history-row {
+    margin-bottom: 5px;
+    padding-left: 6px;
+    padding-right: 6px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    background-color: rgba(255, 255, 255, 0.04);
+    border-left-width: 3px;
+    border-left-color: rgba(53, 173, 159, 0.72);
+    border-radius: 2px;
+    font-size: 12px;
+}
+
+.yuzu-runtime-cli-input-row {
+    min-height: 36px;
+    flex-direction: row;
+    align-items: center;
+    padding-left: 6px;
+    padding-right: 6px;
+    background-color: rgba(0, 0, 0, 0.24);
+    border-top-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.yuzu-runtime-cli-input-field {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+    margin-right: 6px;
+}
+
+.yuzu-runtime-cli-input-field .unity-base-field__label {
+    display: none;
+}
+
+.yuzu-runtime-cli-input-field .unity-base-text-field__input {
+    min-width: 0;
+}
+
+.yuzu-runtime-cli-run-button {
+    width: 64px;
+    min-width: 64px;
+    flex-shrink: 0;
+    margin-right: 0;
+}

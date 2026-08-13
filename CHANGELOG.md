@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added `com.yuzetoolkit.unitydebugtool` under `Packages` so the runtime debug UI and UnityEvalTool share one source repository while retaining package-specific READMEs.
+
 ## 2.0.1 - 2026-08-12
 
 - Release Unity-side PuerTS sessions when CLI consoles close or Broker leases expire, including deferred release across a temporary Unity disconnect.

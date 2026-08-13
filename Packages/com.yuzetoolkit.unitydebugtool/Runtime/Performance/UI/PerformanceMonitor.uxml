@@ -1,0 +1,58 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <ui:VisualElement name="unity-debug-tool-graphy-hud" class="yuzu-debug-performance-graph-hud">
+        <ui:VisualElement name="fps-panel" class="yuzu-debug-hud-panel yuzu-debug-performance-panel yuzu-debug-fps-panel">
+            <ui:VisualElement class="yuzu-debug-hud-row yuzu-debug-fps-metrics">
+                <ui:VisualElement class="yuzu-debug-stacked-metric">
+                    <ui:Label text="avg" class="yuzu-debug-label yuzu-debug-hud-label" />
+                    <ui:Label name="fps-average" text="-" class="yuzu-debug-label yuzu-debug-hud-value yuzu-debug-metric-good yuzu-debug-metric-left" />
+                </ui:VisualElement>
+                <ui:VisualElement class="yuzu-debug-stacked-metric">
+                    <ui:Label text="1%" class="yuzu-debug-label yuzu-debug-hud-label" />
+                    <ui:Label name="fps-one-percent" text="-" class="yuzu-debug-label yuzu-debug-hud-value yuzu-debug-metric-good yuzu-debug-metric-left" />
+                </ui:VisualElement>
+                <ui:VisualElement class="yuzu-debug-stacked-metric">
+                    <ui:Label text=".1%" class="yuzu-debug-label yuzu-debug-hud-label" />
+                    <ui:Label name="fps-zero-one-percent" text="-" class="yuzu-debug-label yuzu-debug-hud-value yuzu-debug-metric-good yuzu-debug-metric-left" />
+                </ui:VisualElement>
+                <ui:VisualElement class="yuzu-debug-fps-stack">
+                    <ui:VisualElement class="yuzu-debug-fps-current">
+                        <ui:Label name="fps-value" text="-" class="yuzu-debug-label yuzu-debug-hud-value yuzu-debug-hud-value-large yuzu-debug-metric-good" />
+                        <ui:Label text="fps" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-fps-unit" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="yuzu-debug-hud-row">
+                        <ui:Label name="fps-ms" text="-" class="yuzu-debug-label yuzu-debug-hud-value" />
+                        <ui:Label text="ms" class="yuzu-debug-label yuzu-debug-hud-label" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="fps-graph-slot" class="yuzu-debug-graph-slot" />
+            <ui:Label text="fps" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-panel-footer" />
+        </ui:VisualElement>
+        <ui:VisualElement name="ram-panel" class="yuzu-debug-hud-panel yuzu-debug-performance-panel yuzu-debug-ram-panel">
+            <ui:VisualElement class="yuzu-debug-hud-row">
+                <ui:Label text="reserved" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-ram-label" />
+                <ui:Label name="ram-reserved" text="-" class="yuzu-debug-label yuzu-debug-hud-value yuzu-debug-ram-reserved" />
+                <ui:Label text="MB" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-ram-unit" />
+            </ui:VisualElement>
+            <ui:VisualElement class="yuzu-debug-hud-row">
+                <ui:Label text="allocated" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-ram-label" />
+                <ui:Label name="ram-allocated" text="-" class="yuzu-debug-label yuzu-debug-hud-value yuzu-debug-ram-allocated" />
+                <ui:Label text="MB" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-ram-unit" />
+            </ui:VisualElement>
+            <ui:VisualElement class="yuzu-debug-hud-row">
+                <ui:Label text="mono" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-ram-label" />
+                <ui:Label name="ram-mono" text="-" class="yuzu-debug-label yuzu-debug-hud-value yuzu-debug-ram-mono" />
+                <ui:Label text="MB" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-ram-unit" />
+            </ui:VisualElement>
+            <ui:VisualElement name="ram-graph-slot" class="yuzu-debug-graph-slot" />
+            <ui:Label text="ram" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-panel-footer" />
+        </ui:VisualElement>
+        <ui:VisualElement name="audio-panel" class="yuzu-debug-hud-panel yuzu-debug-performance-panel yuzu-debug-audio-panel">
+            <ui:VisualElement class="yuzu-debug-hud-row">
+                <ui:Label name="audio-db" text="-- dB" class="yuzu-debug-label yuzu-debug-hud-value" />
+            </ui:VisualElement>
+            <ui:VisualElement name="audio-graph-slot" class="yuzu-debug-graph-slot" />
+            <ui:Label text="audio" class="yuzu-debug-label yuzu-debug-hud-label yuzu-debug-panel-footer" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

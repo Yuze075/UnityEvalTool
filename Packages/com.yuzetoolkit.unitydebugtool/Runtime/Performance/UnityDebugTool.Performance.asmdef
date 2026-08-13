@@ -1,0 +1,17 @@
+{
+  "name": "UnityDebugTool.Performance",
+  "rootNamespace": "YuzeToolkit",
+  "references": [
+    "UnityDebugTool",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,0 +1,16 @@
+{
+  "name": "com.yuzetoolkit.unitydebugtool",
+  "version": "1.0.0",
+  "displayName": "UnityDebugTool",
+  "description": "一个Unity运行时日志、性能信息、调试工具",
+  "unity": "2022.3",
+  "author": {
+    "name": "Yzue",
+    "email": "925581968@qq.com",
+    "url": "https://github.com/Yuze075"
+  },
+  "dependencies": {
+    "com.yuzetoolkit.unityevaltool": "2.0.1",
+    "com.unity.inputsystem": "1.0.0"
+  }
+}

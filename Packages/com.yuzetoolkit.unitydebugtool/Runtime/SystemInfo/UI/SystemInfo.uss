@@ -1,0 +1,63 @@
+.yuzu-debug-system-info-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    flex-direction: column;
+}
+
+.yuzu-debug-system-info-layer .yuzu-debug-system-info-label {
+    color: rgba(255, 255, 255, 0.86);
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+    -unity-font-style: normal;
+    white-space: normal;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-system-info-layer .yuzu-debug-system-info-label-muted {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.yuzu-debug-system-info-hud {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    align-items: flex-end;
+    max-width: 48%;
+    max-height: 56%;
+    padding: 5px 7px;
+    background-color: rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+    align-self: flex-end;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-system-info-lines {
+    align-self: stretch;
+    max-height: 100%;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.yuzu-debug-system-info-row {
+    flex-direction: row;
+    align-items: flex-start;
+    align-self: stretch;
+    justify-content: space-between;
+}
+
+.yuzu-debug-system-info-key {
+    -unity-text-align: upper-left;
+    white-space: nowrap;
+    margin-right: 8px;
+}
+
+.yuzu-debug-system-info-value {
+    -unity-text-align: upper-right;
+    white-space: normal;
+    flex-shrink: 1;
+}

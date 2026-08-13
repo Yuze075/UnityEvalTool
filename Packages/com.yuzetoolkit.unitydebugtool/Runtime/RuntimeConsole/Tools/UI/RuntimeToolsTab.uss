@@ -1,0 +1,36 @@
+.yuzu-runtime-tool-item {
+    margin-bottom: 6px;
+    padding-left: 6px;
+    padding-right: 6px;
+    padding-top: 4px;
+    padding-bottom: 5px;
+    background-color: rgba(255, 255, 255, 0.035);
+    border-left-width: 3px;
+    border-left-color: rgba(53, 173, 159, 0.72);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+    border-radius: 2px;
+}
+
+.yuzu-runtime-tool-item .unity-foldout__toggle {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.yuzu-runtime-tool-item .unity-foldout__content {
+    margin-left: 0;
+    padding-left: 0;
+}
+
+.yuzu-runtime-tool-header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.yuzu-runtime-tool-description {
+    flex-grow: 1;
+    min-width: 0;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: normal;
+}

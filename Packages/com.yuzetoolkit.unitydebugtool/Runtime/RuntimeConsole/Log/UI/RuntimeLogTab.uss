@@ -1,0 +1,281 @@
+.yuzu-runtime-console .yuzu-runtime-log-toolbar-button {
+    min-height: 24px;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 7px;
+    padding-right: 8px;
+    background-color: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.62);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.1);
+    border-right-color: rgba(255, 255, 255, 0.1);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+    border-left-color: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    flex-shrink: 1;
+    flex-grow: 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.yuzu-runtime-console .yuzu-runtime-log-toolbar-button:hover {
+    background-color: rgba(53, 173, 159, 0.16);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.yuzu-runtime-log-filter-toggle {
+    -unity-font-style: normal;
+}
+
+.yuzu-runtime-log-clear-button {
+    min-width: 42px;
+}
+
+.yuzu-runtime-log-filter-toggle-active {
+    color: rgba(255, 255, 255, 0.94);
+}
+
+.yuzu-runtime-log-collapse-toggle {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.yuzu-runtime-log-collapse-toggle.yuzu-runtime-log-filter-toggle-active {
+    background-color: rgba(53, 173, 159, 0.24);
+    border-top-color: rgba(53, 173, 159, 0.72);
+    border-right-color: rgba(53, 173, 159, 0.72);
+    border-bottom-color: rgba(53, 173, 159, 0.72);
+    border-left-color: rgba(53, 173, 159, 0.72);
+}
+
+.yuzu-runtime-log-toolbar-spacer {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.yuzu-runtime-log-search {
+    width: 180px;
+    max-width: 260px;
+    min-width: 88px;
+    flex-grow: 1;
+    flex-shrink: 1;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+.yuzu-runtime-log-search .unity-base-field__label {
+    display: none;
+}
+
+.yuzu-runtime-log-search .unity-base-text-field__input {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.yuzu-runtime-log-filter-log.yuzu-runtime-log-filter-toggle-active {
+    background-color: rgba(190, 210, 220, 0.24);
+    border-top-color: rgba(210, 230, 240, 0.58);
+    border-right-color: rgba(210, 230, 240, 0.58);
+    border-bottom-color: rgba(210, 230, 240, 0.58);
+    border-left-color: rgba(210, 230, 240, 0.58);
+}
+
+.yuzu-runtime-log-filter-log:hover {
+    background-color: rgba(190, 210, 220, 0.1);
+    border-top-color: rgba(210, 230, 240, 0.34);
+    border-right-color: rgba(210, 230, 240, 0.34);
+    border-bottom-color: rgba(210, 230, 240, 0.34);
+    border-left-color: rgba(210, 230, 240, 0.34);
+}
+
+.yuzu-runtime-log-filter-log.yuzu-runtime-log-filter-toggle-active:hover {
+    background-color: rgba(190, 210, 220, 0.24);
+    border-top-color: rgba(210, 230, 240, 0.58);
+    border-right-color: rgba(210, 230, 240, 0.58);
+    border-bottom-color: rgba(210, 230, 240, 0.58);
+    border-left-color: rgba(210, 230, 240, 0.58);
+}
+
+.yuzu-runtime-log-filter-warning.yuzu-runtime-log-filter-toggle-active {
+    background-color: rgba(242, 174, 66, 0.3);
+    border-top-color: rgba(242, 174, 66, 0.82);
+    border-right-color: rgba(242, 174, 66, 0.82);
+    border-bottom-color: rgba(242, 174, 66, 0.82);
+    border-left-color: rgba(242, 174, 66, 0.82);
+}
+
+.yuzu-runtime-log-filter-warning:hover {
+    background-color: rgba(242, 174, 66, 0.12);
+    border-top-color: rgba(242, 174, 66, 0.46);
+    border-right-color: rgba(242, 174, 66, 0.46);
+    border-bottom-color: rgba(242, 174, 66, 0.46);
+    border-left-color: rgba(242, 174, 66, 0.46);
+}
+
+.yuzu-runtime-log-filter-warning.yuzu-runtime-log-filter-toggle-active:hover {
+    background-color: rgba(242, 174, 66, 0.3);
+    border-top-color: rgba(242, 174, 66, 0.82);
+    border-right-color: rgba(242, 174, 66, 0.82);
+    border-bottom-color: rgba(242, 174, 66, 0.82);
+    border-left-color: rgba(242, 174, 66, 0.82);
+}
+
+.yuzu-runtime-log-filter-error.yuzu-runtime-log-filter-toggle-active {
+    background-color: rgba(244, 92, 87, 0.32);
+    border-top-color: rgba(244, 92, 87, 0.86);
+    border-right-color: rgba(244, 92, 87, 0.86);
+    border-bottom-color: rgba(244, 92, 87, 0.86);
+    border-left-color: rgba(244, 92, 87, 0.86);
+}
+
+.yuzu-runtime-log-filter-error:hover {
+    background-color: rgba(244, 92, 87, 0.13);
+    border-top-color: rgba(244, 92, 87, 0.5);
+    border-right-color: rgba(244, 92, 87, 0.5);
+    border-bottom-color: rgba(244, 92, 87, 0.5);
+    border-left-color: rgba(244, 92, 87, 0.5);
+}
+
+.yuzu-runtime-log-filter-error.yuzu-runtime-log-filter-toggle-active:hover {
+    background-color: rgba(244, 92, 87, 0.32);
+    border-top-color: rgba(244, 92, 87, 0.86);
+    border-right-color: rgba(244, 92, 87, 0.86);
+    border-bottom-color: rgba(244, 92, 87, 0.86);
+    border-left-color: rgba(244, 92, 87, 0.86);
+}
+
+.yuzu-runtime-log-list {
+    flex-grow: 1;
+    min-height: 0;
+    background-color: rgba(0, 0, 0, 0.16);
+}
+
+.yuzu-runtime-log-row {
+    min-height: 24px;
+    flex-direction: row;
+    align-items: flex-start;
+    padding-left: 7px;
+    padding-right: 7px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    border-left-width: 3px;
+    border-left-color: rgba(210, 230, 240, 0.26);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.86);
+}
+
+.yuzu-runtime-log-row:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.yuzu-runtime-log-row-message {
+    flex-grow: 1;
+    min-width: 0;
+    color: rgba(255, 255, 255, 0.86);
+    white-space: normal;
+}
+
+.yuzu-runtime-log-row-log:hover {
+    background-color: rgba(190, 210, 220, 0.1);
+}
+
+.yuzu-runtime-log-row-log.yuzu-runtime-log-row-selected {
+    background-color: rgba(190, 210, 220, 0.24);
+}
+
+.yuzu-runtime-log-row-warning {
+    border-left-color: rgb(242, 174, 66);
+}
+
+.yuzu-runtime-log-row-warning .yuzu-runtime-log-row-message {
+    color: rgb(242, 174, 66);
+}
+
+.yuzu-runtime-log-row-warning:hover {
+    background-color: rgba(242, 174, 66, 0.12);
+}
+
+.yuzu-runtime-log-row-warning.yuzu-runtime-log-row-selected {
+    background-color: rgba(242, 174, 66, 0.3);
+}
+
+.yuzu-runtime-log-row-error {
+    border-left-color: rgb(244, 92, 87);
+}
+
+.yuzu-runtime-log-row-error .yuzu-runtime-log-row-message {
+    color: rgb(244, 92, 87);
+}
+
+.yuzu-runtime-log-row-error:hover {
+    background-color: rgba(244, 92, 87, 0.13);
+}
+
+.yuzu-runtime-log-row-error.yuzu-runtime-log-row-selected {
+    background-color: rgba(244, 92, 87, 0.32);
+}
+
+.yuzu-runtime-log-row-selected .yuzu-runtime-log-row-message {
+    color: rgba(255, 255, 255, 0.94);
+}
+
+.yuzu-runtime-log-splitter {
+    height: 8px;
+    min-height: 8px;
+    flex-grow: 0;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.28);
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.08);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.yuzu-runtime-log-splitter:hover,
+.yuzu-runtime-log-splitter-active {
+    background-color: rgba(53, 173, 159, 0.16);
+    border-top-color: rgba(53, 173, 159, 0.42);
+    border-bottom-color: rgba(53, 173, 159, 0.42);
+}
+
+.yuzu-runtime-log-splitter-handle {
+    width: 56px;
+    height: 2px;
+    background-color: rgba(53, 173, 159, 0.46);
+    border-radius: 1px;
+}
+
+.yuzu-runtime-log-splitter:hover .yuzu-runtime-log-splitter-handle,
+.yuzu-runtime-log-splitter-active .yuzu-runtime-log-splitter-handle {
+    background-color: rgba(69, 205, 188, 0.9);
+}
+
+.yuzu-runtime-log-detail {
+    height: 138px;
+    min-height: 0;
+    flex-grow: 0;
+    flex-shrink: 0;
+    background-color: rgba(0, 0, 0, 0.24);
+}
+
+.yuzu-runtime-log-detail .yuzu-runtime-console-pan-content {
+    padding-left: 8px;
+    padding-right: 20px;
+    padding-top: 6px;
+    padding-bottom: 10px;
+}
+
+.yuzu-runtime-log-detail-text {
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.82);
+    white-space: normal;
+    font-size: 12px;
+    -unity-text-align: upper-left;
+}
