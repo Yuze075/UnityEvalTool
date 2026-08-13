@@ -69,8 +69,10 @@ async function execute() {
 
 使用 `tools://` 发现根 module，使用 `tools://<Tool/Path>` 导入具体 module。内置根包括
 `Runtime`、`Runtime/Objects`、`Runtime/Components`、`Runtime/Diagnostics`、
-`Runtime/Inspect`、`Runtime/Reflection`、`UnityEval` 以及仅 Editor 可用的 `Editor`
-层级。应优先使用这些语义 helper，而不是直接使用 `CS.*` 互操作。
+`Runtime/Inspect`、`Runtime/Reflection`、`Runtime/ObserveFrames`、`UnityEval` 以及仅
+Editor 可用的 `Editor` 层级。Editor 层级包含直接 viewport image、持久化的 Unity Test
+Framework 运行状态和有界序列化代码用法搜索。应优先使用这些语义 helper，而不是直接
+使用 `CS.*` 互操作。
 
 - [Helper module 参考](docs/HELPER_MODULES_zh.md)
 - [进阶 session、编译与错误处理](docs/ADVANCED_USAGE_zh.md)

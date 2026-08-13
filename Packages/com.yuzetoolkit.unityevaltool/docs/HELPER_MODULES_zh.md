@@ -2,8 +2,8 @@
 
 [English](HELPER_MODULES.md) | **简体中文** | [Package README](../README_zh.md) | [Runtime 服务](RUNTIME_SERVICES_zh.md) | [项目架构](PROJECT_DESIGN_zh.md) | [进阶使用](ADVANCED_USAGE_zh.md)
 
-[![Runtime](https://img.shields.io/badge/Runtime-6%20modules-2ecc71)](#runtime-helpers)
-[![Editor](https://img.shields.io/badge/Editor-9%20modules-3498db)](#editor-helpers)
+[![Runtime](https://img.shields.io/badge/Runtime-7%20modules-2ecc71)](#runtime-helpers)
+[![Editor](https://img.shields.io/badge/Editor-11%20modules-3498db)](#editor-helpers)
 [![Catalog](https://img.shields.io/badge/Tool%20catalog-1%20module-8e44ad)](#tool-目录)
 [![Tool](https://img.shields.io/badge/Broker%20MCP-3%20tools-orange)](../../../README_zh.md#mcp-配置)
 
@@ -27,8 +27,8 @@ async function execute() {
 | 分类 | 模块 |
 |---|---|
 | Tool 目录 | `tools://UnityEval` |
-| Runtime helpers | `tools://Runtime`, `tools://Runtime/Objects`, `tools://Runtime/Components`, `tools://Runtime/Diagnostics`, `tools://Runtime/Reflection`, `tools://Runtime/Inspect` |
-| Editor helpers | `tools://Editor`, `tools://Editor/Assets`, `tools://Editor/Importers`, `tools://Editor/Scenes`, `tools://Editor/Prefabs`, `tools://Editor/Serialized`, `tools://Editor/Project`, `tools://Editor/Pipeline`, `tools://Editor/Validation` |
+| Runtime helpers | `tools://Runtime`, `tools://Runtime/Objects`, `tools://Runtime/Components`, `tools://Runtime/Diagnostics`, `tools://Runtime/Reflection`, `tools://Runtime/Inspect`, `tools://Runtime/ObserveFrames` |
+| Editor helpers | `tools://Editor`, `tools://Editor/Assets`, `tools://Editor/Importers`, `tools://Editor/Scenes`, `tools://Editor/Prefabs`, `tools://Editor/Serialized`, `tools://Editor/Project`, `tools://Editor/Pipeline`, `tools://Editor/Tests`, `tools://Editor/CodeUsages`, `tools://Editor/Validation` |
 
 Runtime helper 可在 Editor 或 Runtime/Player 中运行，前提是底层 Unity API 可用。Editor helper 依赖 `UnityEditor`，在 Runtime/Player 中会明确失败。
 
@@ -133,6 +133,29 @@ C#/Unity 对象引用格式化辅助。
 | `findMethods(query?, type?, includeNonPublic?, confirmDangerous?, limit?)` | 搜索 public methods。 | 非 public 搜索需要 `confirmDangerous: true` |
 | `callStaticMethod(type, method, args?, includeNonPublic?, confirmDangerous?)` | 调用 static method。 | 非 public 调用需要 `confirmDangerous: true` |
 
+### `tools://Runtime/ObserveFrames`
+
+对 public field 和可读 property 做有界跨帧观察。Component probe 使用
+`{ name, kind: "component", target, type, member, index? }`；static probe 使用
+`{ name, kind: "static", type, member }`。
+
+| 函数 | 用途 | 安全 |
+|---|---|---|
+| `start(probes, maxFrames?, intervalFrames?, maxSamples?, until?, label?)` | 先取得初始 sample，再在后续 Editor update 或 Player frame 采样。`until` 接受 `{ probe, op, value? }`，`op` 可为 `eq`、`ne`、`gt`、`gte`、`lt`、`lte`、`truthy` 或 `falsy`。 | 只读、长时间运行 |
+| `get(id, offset?, limit?)` | 每页读取最多 500 个 sample 及当前完成状态。 | 只读 |
+| `list(status?, limit?)` | 列出保留的 session 摘要。 | 只读 |
+| `cancel(id)` | 停止采样但保留已有 sample。 | 仅修改内存状态 |
+| `release(id)` | 释放 session 及其 sample。 | 仅修改内存状态 |
+
+每个 session 最多包含 32 个 probe、36,000 个观察帧和 10,000 个 sample；最多同时运行
+8 个 session，并保留 64 个。格式化 value 和保留的 session 数据也有明确字符预算；保留的
+JSON 达到 8,388,608 个字符前，session 会以 `storage-limit` 完成。采样只会调用明确指定的
+field/property getter。已知标量和 Unity value type 会直接格式化；array 以及准确的 `List<>`、
+`Dictionary<,>` 最多展开 4 层和 128 个条目，任意自定义对象只返回类型摘要，不会调用
+`ToString()` 或继续读取其它 property。单个字符串最多 4,096 字符，单个格式化 value 最多
+32,768 字符。Edit Mode 下，一个观察帧表示一次 Editor update。session 是进程内存状态，
+不跨 Domain Reload；需要跨 reload 保留测试执行状态时应使用 Tests Tool。
+
 ## Editor Helpers
 
 ### `tools://Editor`
@@ -150,6 +173,14 @@ Editor 状态、编译、Selection、菜单、播放模式和截图。
 | `executeMenuItem(path, confirm?)` | 执行 Editor menu item。 | 非 UnityEvalTool 菜单需要 `confirm: true` |
 | `setPlayMode(isPlaying)` / `setPause(isPaused)` | 控制播放/暂停状态。 | 改变 Editor 状态 |
 | `screenshotGameView(path?)` | 捕获 Game View。 | 写入截图文件 |
+| `captureViewport(target?, maxLongEdge?, windowQuery?)` | 同步返回 Game View、Scene View 或可见 Editor 窗口 PNG；MCP 结果同时包含 image、尺寸和来源 metadata。 | 只读 |
+
+`captureViewport` 接受 `game`、`scene` 或 `editor_window`。`maxLongEdge = 0` 保留来源尺寸；
+1 到 8192 会在必要时等比缩小。任意 Editor 窗口必须是当前选中的可见 tab，且 Unity 必须
+位于前台。旧的文件写入接口 `screenshotGameView` 保持不变。Game 与 Scene render texture
+会先在 GPU 上缩小，再执行 readback。Editor 窗口来源超过 8,388,608 像素、任意输出超过
+16,777,216 像素，或编码后的 PNG 超过 33,554,432 bytes 时会明确失败；此时应传入更小的
+`maxLongEdge`。
 
 ### `tools://Editor/Assets`
 
@@ -226,6 +257,22 @@ SerializedObject 和 Inspector property 读写。
 target 可以是 `assetPath`、`guid`、`instanceId` 或 GameObject selector。
 支持写入的常见类型包括 integer、boolean、float、string、color、object reference、enum、Vector2/3/4、Quaternion、Vector2Int/3Int、Rect/RectInt、Bounds/BoundsInt 和 AnimationCurve。不支持的 property 类型会明确报错。
 
+### `tools://Editor/CodeUsages`
+
+针对一个已编译 `MonoScript` 与可选 member name 的有界序列化用法搜索。
+
+| 函数 | 用途 | 安全 |
+|---|---|---|
+| `search(scriptPath, folders, member?, limit?)` | 不传 `member` 时查找 MonoBehaviour 与 ScriptableObject 挂载点；传入后查找序列化字段、UnityEvent 方法绑定（含未解析 target）以及 AnimationEvent 函数名匹配。 | 只读、长时间运行 |
+
+`folders` 必填，必须是 `Assets` 或 `Packages` 下的一个 AssetDatabase folder 或 folder 数组；
+不会隐式扫描整个项目。结果会报告候选资产、serialized owner、结果、单对象 property 与 YAML
+fallback 的上限，以及截断原因和有界的逐资产错误。工具保留的候选路径会按资产类型配额限制，
+结果同时返回逐类型搜索统计；Unity 的 `AssetDatabase.FindAssets` 仍会在工具侧限制生效前分配
+自身的 GUID array。UnityEvent 结果会区分 `fileID: 0` 的 `missingTarget`，以及非零但未 live-load
+的 serialized target。AnimationEvent 记录会明确标为仅函数名候选，因为 AnimationClip 不会
+序列化接收它的 C# 类型。LDtk 文件会被排除。
+
 ### `tools://Editor/Project`
 
 项目级诊断。
@@ -247,10 +294,36 @@ Package Manager、Test Runner 和 BuildPipeline 工作流。
 | `removePackage(packageName, confirm?)` | 移除 package。 | 需要 `confirm: true` |
 | `searchPackages(packageName?)` | 搜索 package registry。 | 只读/request |
 | `getPackageRequest(id)` | 查询 package request。 | 只读 |
-| `runTests(mode?, testName?)` / `getTestRun(id)` | 运行或查询测试。 | 可选 Test Framework；未安装时不支持 |
+| `runTests(mode?, testName?)` / `getTestRun(id)` | 委托给 `Editor/Tests` 的兼容入口。 | 可选 Test Framework；未安装时不支持 |
 | `getBuildSettings()` | 读取 build scenes 和 target。 | 只读 |
 | `buildPlayer(locationPathName, confirm?)` | 构建 player。 | 需要 `confirm: true` |
 | `getBuild(id)` | 查询 build request。 | 只读 |
+
+### `tools://Editor/Tests`
+
+Unity Test Framework 的测试发现与 callback 驱动执行。未安装可选 Package 时，稳定 Tool 仍会
+显示，并明确提示需要 `com.unity.test-framework` 1.4.0 或更高版本。
+
+| 函数 | 用途 | 安全 |
+|---|---|---|
+| `list(mode?, assemblies?, tests?, groups?, categories?, limit?)` | 启动异步 EditMode 或 PlayMode 测试发现并返回 `listId`。发现上限为 1..5000，默认 500。 | 只读、长时间运行 |
+| `getList(listId, offset?, limit?)` | 每页读取最多 500 个参数化叶测试。 | 只读 |
+| `run(mode?, assemblies?, tests?, groups?, categories?)` | 启动一次过滤后的测试并返回官方 `runId`。 | 可能进入 Play Mode 或 reload |
+| `get(runId, detail?, offset?, limit?)` | 以每页最多 500 条读取 `summary`、`failures` 或 `all` 结果。 | 只读 |
+| `cancel(runId)` | 请求 Unity Test Framework 取消 active run。 | 修改测试运行状态 |
+
+run 与 discovery record 保存在 `Library` 下，最多保留 32 个 run 和 16 个 discovery request。
+可选 adapter 会在 Domain Reload 后重新注册官方 TestRunner callback，让 active framework job
+继续更新同一记录。丢失的 framework job，以及因 reload 丢失 callback 的 discovery，会转成明确的
+terminal record，不会阻塞后续工作。Unity Test Framework 1.4 的 callback 是进程全局的，并且
+不包含 run id；因此本工具只会在没有其它 framework job 时启动，并且只有当自身官方 GUID 是唯一
+active job 时才接受 callback。发现干扰时会记录 `OwnershipConflict` 并取消自身 run，不会猜测归属。
+
+discovery 最多访问 50,000 个 tree node，保留请求指定的 1..5,000 个测试，并存储最多 2 MiB 文本。
+run detail 最多保留 10,000 个叶结果和 2 MiB 文本，计数与文本截断都会显式返回。`groups` 与
+`categories` 各自最多接受 32 个、每个最多 256 字符的表达式；保守 regex 子集禁止 group、
+lookaround、计数重复、backreference 与无界 wildcard 重复，本地匹配另有 100 ms timeout。
+assembly/test 精确过滤各自最多接受 256 个、每个最多 1,024 字符的值。
 
 ### `tools://Editor/Validation`
 
@@ -270,11 +343,15 @@ Package Manager、Test Runner 和 BuildPipeline 工作流。
 | 检查 Unity 环境 | `tools://Runtime#getState()` |
 | 检查场景对象 | `tools://Runtime/Objects` |
 | 读取 live component 数据 | `tools://Runtime/Components` |
+| 跨帧观察数据 | `tools://Runtime/ObserveFrames` |
 | 编辑 Inspector 字段 | `tools://Editor/Serialized` |
+| 捕获 Editor viewport | `tools://Editor#captureViewport()` |
 | 搜索项目资源 | `tools://Editor/Assets#find()` |
+| 查找序列化代码用法 | `tools://Editor/CodeUsages` |
 | 修改 importer 设置 | `tools://Editor/Importers` |
 | 处理 Prefab | `tools://Editor/Prefabs` |
-| 运行测试或构建 | `tools://Editor/Pipeline` |
+| 发现或运行测试 | `tools://Editor/Tests` |
+| 运行构建 | `tools://Editor/Pipeline` |
 | 调用自定义 static C# API | `tools://Runtime/Reflection` |
 | 执行一次性 Unity/C# 代码 | `eval` 中的 PuerTS `CS.*` interop |
 | 使用底层 commands | [高级说明](ADVANCED_USAGE_zh.md) |

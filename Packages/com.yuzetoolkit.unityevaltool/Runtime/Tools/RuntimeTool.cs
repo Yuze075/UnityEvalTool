@@ -14,6 +14,7 @@ namespace YuzeToolkit
     [EvalSubTool(typeof(DiagnosticsTool))]
     [EvalSubTool(typeof(ReflectionTool))]
     [EvalSubTool(typeof(InspectTool))]
+    [EvalSubTool(typeof(ObserveFramesTool))]
     public sealed partial class RuntimeTool
     {
         [UnityEngine.Scripting.Preserve]

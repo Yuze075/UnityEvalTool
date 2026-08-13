@@ -22,6 +22,7 @@ namespace YuzeToolkit
                     typeof(DiagnosticsTool),
                     typeof(InspectTool),
                     typeof(ReflectionTool),
+                    typeof(ObserveFramesTool),
                     typeof(ToolManagerTool),
                 };
             }

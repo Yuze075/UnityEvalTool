@@ -2,8 +2,8 @@
 
 **English** | [简体中文](HELPER_MODULES_zh.md) | [Package README](../README.md) | [Runtime services](RUNTIME_SERVICES.md) | [Architecture](PROJECT_DESIGN.md) | [Advanced usage](ADVANCED_USAGE.md)
 
-[![Runtime](https://img.shields.io/badge/Runtime-6%20modules-2ecc71)](#runtime-helpers)
-[![Editor](https://img.shields.io/badge/Editor-9%20modules-3498db)](#editor-helpers)
+[![Runtime](https://img.shields.io/badge/Runtime-7%20modules-2ecc71)](#runtime-helpers)
+[![Editor](https://img.shields.io/badge/Editor-11%20modules-3498db)](#editor-helpers)
 [![Catalog](https://img.shields.io/badge/Tool%20catalog-1%20module-8e44ad)](#tool-catalog)
 [![Tool](https://img.shields.io/badge/Broker%20MCP-3%20tools-orange)](../../../README.md#mcp-setup)
 
@@ -27,8 +27,8 @@ async function execute() {
 | Category | Modules |
 |---|---|
 | Tool catalog | `tools://UnityEval` |
-| Runtime helpers | `tools://Runtime`, `tools://Runtime/Objects`, `tools://Runtime/Components`, `tools://Runtime/Diagnostics`, `tools://Runtime/Reflection`, `tools://Runtime/Inspect` |
-| Editor helpers | `tools://Editor`, `tools://Editor/Assets`, `tools://Editor/Importers`, `tools://Editor/Scenes`, `tools://Editor/Prefabs`, `tools://Editor/Serialized`, `tools://Editor/Project`, `tools://Editor/Pipeline`, `tools://Editor/Validation` |
+| Runtime helpers | `tools://Runtime`, `tools://Runtime/Objects`, `tools://Runtime/Components`, `tools://Runtime/Diagnostics`, `tools://Runtime/Reflection`, `tools://Runtime/Inspect`, `tools://Runtime/ObserveFrames` |
+| Editor helpers | `tools://Editor`, `tools://Editor/Assets`, `tools://Editor/Importers`, `tools://Editor/Scenes`, `tools://Editor/Prefabs`, `tools://Editor/Serialized`, `tools://Editor/Project`, `tools://Editor/Pipeline`, `tools://Editor/Tests`, `tools://Editor/CodeUsages`, `tools://Editor/Validation` |
 
 Runtime helpers can run in Editor or Runtime/Player when the underlying Unity API is available. Editor helpers require `UnityEditor` and fail clearly in Runtime/Player.
 
@@ -133,6 +133,31 @@ C# type discovery and static method calls for project-specific APIs.
 | `findMethods(query?, type?, includeNonPublic?, confirmDangerous?, limit?)` | Search public methods. | Non-public search requires `confirmDangerous: true` |
 | `callStaticMethod(type, method, args?, includeNonPublic?, confirmDangerous?)` | Call a static method. | Non-public call requires `confirmDangerous: true` |
 
+### `tools://Runtime/ObserveFrames`
+
+Bounded cross-frame observation of public fields and readable properties. Component probes use
+`{ name, kind: "component", target, type, member, index? }`; static probes use
+`{ name, kind: "static", type, member }`.
+
+| Function | Purpose | Safety |
+|---|---|---|
+| `start(probes, maxFrames?, intervalFrames?, maxSamples?, until?, label?)` | Capture an initial sample and start sampling on later Editor updates or Player frames. `until` accepts `{ probe, op, value? }`, where `op` is `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `truthy`, or `falsy`. | Read-only, long-running |
+| `get(id, offset?, limit?)` | Read a page of at most 500 samples and current completion state. | Read-only |
+| `list(status?, limit?)` | List retained session summaries. | Read-only |
+| `cancel(id)` | Stop sampling while retaining captured samples. | In-memory state only |
+| `release(id)` | Release a session and its samples. | In-memory state only |
+
+A session is limited to 32 probes, 36,000 observation frames, and 10,000 samples; at most eight
+sessions run concurrently and 64 are retained. Formatted values and retained session data also
+have explicit character budgets; a session completes with `storage-limit` before retaining more
+than 8,388,608 JSON characters. Sampling invokes only the explicitly named field/property getter.
+Known scalar and Unity value types are formatted directly; arrays plus exact `List<>` and
+`Dictionary<,>` values are expanded to depth 4 and 128 entries, while arbitrary custom objects are
+returned as type summaries without calling `ToString()` or inspecting additional properties. A
+single string is limited to 4,096 characters and one formatted value to 32,768 characters. In Edit
+Mode, one observation frame means one Editor update. Sessions are process-memory state and do not
+survive Domain Reload; use the test tool for reload-persistent test execution state.
+
 ## Editor Helpers
 
 ### `tools://Editor`
@@ -150,6 +175,15 @@ Editor state, compilation, selection, menu commands, play mode, and screenshots.
 | `executeMenuItem(path, confirm?)` | Execute an Editor menu item. | Non-UnityEvalTool menu requires `confirm: true` |
 | `setPlayMode(isPlaying)` / `setPause(isPaused)` | Control play/pause state. | Changes Editor state |
 | `screenshotGameView(path?)` | Capture Game View. | Writes screenshot file |
+| `captureViewport(target?, maxLongEdge?, windowQuery?)` | Synchronously return a Game View, Scene View, or visible Editor-window PNG as an MCP image plus dimensions and source metadata. | Read-only |
+
+`captureViewport` accepts `game`, `scene`, or `editor_window`. `maxLongEdge = 0` preserves the
+source size; values from 1 through 8192 downscale proportionally when needed. Arbitrary Editor
+windows must be the selected visible tab and Unity must be the foreground application. The older
+file-writing `screenshotGameView` contract remains unchanged. Game and Scene render textures are
+downscaled on the GPU before readback. Hard limits reject an Editor-window source above 8,388,608
+pixels, any output above 16,777,216 pixels, or an encoded PNG above 33,554,432 bytes; choose a
+smaller `maxLongEdge` when an output exceeds those bounds.
 
 ### `tools://Editor/Assets`
 
@@ -226,6 +260,24 @@ SerializedObject and Inspector property reads/writes.
 Targets can be `assetPath`, `guid`, `instanceId`, or a GameObject selector.
 Supported write value types include integer, boolean, float, string, color, object reference, enum, Vector2/3/4, Quaternion, Vector2Int/3Int, Rect/RectInt, Bounds/BoundsInt, and AnimationCurve. Unsupported property kinds fail with an explicit error.
 
+### `tools://Editor/CodeUsages`
+
+Bounded serialized usage search for one compiled `MonoScript` and an optional member name.
+
+| Function | Purpose | Safety |
+|---|---|---|
+| `search(scriptPath, folders, member?, limit?)` | Without `member`, find MonoBehaviour and ScriptableObject attachment points. With `member`, find matching serialized fields, UnityEvent method bindings (including unresolved targets), and AnimationEvent function-name matches. | Read-only, long-running |
+
+`folders` is required and must contain one AssetDatabase folder or an array of folders under
+`Assets` or `Packages`; no implicit project-wide scan occurs. The result reports candidate,
+serialized-owner, result, property, and YAML fallback limits together with truncation reasons and
+bounded per-asset errors. Candidate paths retained by the tool are split across bounded asset-type
+quotas and the result includes per-type search statistics; Unity's `AssetDatabase.FindAssets`
+still allocates its own GUID array before those tool-side bounds can apply. UnityEvent results
+distinguish a `missingTarget` (`fileID: 0`) from a nonzero serialized target that is not live-loaded.
+AnimationEvent records are explicitly name-only candidates because an AnimationClip does not
+serialize the receiving C# type. LDtk files are excluded.
+
 ### `tools://Editor/Project`
 
 Project-level diagnostics.
@@ -247,10 +299,40 @@ Package Manager, Test Runner, and BuildPipeline workflows.
 | `removePackage(packageName, confirm?)` | Remove a package. | Requires `confirm: true` |
 | `searchPackages(packageName?)` | Search package registry. | Read-only/request |
 | `getPackageRequest(id)` | Poll package request. | Read-only |
-| `runTests(mode?, testName?)` / `getTestRun(id)` | Run or poll tests. | Optional Test Framework; unsupported without it |
+| `runTests(mode?, testName?)` / `getTestRun(id)` | Compatibility entry points that delegate to `Editor/Tests`. | Optional Test Framework; unsupported without it |
 | `getBuildSettings()` | Read build scenes and target. | Read-only |
 | `buildPlayer(locationPathName, confirm?)` | Build player. | Requires `confirm: true` |
 | `getBuild(id)` | Poll build request. | Read-only |
+
+### `tools://Editor/Tests`
+
+Unity Test Framework discovery and callback-driven execution. The stable Tool remains visible when
+the optional package is absent and then reports that `com.unity.test-framework` 1.4.0 or newer is
+required.
+
+| Function | Purpose | Safety |
+|---|---|---|
+| `list(mode?, assemblies?, tests?, groups?, categories?, limit?)` | Start asynchronous EditMode or PlayMode discovery and return a `listId`. The discovery limit is 1..5000 and defaults to 500. | Read-only, long-running |
+| `getList(listId, offset?, limit?)` | Read a discovery page of at most 500 parameterized leaf tests. | Read-only |
+| `run(mode?, assemblies?, tests?, groups?, categories?)` | Start one filtered test run and return its official `runId`. | May enter Play Mode or reload |
+| `get(runId, detail?, offset?, limit?)` | Read `summary`, `failures`, or `all` results in pages of at most 500. | Read-only |
+| `cancel(runId)` | Ask Unity Test Framework to cancel an active run. | Changes test-run state |
+
+Runs and discovery records are persisted under `Library`, with 32 runs and 16 discovery requests
+retained. The optional adapter re-registers official TestRunner callbacks after Domain Reload so an
+active framework job can continue updating the same record. A lost framework job and a discovery
+whose callback was lost to reload become explicit terminal records instead of blocking later work.
+Because Unity Test Framework 1.4 callbacks are process-global and contain no run id, this Tool starts
+only when no framework job is active and accepts callbacks only while its official GUID is the unique
+active job; interference becomes `OwnershipConflict` and the owned run is canceled rather than
+guessing attribution.
+
+Discovery visits at most 50,000 tree nodes, retains at most the requested 1..5,000 tests, and stores
+at most 2 MiB of text. Run details retain at most 10,000 leaf results and 2 MiB of text, with explicit
+count/text truncation fields. `groups` and `categories` each accept at most 32 expressions of at most
+256 characters. Their conservative regex subset excludes groups, lookarounds, counted repetitions,
+backreferences, and unbounded wildcard repetition; local matching also has a 100 ms timeout. Exact
+assembly/test filters allow at most 256 values of 1,024 characters each.
 
 ### `tools://Editor/Validation`
 
@@ -270,11 +352,15 @@ Project health checks.
 | Check Unity environment | `tools://Runtime#getState()` |
 | Inspect scene objects | `tools://Runtime/Objects` |
 | Read live component data | `tools://Runtime/Components` |
+| Observe values across frames | `tools://Runtime/ObserveFrames` |
 | Edit Inspector fields | `tools://Editor/Serialized` |
+| Capture an Editor viewport | `tools://Editor#captureViewport()` |
 | Search project assets | `tools://Editor/Assets#find()` |
+| Find serialized code usages | `tools://Editor/CodeUsages` |
 | Modify importer settings | `tools://Editor/Importers` |
 | Work with Prefabs | `tools://Editor/Prefabs` |
-| Run tests or builds | `tools://Editor/Pipeline` |
+| Discover or run tests | `tools://Editor/Tests` |
+| Run builds | `tools://Editor/Pipeline` |
 | Call custom static C# API | `tools://Runtime/Reflection` |
 | Run one-off Unity/C# code | PuerTS `CS.*` interop in `eval` |
 | Use low-level commands | [Advanced notes](ADVANCED_USAGE.md) |

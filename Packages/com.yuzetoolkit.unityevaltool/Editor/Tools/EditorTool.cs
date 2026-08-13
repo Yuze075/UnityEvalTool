@@ -17,6 +17,8 @@ namespace YuzeToolkit
     [EvalSubTool(typeof(SerializedTool))]
     [EvalSubTool(typeof(ProjectTool))]
     [EvalSubTool(typeof(PipelineTool))]
+    [EvalSubTool(typeof(TestsTool))]
+    [EvalSubTool(typeof(CodeUsagesTool))]
     [EvalSubTool(typeof(ValidationTool))]
     public sealed partial class EditorTool
     {
@@ -151,6 +153,19 @@ namespace YuzeToolkit
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
             ScreenCapture.CaptureScreenshot(fullPath);
             return EvalData.Obj(("path", projectPath), ("fullPath", fullPath), ("message", "Screenshot capture was requested. The file may be written after the current frame."));
+        }
+
+        [EvalFunction("Synchronously capture a PNG from the Game View, Scene View, or a visible Editor window. Args: target=game|scene|editor_window, maxLongEdge=0|1..8192, windowQuery? matches title or C# type for editor_window. Hard limits: editor_window source 8388608 pixels, output 16777216 pixels, encoded PNG 33554432 bytes.",
+            Safety = EvalToolSafety.ReadOnly)]
+        public Dictionary<string, object?> captureViewport(
+            [EvalParameter("Capture source: game, scene, or editor_window.")]
+            string target = "game",
+            [EvalParameter("Zero preserves source dimensions; 1..8192 proportionally downsizes the longest edge.")]
+            int maxLongEdge = 0,
+            [EvalParameter("For editor_window, optional title, short C# type, or full C# type query. The matched tab must be visible.")]
+            string windowQuery = "")
+        {
+            return EditorViewportCapture.Capture(target, maxLongEdge, windowQuery);
         }
     }
 }

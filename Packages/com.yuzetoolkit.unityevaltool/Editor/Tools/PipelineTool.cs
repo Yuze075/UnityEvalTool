@@ -5,10 +5,6 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEditor.PackageManager.Requests;
-#if YUZE_USE_UNITY_TEST_FRAMEWORK
-using UnityEditor.TestTools.TestRunner.Api;
-#endif
-using UnityEngine;
 using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 namespace YuzeToolkit
@@ -56,30 +52,27 @@ namespace YuzeToolkit
         [EvalFunction("Read package request status.")]
         public Dictionary<string, object?> getPackageRequest(string id) => PipelineRequestStore.GetPackageRequest(id);
 
-        [EvalFunction("Start tests.", Safety = EvalToolSafety.TriggersReload | EvalToolSafety.LongRunning)]
+        [EvalFunction("Start tests.", Safety = EvalToolSafety.MutatesEditorState | EvalToolSafety.TriggersReload | EvalToolSafety.LongRunning)]
         public Dictionary<string, object?> runTests(string mode = "EditMode", string testName = "")
         {
-#if YUZE_USE_UNITY_TEST_FRAMEWORK
-            var testMode = mode.Equals("PlayMode", StringComparison.OrdinalIgnoreCase) ? TestMode.PlayMode : TestMode.EditMode;
-            var filter = new Filter { testMode = testMode };
-            if (!string.IsNullOrWhiteSpace(testName))
-                filter.testNames = new[] { testName };
-            var executionId = PipelineRequestStore.TestRunner.Execute(new ExecutionSettings(filter));
-            PipelineRequestStore.TrackTestRun(testMode.ToString(), executionId);
-            return PipelineRequestStore.GetTestRun(executionId);
-#else
-            throw new InvalidOperationException(PipelineRequestStore.TestFrameworkUnavailableMessage);
-#endif
+            object? tests = string.IsNullOrWhiteSpace(testName) ? null : testName;
+            return ToLegacyTestRun(new TestsTool().run(mode, tests: tests));
         }
 
         [EvalFunction("Read test run status.")]
         public Dictionary<string, object?> getTestRun(string id)
         {
-#if YUZE_USE_UNITY_TEST_FRAMEWORK
-            return PipelineRequestStore.GetTestRun(id);
-#else
-            throw new InvalidOperationException(PipelineRequestStore.TestFrameworkUnavailableMessage);
-#endif
+            return ToLegacyTestRun(new TestsTool().get(id, "summary", 0, UnityTestToolUtility.DefaultPageSize));
+        }
+
+        private static Dictionary<string, object?> ToLegacyTestRun(Dictionary<string, object?> value)
+        {
+            value["id"] = value.TryGetValue("runId", out var runId) ? runId : string.Empty;
+            value["result"] = value.TryGetValue("summary", out var summary) &&
+                              summary is IDictionary<string, object?> summaryObject
+                ? new Dictionary<string, object?>(summaryObject, StringComparer.Ordinal)
+                : summary;
+            return value;
         }
 
         [EvalFunction("Read build settings.")]
@@ -115,18 +108,9 @@ namespace YuzeToolkit
 
         private static class PipelineRequestStore
         {
-            public const string TestFrameworkUnavailableMessage = "Unity Test Framework support is unavailable. Install com.unity.test-framework 1.4.0 or newer so YUZE_USE_UNITY_TEST_FRAMEWORK is defined.";
-
             private static readonly Dictionary<string, TrackedPackageRequest> PackageRequests = new(StringComparer.Ordinal);
-#if YUZE_USE_UNITY_TEST_FRAMEWORK
-            private static readonly Dictionary<string, TrackedTestRun> TestRuns = new(StringComparer.Ordinal);
-#endif
             private static readonly Dictionary<string, Dictionary<string, object?>> Builds = new(StringComparer.Ordinal);
             private static readonly object SyncRoot = new();
-#if YUZE_USE_UNITY_TEST_FRAMEWORK
-            private static TestRunnerApi? _testRunner;
-            private static bool _callbacksRegistered;
-#endif
 
             public static string TrackPackageRequest(string kind, string label, Request request)
             {
@@ -145,51 +129,6 @@ namespace YuzeToolkit
                     return SummarizePackageRequest(tracked);
                 }
             }
-
-#if YUZE_USE_UNITY_TEST_FRAMEWORK
-            public static string TrackTestRun(string mode, string executionId)
-            {
-                lock (SyncRoot)
-                    TestRuns[executionId] = new TrackedTestRun(executionId, mode, DateTime.UtcNow);
-                return executionId;
-            }
-
-            public static Dictionary<string, object?> GetTestRun(string id)
-            {
-                lock (SyncRoot)
-                {
-                    if (!TestRuns.TryGetValue(id, out var tracked))
-                        return EvalData.Obj(("found", false), ("id", id));
-                    return tracked.ToObject();
-                }
-            }
-
-            public static void EnsureTestCallbacks()
-            {
-                if (_callbacksRegistered) return;
-                _testRunner = ScriptableObject.CreateInstance<TestRunnerApi>();
-                _testRunner.RegisterCallbacks(new PipelineTestCallbacks());
-                _callbacksRegistered = true;
-            }
-
-            public static TestRunnerApi TestRunner
-            {
-                get
-                {
-                    EnsureTestCallbacks();
-                    return _testRunner!;
-                }
-            }
-
-            public static void CompleteRunningTests(ITestResultAdaptor result)
-            {
-                lock (SyncRoot)
-                {
-                    foreach (var tracked in TestRuns.Values.Where(run => run.Status == "Running"))
-                        tracked.Complete(result);
-                }
-            }
-#endif
 
             public static string TrackBuild(Dictionary<string, object?> summary)
             {
@@ -265,84 +204,6 @@ namespace YuzeToolkit
                 public DateTime StartedAtUtc { get; }
             }
 
-#if YUZE_USE_UNITY_TEST_FRAMEWORK
-            private sealed class TrackedTestRun
-            {
-                private object? _result;
-
-                public TrackedTestRun(string id, string mode, DateTime startedAtUtc)
-                {
-                    Id = id;
-                    Mode = mode;
-                    StartedAtUtc = startedAtUtc;
-                    Status = "Running";
-                }
-
-                public string Id { get; }
-                public string Mode { get; }
-                public DateTime StartedAtUtc { get; }
-                public DateTime FinishedAtUtc { get; private set; }
-                public string Status { get; private set; }
-
-                public void Complete(ITestResultAdaptor result)
-                {
-                    Status = result.TestStatus.ToString();
-                    FinishedAtUtc = DateTime.UtcNow;
-                    _result = TestResultSummaryUtility.Summarize(result, 2);
-                }
-
-                public Dictionary<string, object?> ToObject() =>
-                    EvalData.Obj(
-                        ("found", true),
-                        ("id", Id),
-                        ("mode", Mode),
-                        ("status", Status),
-                        ("startedAtUtc", StartedAtUtc.ToString("O")),
-                        ("finishedAtUtc", FinishedAtUtc == default ? string.Empty : FinishedAtUtc.ToString("O")),
-                        ("result", _result)
-                    );
-            }
-#endif
         }
-
-#if YUZE_USE_UNITY_TEST_FRAMEWORK
-        private sealed class PipelineTestCallbacks : ICallbacks
-        {
-            public void RunStarted(ITestAdaptor testsToRun) { }
-
-            public void RunFinished(ITestResultAdaptor result) => PipelineRequestStore.CompleteRunningTests(result);
-
-            public void TestStarted(ITestAdaptor test) { }
-
-            public void TestFinished(ITestResultAdaptor result) { }
-        }
-
-        private static class TestResultSummaryUtility
-        {
-            public static object Summarize(ITestResultAdaptor result, int depth)
-            {
-                var children = new List<object?>();
-                if (depth > 0 && result.Children != null)
-                {
-                    foreach (var child in result.Children)
-                        children.Add(Summarize(child, depth - 1));
-                }
-
-                return EvalData.Obj(
-                    ("name", result.Name),
-                    ("fullName", result.FullName),
-                    ("testStatus", result.TestStatus.ToString()),
-                    ("resultState", result.ResultState),
-                    ("duration", result.Duration),
-                    ("passCount", result.PassCount),
-                    ("failCount", result.FailCount),
-                    ("skipCount", result.SkipCount),
-                    ("message", result.Message),
-                    ("stackTrace", result.StackTrace),
-                    ("children", children)
-                );
-            }
-        }
-#endif
     }
 }

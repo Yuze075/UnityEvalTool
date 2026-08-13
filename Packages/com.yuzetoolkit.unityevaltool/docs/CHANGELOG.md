@@ -7,6 +7,9 @@ for the Unity package, computer-level Broker/CLI, npm packages, and Roslyn gener
 
 ## Unreleased
 
+- Add direct viewport image results, optional Test Framework discovery/run/cancel with
+  reload-persistent bounded records, serialized code-usage search, and bounded cross-frame
+  observation helpers.
 - Add matching English and Simplified Chinese package documentation and route complete
   installation and first-use guidance through the repository README.
 - Prepare package version 2.0.2 and pin Git URL installation to immutable tag `v2.0.2`.

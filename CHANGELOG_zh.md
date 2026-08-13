@@ -4,6 +4,8 @@
 
 ## 未发布
 
+- 增加同步 Game/Scene/Editor 窗口图像捕获、带跨 reload 持久有界记录的完整可选 Unity
+  Test Framework Tool、序列化代码/member 用法搜索，以及有界跨帧 Runtime 观察 session。
 - 将公共文档重构为一一对应的英文与简体中文指南；让仓库 README 成为完整的安装与
   首次使用入口；将可重现的源码打包与维护者自行定义的分发拆开；移除与宿主项目
   绑定的开发说明。

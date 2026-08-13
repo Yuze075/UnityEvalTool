@@ -7,6 +7,8 @@ Roslyn Generator 的规范发行历史。
 
 ## 未发布
 
+- 增加直接 viewport image 结果、带跨 reload 持久有界记录的可选 Test Framework
+  发现/运行/取消、序列化代码用法搜索和有界跨帧观察 helper。
 - 增加一一对应的英文与简体中文 Package 文档，并把完整安装与首次使用指南统一导向
   仓库 README。
 - 准备 Package 2.0.2，并将 Git URL 安装锁定到不可变 tag `v2.0.2`。

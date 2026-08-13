@@ -176,9 +176,12 @@ public sealed partial class AsyncTool
             var result = RunGenerator(files.Select(File.ReadAllText).ToArray());
 
             Assert.Empty(result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
-            Assert.Equal(16, result.GeneratedSources.Length);
+            Assert.Equal(19, result.GeneratedSources.Length);
             Assert.Contains(result.GeneratedSources, source => source.Contains("partial class RuntimeTool : global::YuzeToolkit.IEvalTool"));
             Assert.Contains(result.GeneratedSources, source => source.Contains("partial class AssetsTool : global::YuzeToolkit.IEvalTool"));
+            Assert.Contains(result.GeneratedSources, source => source.Contains("partial class ObserveFramesTool : global::YuzeToolkit.IEvalTool"));
+            Assert.Contains(result.GeneratedSources, source => source.Contains("partial class TestsTool : global::YuzeToolkit.IEvalTool"));
+            Assert.Contains(result.GeneratedSources, source => source.Contains("partial class CodeUsagesTool : global::YuzeToolkit.IEvalTool"));
             Assert.Contains(result.GeneratedSources, source => source.Contains("partial class ToolManagerTool : global::YuzeToolkit.IEvalTool"));
         }
 

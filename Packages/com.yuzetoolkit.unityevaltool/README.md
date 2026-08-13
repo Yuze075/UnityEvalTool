@@ -75,8 +75,10 @@ async function execute() {
 
 Use `tools://` to discover root modules and `tools://<Tool/Path>` to import a module. The
 built-in roots are `Runtime`, `Runtime/Objects`, `Runtime/Components`,
-`Runtime/Diagnostics`, `Runtime/Inspect`, `Runtime/Reflection`, `UnityEval`, and the
-Editor-only `Editor` hierarchy. Prefer these semantic helpers over direct `CS.*` interop.
+`Runtime/Diagnostics`, `Runtime/Inspect`, `Runtime/Reflection`, `Runtime/ObserveFrames`,
+`UnityEval`, and the Editor-only `Editor` hierarchy. The Editor hierarchy includes direct
+viewport images, persistent Unity Test Framework runs, and bounded serialized code-usage
+search. Prefer these semantic helpers over direct `CS.*` interop.
 
 - [Helper module reference](docs/HELPER_MODULES.md)
 - [Advanced sessions, compilation, and errors](docs/ADVANCED_USAGE.md)

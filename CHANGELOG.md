@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- Add synchronous Game/Scene/Editor-window image capture, a complete optional Unity Test
+  Framework Tool with reload-persistent bounded records, serialized code/member usage
+  search, and bounded cross-frame runtime observation sessions.
 - Rebuild the public documentation as matching English and Simplified Chinese guides,
   make the repository README the complete installation and first-use entry point, separate
   reproducible source packaging from maintainer-defined distribution, and remove
