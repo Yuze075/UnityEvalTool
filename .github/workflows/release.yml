@@ -28,6 +28,15 @@ jobs:
         run: |
           echo "Publishing is only allowed from refs/heads/main; got ${{ github.ref }}." >&2
           exit 1
+      - name: Require npm credentials for publication
+        if: ${{ inputs.publish }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          test -n "$NODE_AUTH_TOKEN" || {
+            echo "Repository secret NPM_TOKEN is required when publish=true." >&2
+            exit 1
+          }
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.300
@@ -277,11 +286,11 @@ jobs:
           set -eu
           while IFS= read -r package; do
             test -n "$package" || continue
-            npm publish "$package" --access public
+            npm publish "./$package" --access public
           done < packages/.publish-native
           while IFS= read -r package; do
             test -n "$package" || continue
-            npm publish "$package" --access public
+            npm publish "./$package" --access public
           done < packages/.publish-root
       - name: Create or repair GitHub release at the built commit
         env:
