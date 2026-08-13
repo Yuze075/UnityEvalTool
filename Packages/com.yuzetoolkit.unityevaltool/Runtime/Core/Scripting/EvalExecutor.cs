@@ -200,7 +200,8 @@ namespace YuzeToolkit
             "Generated C# tool functions use positional arguments. " +
             "Prefer helper tools for common workflows; use PuerTS `CS.*` interop only when no helper covers the task. " +
             "Return primitives, lists, or dictionaries. Editor-only tools require the Unity Editor. " +
-            "After editing C# scripts, import `tools://Editor`, call `scheduleAssetRefresh()`, then poll `getCompilationState()` in later eval calls; refresh helpers stop PlayMode before recompiling when needed. " +
+            "Before an eval that may compile, retain a fresh unity_status capturedAtUtc. After calling `tools://Editor`.scheduleAssetRefresh(), return from the eval and wait through unity_status(waitFor: 'compilation-complete', observedAfterUtc: capturedAtUtc); never poll eval while Unity is busy. " +
+            "CompilationFailed is repair mode: eval runs against the last successfully loaded assemblies so you can read compiler messages, fix code, and request another refresh. " +
             "Destructive operations require explicit confirmation flags.";
     }
 }

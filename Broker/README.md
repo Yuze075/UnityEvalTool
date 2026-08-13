@@ -48,7 +48,7 @@ installing an entry version whose matching native dependency is not available ye
 ## Release checklist
 
 1. Keep the Unity package and npm package versions identical.
-2. Build `Broker/UnityEvalTool.Broker.slnx` in Release configuration.
+2. Build `Broker/UnityEvalTool.Broker.slnx` and run its tests in Release configuration.
 3. Run `release.yml` with `publish=false` and verify all seven artifacts.
 4. Install the entry tarball together with the current platform tarball and run
    `unity --help` and `unity doctor`.

@@ -7,7 +7,7 @@
 
 [中文说明](README_zh.md) · [UnityEvalTool package](Packages/com.yuzetoolkit.unityevaltool/README.md) · [UnityDebugTool package](Packages/com.yuzetoolkit.unitydebugtool/README.md) · [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
 
-UnityEvalTool connects every local Unity Editor or Player to one computer-level Broker. AI agents and terminal users talk to the Broker instead of depending on a listener inside a Unity script domain. Compilation, assembly reload, process exit and a stalled Unity main thread therefore remain visible even while eval is temporarily unavailable.
+UnityEvalTool connects every local Unity Editor or Player to one computer-level Broker. AI agents and terminal users talk to the Broker instead of depending on a listener inside a Unity script domain. Compilation, assembly reload, process exit and a stalled Unity main thread therefore remain visible even while eval is temporarily unavailable; failed compilation keeps MCP/CLI available in repair mode through the last successfully loaded assemblies.
 
 The repository also ships UnityDebugTool, a UI Toolkit runtime debug panel and console that exposes the same tool model to players, developers and AI agents.
 

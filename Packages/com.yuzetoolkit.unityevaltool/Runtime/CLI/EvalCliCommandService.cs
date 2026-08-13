@@ -130,10 +130,9 @@ namespace YuzeToolkit
         private static string FormatGlobalHelp()
         {
             var builder = new StringBuilder();
-            builder.AppendLine("unity --host <ip> --port <port> [--token <token>] [command]");
+            builder.AppendLine("Unity-side commands for the computer-level `unity` Broker CLI.");
             builder.AppendLine();
-            builder.AppendLine("Without command, opens the Unity CLI REPL.");
-            builder.AppendLine("With command, executes once and exits.");
+            builder.AppendLine("Use `unity <command...>` for one-shot execution, or `unity connect <instance>` for an interactive console.");
             builder.AppendLine();
             builder.AppendLine("Built-ins:");
             builder.AppendLine("  -h | --help | -help                         Show this help.");

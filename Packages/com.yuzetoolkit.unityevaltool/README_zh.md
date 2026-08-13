@@ -46,18 +46,20 @@ Broker 只暴露三个工具：
 
 1. `unity_status`：列出全部 Unity 进程及其状态。在选择前可以按 `instanceId`
    等待 `ready` 或 `compilation-complete`；选择后也可以按 `connectionHandle` 等待。
+   两种等待都可能以 `CompilationFailed` 结束，必须检查 `phase`、`canEval` 和编译计数。
 2. `unity_connect`：使用上一步快照返回的 `registryRevision` 精确选择
    `instanceId`，返回仅属于当前工作流的不透明 handle。
 3. `eval`：在已选择的 Unity 中执行现有的
    `async function execute() { ... }` 契约。它必须携带 handle，Unity 忙碌时会被拒绝。
 
 Agent 必须先完成状态查询和连接，之后才能 eval。handle 不是全局选择；同一个
-Unity 进程 Domain Reload 后仍可继续使用，空闲会过期，Unity 进程被替换时会失效。
-被中断的 eval 永远不会自动重试。
+Unity 进程发生 registry 变化或 Domain Reload 后仍可继续使用，空闲会过期，Unity
+进程被替换时会失效；registry 变化本身不需要创建新 handle。被中断的 eval 永远不会自动重试。
 
 Unity 会独立报告 `Ready`、`Importing`、`Compiling`、`CompilationFailed`、
 `Reloading`、`PlayModeTransition` 以及退出和连接状态。因此即使脚本域暂时不存在，
-Agent 仍可以在 Broker 中等待。
+Agent 仍可以在 Broker 中等待。编译失败后 MCP/CLI 进入 repair mode，继续通过上一次
+成功加载的程序集读取错误、修改代码并再次刷新。
 
 ## CLI
 

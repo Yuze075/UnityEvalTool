@@ -127,9 +127,9 @@ Editor state, compilation, selection, menu commands, play mode, and screenshots.
 | Function | Purpose | Safety |
 |---|---|---|
 | `getState()` | Editor state, active scene, selection summary. | Read-only |
-| `getCompilationState()` | Compilation, asset refresh, pending state, and Domain-Reload-safe request id, Ready/Failed status, and error/warning counts. | Read-only |
-| `requestScriptCompilation()` | Request script compilation and return pollable request state; exits PlayMode first when needed. | May trigger reload |
-| `scheduleAssetRefresh()` | Request script-safe AssetDatabase refresh and return pollable request state; exits PlayMode first when needed. | May trigger reload |
+| `getCompilationState()` | Unity-side diagnostic request state and error/warning counts. Use Broker `unity_status` for waiting. | Read-only |
+| `requestScriptCompilation()` | Request script compilation once, then return from eval and wait through Broker status; exits PlayMode first when needed. | May trigger reload |
+| `scheduleAssetRefresh()` | Request script-safe AssetDatabase refresh once, then return from eval and wait through Broker status; exits PlayMode first when needed. | May trigger reload |
 | `getCompilerMessages(count?)` | Recent compiler-like errors/warnings. | Read-only |
 | `getSelection()` / `setSelection(items)` | Read or set Editor selection. | Selection mutation |
 | `executeMenuItem(path, confirm?)` | Execute an Editor menu item. | Non-UnityEvalTool menu requires `confirm: true` |

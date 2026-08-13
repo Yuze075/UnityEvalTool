@@ -2,7 +2,7 @@
 
 [English](README.md) · [UnityEvalTool 包说明](Packages/com.yuzetoolkit.unityevaltool/README_zh.md) · [UnityDebugTool 包说明](Packages/com.yuzetoolkit.unitydebugtool/README_zh.md) · [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md)
 
-UnityEvalTool 让电脑上的所有 Unity Editor 或 Player 主动连接同一个电脑级 Broker。AI Agent 和终端不再依赖 Unity 脚本域内部的监听器，因此即使 Unity 正在编译、程序集重载、进程退出或主线程卡住，外部仍然能看到准确状态并等待恢复。
+UnityEvalTool 让电脑上的所有 Unity Editor 或 Player 主动连接同一个电脑级 Broker。AI Agent 和终端不再依赖 Unity 脚本域内部的监听器，因此即使 Unity 正在编译、程序集重载、进程退出或主线程卡住，外部仍然能看到准确状态并等待恢复；编译失败时 MCP/CLI 会通过上一次成功加载的程序集继续提供 repair mode。
 
 仓库同时提供 UnityDebugTool：一个基于 UI Toolkit 的运行时调试面板与控制台，让玩家、开发者和 AI Agent 共享同一套 Tool 模型。
 

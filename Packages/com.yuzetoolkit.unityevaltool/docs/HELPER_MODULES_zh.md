@@ -127,9 +127,9 @@ Editor 状态、编译、Selection、菜单、播放模式和截图。
 | 函数 | 用途 | 安全 |
 |---|---|---|
 | `getState()` | Editor 状态、active scene、selection 摘要。 | 只读 |
-| `getCompilationState()` | 编译、资源刷新、pending 状态，以及可跨 Domain Reload 追踪的 requestId、Ready/Failed 状态和错误/警告计数。 | 只读 |
-| `requestScriptCompilation()` | 请求脚本编译并返回可轮询请求状态；必要时先退出 PlayMode。 | 可能触发 reload |
-| `scheduleAssetRefresh()` | 请求脚本安全 AssetDatabase refresh 并返回可轮询请求状态；必要时先退出 PlayMode。 | 可能触发 reload |
+| `getCompilationState()` | Unity 侧诊断 request 状态及错误/警告计数；等待编译使用 Broker `unity_status`。 | 只读 |
+| `requestScriptCompilation()` | 只请求一次脚本编译，随后结束 eval 并通过 Broker 状态等待；必要时先退出 PlayMode。 | 可能触发 reload |
+| `scheduleAssetRefresh()` | 只请求一次脚本安全 AssetDatabase refresh，随后结束 eval 并通过 Broker 状态等待；必要时先退出 PlayMode。 | 可能触发 reload |
 | `getCompilerMessages(count?)` | 最近类似编译器的错误/警告。 | 只读 |
 | `getSelection()` / `setSelection(items)` | 读取或设置 Editor selection。 | 修改 selection |
 | `executeMenuItem(path, confirm?)` | 执行 Editor menu item。 | 非 UnityEvalTool 菜单需要 `confirm: true` |

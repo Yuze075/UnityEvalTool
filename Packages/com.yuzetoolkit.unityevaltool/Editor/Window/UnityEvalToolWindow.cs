@@ -223,7 +223,7 @@ namespace YuzeToolkit
             _overviewRoot.Add(environmentCard);
 
             var workflow = new HelpBox(
-                "Agent workflow: unity_status → unity_connect(registryRevision, instanceId) → eval. During compilation or reload, wait through unity_status instead of polling eval.",
+                "Agent workflow: unity_status → unity_connect → reuse handle → eval. Wait for compilation through unity_status; CompilationFailed remains executable for repair.",
                 HelpBoxMessageType.None);
             workflow.style.marginTop = 4;
             _overviewRoot.Add(workflow);
@@ -276,7 +276,9 @@ namespace YuzeToolkit
             SetBadge(_connectionBadge, connectionText, connectionColor);
             _phase.text = status.Phase;
             SetBadge(_phaseBadge, status.Phase, status.CanEval ? RunningColor : WarningColor);
-            _canEval.text = status.CanEval && connected ? "Ready" : "Unavailable";
+            _canEval.text = status.CanEval && connected
+                ? string.Equals(status.Phase, "CompilationFailed", StringComparison.Ordinal) ? "Repair" : "Ready"
+                : "Unavailable";
             _canEval.style.color = status.CanEval && connected ? RunningColor : WarningColor;
             _busyReason.text = string.IsNullOrWhiteSpace(status.BusyReason) ? "—" : status.BusyReason;
             _playMode.text = status.IsPlaying

@@ -35,6 +35,8 @@ jobs:
         run: node --input-type=module -e "import { resolveAndValidateVersion } from './npm/scripts/version.mjs'; console.log(resolveAndValidateVersion(process.cwd()));"
       - name: Build Native Broker
         run: dotnet build Broker/UnityEvalTool.Broker.slnx -c Release
+      - name: Test Native Broker
+        run: dotnet test Broker/tests/UnityEvalTool.Broker.Tests/UnityEvalTool.Broker.Tests.csproj -c Release --no-build
       - name: Test Roslyn source generator
         run: dotnet test Roslyn/UnityEvalToolRoslyn.sln -c Release
       - name: Verify committed Unity analyzer

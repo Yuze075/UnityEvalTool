@@ -3,6 +3,13 @@
 The repository-level [CHANGELOG](../../../CHANGELOG.md) is the canonical release history
 for the Unity package, computer-level Broker/CLI, npm packages and Roslyn generator.
 
+## Unreleased
+
+- `CompilationFailed` is now an executable repair mode backed by the last successfully
+  loaded assemblies, allowing MCP/CLI to read errors, edit source, and refresh again.
+- Agent guidance now waits through Broker status instead of eval polling and keeps the
+  existing handle across same-process registry changes and Domain Reload.
+
 ## 2.0.1 - 2026-08-12
 
 - PuerTS sessions now follow Broker lease and CLI-console lifetimes and are released across

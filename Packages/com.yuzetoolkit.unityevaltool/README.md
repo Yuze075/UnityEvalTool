@@ -47,19 +47,23 @@ The Broker exposes exactly three tools:
 
 1. `unity_status`: list all Unity processes and their state. It can wait for `ready` or
    `compilation-complete` by `instanceId` before selection, or by `connectionHandle`
-   afterward.
+   afterward. Both waits may return `CompilationFailed`; always inspect `phase`,
+   `canEval`, and compiler counts.
 2. `unity_connect`: select the exact `instanceId` using the `registryRevision` returned
    by the preceding status snapshot. It returns an opaque, workflow-scoped handle.
 3. `eval`: execute the existing `async function execute() { ... }` contract in the
    selected Unity. It requires the handle and is rejected while Unity is busy.
 
 Agents must complete status and connect before eval. Handles are not globally selected,
-survive a Domain Reload for the same Unity process, expire when idle, and are invalidated
-if that process is replaced. An interrupted eval is never retried automatically.
+survive registry changes and Domain Reload for the same Unity process, expire when idle,
+and are invalidated if that process is replaced. Registry changes alone do not require a
+new handle. An interrupted eval is never retried automatically.
 
 Unity reports `Ready`, `Importing`, `Compiling`, `CompilationFailed`, `Reloading`,
 `PlayModeTransition`, and exit/connectivity state independently of eval. This lets an
-agent wait in the Broker even while Unity's scripting domain does not exist.
+agent wait in the Broker even while Unity's scripting domain does not exist. When
+compilation fails, eval and CLI remain available in repair mode through the last
+successfully loaded assemblies so the agent can read errors, edit code, and refresh again.
 
 ## CLI
 

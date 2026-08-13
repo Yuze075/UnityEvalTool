@@ -29,15 +29,19 @@ detects the new `brokerInstanceId` and disposes all sessions owned by the previo
 
 ## Safe compilation flow
 
-1. Call `unity_status`, retain its `capturedAtUtc`, and call `unity_connect`.
-2. Use eval to edit code and call `Editor.scheduleAssetRefresh()`.
+1. Call `unity_status` and `unity_connect`. Immediately before the eval that may compile,
+   take a fresh status snapshot and retain its `capturedAtUtc`.
+2. Use eval to edit code and call `Editor.scheduleAssetRefresh()` once, then return from eval.
 3. The Unity client reports `Compiling` and then `Reloading`; the transport may disconnect.
-4. Call `unity_status` with the known `instanceId`, `waitFor: "compilation-complete"`,
+4. Call `unity_status` with the existing handle (or the known `instanceId` before selection),
+   `waitFor: "compilation-complete"`,
    `observedAfterUtc` set to the retained pre-request `capturedAtUtc`, and a sufficient
    timeout. This marker prevents a stale `Ready` sample from winning the race before Unity
    publishes `Compiling`. The wait runs in the Broker.
-5. Inspect compiler counts/phase. Query status again and reconnect if the registry revision
-   changed before the next eval.
+5. Inspect `phase`, `canEval`, and compiler counts. Reuse the handle across same-process
+   reloads and registry changes; reconnect only if the handle is invalid/expired or the
+   Unity process was replaced. In `CompilationFailed`, use repair mode to read compiler
+   messages, fix source, and repeat the flow.
 
 Do not retry an eval whose connection was interrupted after dispatch. The Broker reports
 whether execution outcome may be unknown.
@@ -52,7 +56,8 @@ existing behavior. Tool paths are shown by `unity tools`; use the displayed casi
 
 - `RegistryChanged`: repeat status discovery before connecting.
 - `UnityBusy`: wait through status rather than looping eval.
-- `CompilationFailed`: read compiler counts/logs and fix the compile error.
+- `CompilationFailed`: executable repair mode using the last successfully loaded assemblies;
+  read compiler messages, fix source, and request another refresh.
 - `UnityDisconnected`: wait for the retained instance to reconnect.
 - `ConnectionHandleInvalid`: the lease expired or the Unity process was replaced; discover
   and connect again.

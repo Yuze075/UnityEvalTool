@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Added `com.yuzetoolkit.unitydebugtool` under `Packages` so the runtime debug UI and UnityEvalTool share one source repository while retaining package-specific READMEs.
+- Keep MCP/CLI executable in `CompilationFailed` repair mode through the last successful Unity assemblies, while continuing to reject compile/import/reload transitions.
+- Clarify event-driven compilation waits and same-process handle reuse across registry changes, and add Broker state-policy regression tests.
 
 ## 2.0.1 - 2026-08-12
 

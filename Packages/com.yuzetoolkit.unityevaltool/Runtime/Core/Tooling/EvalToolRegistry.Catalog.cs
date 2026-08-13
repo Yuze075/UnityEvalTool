@@ -489,7 +489,7 @@ async function execute() {
 }
 ```";
 
-            return @$"UnityEvalTool exposes one MCP tool named `eval`.
+            return @$"Within the Broker's `eval` tool, UnityEvalTool exposes loader-backed Unity helper modules.
 
 Inside `eval`, import Unity helper tools with the `tools://` protocol:
 

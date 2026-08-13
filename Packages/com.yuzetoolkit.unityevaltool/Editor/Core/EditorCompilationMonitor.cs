@@ -102,7 +102,7 @@ namespace YuzeToolkit
             state["requestId"] = requestId;
             state["requested"] = "scriptCompilation";
             state["pending"] = false;
-            state["message"] = "Script compilation was accepted. Poll getCompilationState with this requestId until lastRequestStatus is Ready or Failed.";
+            state["message"] = "Script compilation was accepted. Return from this eval and wait through Broker unity_status with waitFor=compilation-complete and the pre-request capturedAtUtc. This Unity-side requestId is diagnostic and is not a Broker compilationCycleId.";
             return state;
         }
 
@@ -118,7 +118,7 @@ namespace YuzeToolkit
             state["requestId"] = requestId;
             state["requested"] = "assetRefresh";
             state["pending"] = false;
-            state["message"] = "Asset refresh and script compilation were accepted. Poll getCompilationState with this requestId until lastRequestStatus is Ready or Failed.";
+            state["message"] = "Asset refresh and script compilation were accepted. Return from this eval and wait through Broker unity_status with waitFor=compilation-complete and the pre-request capturedAtUtc. This Unity-side requestId is diagnostic and is not a Broker compilationCycleId.";
             return state;
         }
 

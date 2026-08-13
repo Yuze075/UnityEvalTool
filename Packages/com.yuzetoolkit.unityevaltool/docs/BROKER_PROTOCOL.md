@@ -65,19 +65,36 @@ The Broker determines transport connectivity itself. A live socket does not prov
 - `session/release`: dispose a named Unity-side eval session
 - `broker/ping`: transport-level liveness check
 
-Unity executes `eval/execute` and `cli/execute` only while `canEval` is true. The Broker never retries an interrupted mutating request automatically.
+Unity executes `eval/execute` and `cli/execute` while `canEval` is true. `CompilationFailed`
+is also executable repair mode for compatibility with clients that predate the repair-mode
+`canEval` flag; execution uses the last successfully loaded assemblies. The Broker never
+retries an interrupted mutating request automatically.
 
 ## Selection handles
 
 There is no process-global selected Unity. `unity_connect` creates an opaque, unguessable `connectionHandle` bound to one registered `instanceId`. MCP calls and CLI consoles carry their own handle. A status snapshot returns `registryRevision`; connect must submit that revision so a stale discovery result cannot silently target a changed registry.
 
-Handles survive a temporary Domain Reload disconnect for the same `instanceId`, but the returned status exposes the new `connectionEpoch` and `vmGeneration`. Handles expire after inactivity and become invalid when their instance exits or is replaced by a different process lifetime. Closing a CLI console, replacing its selection, or expiring a lease releases the associated Unity-side PuerTS session. If Unity is temporarily disconnected, the Broker retains the release request for the same process lifetime and sends it after reconnection.
+Handles survive registry revision changes and a temporary Domain Reload disconnect for the
+same process lifetime, while status exposes the new `connectionEpoch` and `vmGeneration`.
+A revision change matters only when creating a new handle. Existing handles expire after
+inactivity and become invalid when their instance exits or is replaced. Closing a CLI console,
+replacing its selection, or expiring a lease releases the associated Unity-side PuerTS session.
+If Unity is temporarily disconnected, the Broker retains the release request for the same
+process lifetime and sends it after reconnection.
 
 ## Compilation and reload
 
 Every observed Unity compilation receives a `compilationCycleId`, including compilations not initiated through eval. Unity publishes `Compiling` at `CompilationPipeline.compilationStarted`, compiler counts during assembly completion, `CompilationFailed` on errors, and `Reloading` before assembly reload. After reconnect, Unity publishes `Ready` only after a stable main-thread update.
 
-`unity_status` may wait for `ready` or `compilation-complete`. Before selection it accepts an `instanceId`, so an agent that starts while Unity is compiling or temporarily disconnected can wait and then call `unity_connect` with the returned current registry revision. After selection it can wait through the opaque handle. Waiting is event-driven in the Broker and never runs inside Unity eval. `requestId` in the status tool refers to the observed `compilationCycleId`, not an eval request id. When an eval is about to trigger compilation, retain the preceding snapshot's `capturedAtUtc` and pass it as `observedAfterUtc`; the Broker then waits for a compilation that actually started after that marker instead of accepting a stale `Ready` sample.
+`unity_status` may wait for `ready` or `compilation-complete`. `ready` means execution is
+available and therefore returns for normal `Ready` or `CompilationFailed` repair mode;
+`compilation-complete` returns after either a successful or failed compilation. Callers must
+inspect `phase`, `canEval`, and compiler counts. Before selection, wait by `instanceId`; after
+selection, prefer the existing opaque handle. Waiting is event-driven in the Broker and never
+runs inside Unity eval. `requestId` here refers to `compilationCycleId`, never the Unity-side
+request id returned by `scheduleAssetRefresh`. Immediately before an eval that may compile,
+retain a fresh snapshot's `capturedAtUtc` and pass it as `observedAfterUtc`; this prevents an
+older cycle or stale `Ready` sample from completing the wait.
 
 ## Stable error codes
 

@@ -43,7 +43,9 @@ namespace YuzeToolkit
                 ? RuntimeConsoleUi.RunningColor
                 : running ? RuntimeConsoleUi.WarningColor : DisabledColor;
             _phase.text = status.Phase;
-            _canEval.text = connected && status.CanEval ? "Ready" : "Unavailable";
+            _canEval.text = connected && status.CanEval
+                ? string.Equals(status.Phase, "CompilationFailed", StringComparison.Ordinal) ? "Repair" : "Ready"
+                : "Unavailable";
             _canEval.style.color = connected && status.CanEval
                 ? RuntimeConsoleUi.RunningColor
                 : RuntimeConsoleUi.WarningColor;
@@ -108,7 +110,7 @@ namespace YuzeToolkit
             content.Add(workflowCard);
             RuntimeConsoleUi.AddTitle(workflowCard, "Agent workflow");
             workflowCard.Add(RuntimeConsoleUi.CreateMessage(
-                "Use unity_status, then unity_connect with registryRevision and instanceId, then eval. Wait through unity_status while Unity is compiling or reloading.",
+                "Use unity_status, then unity_connect, then reuse the handle. Wait for compilation through unity_status; CompilationFailed remains available for repair.",
                 RuntimeConsoleUi.RunningColor));
             Tick();
         }

@@ -8,13 +8,13 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 internal sealed class UnityBrokerTools(BrokerRegistry registry)
 {
     [McpServerTool(Name = "unity_status", UseStructuredContent = true)]
-    [Description("Query every Unity instance registered with the local Broker and the selected Unity for an optional connection handle. Call this before unity_connect. It can also wait for the selected Unity to become ready or finish compilation without invoking Unity eval.")]
+    [Description("Query Unity instances and state from the computer-level Broker. Call this before unity_connect. Waiting is event-driven and survives temporary Unity disconnects. ready returns when execution is available, including CompilationFailed repair mode; compilation-complete returns after compilation succeeds or fails. Always inspect phase, canEval, and compiler counts.")]
     public async Task<JsonElement> StatusAsync(
         [Description("Optional handle returned by unity_connect. Pass either this or instanceId when waiting.")] string connectionHandle = "",
         [Description("Optional instanceId returned by an earlier snapshot. Use this to wait before unity_connect, including while Unity is compiling or reloading.")] string instanceId = "",
-        [Description("snapshot, ready, or compilation-complete.")] string waitFor = "snapshot",
-        [Description("Optional compilationCycleId from unity_status to match while waiting.")] string requestId = "",
-        [Description("Optional capturedAtUtc from a snapshot taken before compilation was requested. compilation-complete then waits for a cycle that started after this marker, avoiding a pre-observation race.")] string observedAfterUtc = "",
+        [Description("snapshot; ready (normal Ready or CompilationFailed repair mode); or compilation-complete (successful or failed terminal compilation). Always inspect the returned phase.")] string waitFor = "snapshot",
+        [Description("Optional compilationCycleId from unity_status to match while waiting. Do not pass the Unity-side requestId returned by scheduleAssetRefresh.")] string requestId = "",
+        [Description("Optional capturedAtUtc from a fresh unity_status snapshot taken immediately before the eval that requests compilation. compilation-complete then ignores older cycles.")] string observedAfterUtc = "",
         [Description("Wait timeout in seconds. Zero returns immediately.")] int timeoutSeconds = 0,
         CancellationToken cancellationToken = default)
     {
@@ -34,7 +34,7 @@ internal sealed class UnityBrokerTools(BrokerRegistry registry)
     }
 
     [McpServerTool(Name = "unity_connect", UseStructuredContent = true)]
-    [Description("Select one Unity instance for subsequent eval calls. First call unity_status, choose an instanceId, and pass the exact registryRevision from that snapshot. The returned opaque connectionHandle is scoped to the caller's workflow; there is no Broker-global selected Unity.")]
+    [Description("Select one Unity instance for subsequent eval calls. First call unity_status and pass its exact registryRevision. The opaque connectionHandle survives compilation and same-process Domain Reload even when registryRevision changes; reconnect only when the handle expires, is invalid, or the Unity process is replaced.")]
     public JsonElement Connect(
         [Description("Exact instanceId returned by unity_status.")] string instanceId,
         [Description("Exact registryRevision returned by the preceding unity_status call.")] long registryRevision)
@@ -44,7 +44,7 @@ internal sealed class UnityBrokerTools(BrokerRegistry registry)
     }
 
     [McpServerTool(Name = "eval", UseStructuredContent = true)]
-    [Description("Execute JavaScript inside the Unity selected by unity_connect. A valid connectionHandle is mandatory. Eval is rejected while Unity is compiling, reloading, importing, changing PlayMode, stalled, disconnected, or in CompilationFailed state. Interrupted eval requests are never retried automatically.")]
+    [Description("Execute JavaScript inside the Unity selected by unity_connect. Eval is rejected while Unity is compiling, reloading, importing, changing PlayMode, stalled, or disconnected. CompilationFailed is an executable repair mode backed by the last successfully loaded assemblies; use it to read errors, edit code, and request another refresh. Interrupted requests are never retried automatically.")]
     public Task<JsonElement> EvalAsync(
         [Description("Opaque handle returned by unity_connect.")] string connectionHandle,
         [Description("An async function declaration named execute, using the existing UnityEvalTool PuerTS/tool-module contract.")] string code,

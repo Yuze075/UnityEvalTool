@@ -37,12 +37,13 @@ MCP 工作流或 CLI 控制台，不是 Broker 全局状态。
 Editor 观察每一次 `CompilationPipeline`。脚本域消失前会报告 `Compiling`、编译器
 计数、`CompilationFailed` 和 `Reloading`。Broker 保留断开的实例和选择租约；重载后
 同一进程以更高 epoch/VM generation 重连，并在主线程更新后报告 `Ready`。等待发生在
-Broker 内部，不依赖 eval。
+Broker 内部，不依赖 eval。编译失败不会卸载旧脚本域，而是进入可执行的 repair mode。
 
 ## 执行保证
 
 - eval 前必须完成状态发现、明确连接并携带有效 handle。
-- Unity 必须已连接且 `canEval`，Broker 才会转发请求。
+- Unity 必须已连接，并且 `canEval` 或处于 `CompilationFailed` repair mode，Broker 才会转发请求。
+- repair mode 使用上一次成功加载的程序集，以便读取错误、修改源码并再次刷新；失败源码不会被视为已加载代码。
 - 每个 handle/CLI 控制台在 Unity 侧拥有持久 PuerTS session。
 - 重连会改变 VM generation；旧脚本域丢失的 session 不会被伪装成仍然存在。
 - 断开后结果不确定的修改请求绝不自动重试。

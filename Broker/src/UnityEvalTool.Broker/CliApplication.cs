@@ -155,14 +155,20 @@ internal static class CliApplication
         if (selected.ValueKind == JsonValueKind.Null)
             throw new BrokerOperationException(BrokerErrorCodes.UnityDisconnected, "Selected Unity is unavailable.");
         var status = selected.GetProperty("status");
-        if (status.GetProperty("canEval").GetBoolean()) return;
+        if (CanExecute(status)) return;
         var phase = status.GetProperty("phase").GetString() ?? "Unknown";
-        if (string.Equals(phase, "CompilationFailed", StringComparison.Ordinal))
-            throw new BrokerOperationException(BrokerErrorCodes.CompilationFailed,
-                $"Unity compilation failed with {status.GetProperty("compilerErrorCount").GetInt32()} error(s).");
         Console.WriteLine($"[Waiting for Unity: {phase}]");
-        await connection.StatusAsync("ready", 600, cancellationToken);
+        var terminal = await connection.StatusAsync("ready", 600, cancellationToken);
+        var terminalSelected = terminal.GetProperty("selectedUnity");
+        if (terminalSelected.ValueKind == JsonValueKind.Null ||
+            !CanExecute(terminalSelected.GetProperty("status")))
+            throw new BrokerOperationException(BrokerErrorCodes.UnityBusy,
+                "Unity stopped waiting without reaching an executable state.");
     }
+
+    private static bool CanExecute(JsonElement status) =>
+        status.GetProperty("canEval").GetBoolean() ||
+        string.Equals(status.GetProperty("phase").GetString(), "CompilationFailed", StringComparison.Ordinal);
 
     private static JsonElement ResolveInstance(JsonElement registry, string selector)
     {

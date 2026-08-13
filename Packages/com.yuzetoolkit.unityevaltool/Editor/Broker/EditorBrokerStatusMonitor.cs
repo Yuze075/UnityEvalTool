@@ -41,7 +41,8 @@ namespace YuzeToolkit
             {
                 "Importing" => "Unity Editor is importing or updating assets.",
                 "Compiling" => "Unity Editor is compiling scripts.",
-                "CompilationFailed" => $"Unity script compilation failed with {SessionState.GetInt(KeyErrorCount, 0)} error(s).",
+                "CompilationFailed" => $"Unity script compilation failed with {SessionState.GetInt(KeyErrorCount, 0)} error(s). " +
+                                       "Eval and CLI are available in repair mode through the last successfully loaded assemblies.",
                 "Reloading" => "Unity Editor is reloading assemblies.",
                 "PlayModeTransition" => "Unity Editor is changing PlayMode.",
                 _ => string.Empty
@@ -49,7 +50,8 @@ namespace YuzeToolkit
             return new BrokerUnityStatusSnapshot
             {
                 Phase = phase,
-                CanEval = string.Equals(phase, "Ready", StringComparison.Ordinal),
+                CanEval = string.Equals(phase, "Ready", StringComparison.Ordinal) ||
+                          string.Equals(phase, "CompilationFailed", StringComparison.Ordinal),
                 BusyReason = busyReason,
                 IsPlaying = EditorApplication.isPlaying,
                 IsPaused = EditorApplication.isPaused,

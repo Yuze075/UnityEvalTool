@@ -140,7 +140,8 @@ internal sealed class BrokerRegistry
             lock (_syncRoot)
             {
                 snapshot = GetSnapshot(connectionHandle, instanceId);
-                if (MatchesWait(snapshot.SelectedUnity, waitFor, requestId, observedAfterUtc)) return snapshot;
+                if (BrokerStatePolicy.MatchesWait(snapshot.SelectedUnity, waitFor, requestId, observedAfterUtc))
+                    return snapshot;
                 changedTask = _changed.Task;
             }
 
@@ -168,7 +169,7 @@ internal sealed class BrokerRegistry
         if (string.IsNullOrWhiteSpace(code))
             throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest, "Eval code is required.");
         var (connection, snapshot) = ResolveConnected(connectionHandle);
-        EnsureCanExecute(snapshot);
+        BrokerStatePolicy.EnsureCanExecute(snapshot);
         var normalizedTimeout = Math.Clamp(timeoutSeconds <= 0 ? 30 : timeoutSeconds, 1, 600);
         var requestId = Guid.NewGuid().ToString("N");
         var request = new UnityCommandRequest("mcp:" + connectionHandle, requestId, code, null,
@@ -181,7 +182,7 @@ internal sealed class BrokerRegistry
         CancellationToken cancellationToken)
     {
         var (connection, snapshot) = ResolveConnected(connectionHandle);
-        EnsureCanExecute(snapshot);
+        BrokerStatePolicy.EnsureCanExecute(snapshot);
         var request = new UnityCommandRequest("cli:" + consoleId, Guid.NewGuid().ToString("N"), null, line,
             600, false);
         return await connection.RequestAsync("cli/execute", request, TimeSpan.FromMinutes(11), cancellationToken);
@@ -281,43 +282,6 @@ internal sealed class BrokerRegistry
         }
         if (touch) lease.LastUsedAtUtc = DateTimeOffset.UtcNow;
         return lease;
-    }
-
-    private static void EnsureCanExecute(UnityInstanceSnapshot snapshot)
-    {
-        if (string.Equals(snapshot.Status.Phase, "CompilationFailed", StringComparison.Ordinal))
-            throw new BrokerOperationException(BrokerErrorCodes.CompilationFailed,
-                $"Unity compilation failed with {snapshot.Status.CompilerErrorCount} error(s).");
-        if (!snapshot.Status.CanEval)
-            throw new BrokerOperationException(BrokerErrorCodes.UnityBusy,
-                string.IsNullOrWhiteSpace(snapshot.Status.BusyReason)
-                    ? $"Unity is not ready for eval ({snapshot.Status.Phase})."
-                    : snapshot.Status.BusyReason);
-    }
-
-    private static bool MatchesWait(UnityInstanceSnapshot? selected, string waitFor, string? requestId,
-        DateTimeOffset? observedAfterUtc)
-    {
-        if (selected == null)
-            throw new BrokerOperationException(BrokerErrorCodes.ConnectionHandleRequired,
-                "A connectionHandle or instanceId is required when waiting for Unity state.");
-        if (string.Equals(waitFor, "ready", StringComparison.OrdinalIgnoreCase))
-            return selected.IsConnected &&
-                   (string.Equals(selected.Status.Phase, "Ready", StringComparison.Ordinal) ||
-                    string.Equals(selected.Status.Phase, "CompilationFailed", StringComparison.Ordinal));
-        if (string.Equals(waitFor, "compilation-complete", StringComparison.OrdinalIgnoreCase))
-        {
-            if (!string.IsNullOrWhiteSpace(requestId) &&
-                !string.Equals(selected.Status.CompilationCycleId, requestId, StringComparison.Ordinal)) return false;
-            if (observedAfterUtc.HasValue &&
-                (!selected.Status.LastCompilationStartedAtUtc.HasValue ||
-                 selected.Status.LastCompilationStartedAtUtc.Value < observedAfterUtc.Value)) return false;
-            return selected.IsConnected &&
-                   (string.Equals(selected.Status.Phase, "Ready", StringComparison.Ordinal) ||
-                    string.Equals(selected.Status.Phase, "CompilationFailed", StringComparison.Ordinal));
-        }
-        throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest,
-            "waitFor must be snapshot, ready, or compilation-complete.");
     }
 
     private void OnStatus(UnityConnection connection, UnityStatus status)
