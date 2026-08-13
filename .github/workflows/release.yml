@@ -186,7 +186,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          set -eu
+          set -euo pipefail
           : > packages/.publish-native
           : > packages/.publish-root
           : > packages/.package-names

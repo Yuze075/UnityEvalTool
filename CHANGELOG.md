@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve npm metadata lookup failures through release-preflight pipelines so an unpublished version's E404 is correctly classified as publishable instead of a conflicting immutable artifact.
 - Pin .NET SDK 10.0.300 locally and in every release job, exclude repository-specific Git revisions from the SourceGenerator assembly, and regenerate the committed Analyzer so byte-for-byte validation remains stable across the RelicLight and standalone repositories.
 - Fix the release workflow's committed-version output so Bash parses the Node expression correctly before validation and publication.
 - Prepare the immutable `v2.0.2` repository release: UnityEvalTool/Broker/npm use 2.0.2 and UnityDebugTool 1.0.1 depends on UnityEvalTool 2.0.2.
