@@ -147,8 +147,10 @@ node npm/scripts/pack-root.mjs
 Broker、Roslyn 与两个 Unity Package 都以普通源码目录存放在该仓库中，不再依赖源码压缩包，
 Package 开发也不会临时下载辅助源码。`version.json` 是发布版本的唯一来源；CI 会先验证
 Broker、Unity Package、运行时常量和 npm metadata 版本一致，再构建六个 NativeAOT
-平台包和一个平台无关入口包。发布必须显式开启并提供 npm 凭据，不会在普通构建中自动发生。
-更完整的打包与发布检查见 [Broker/README.md](Broker/README.md)。
+平台包和一个平台无关入口包。发布必须显式开启；7 个 npm 包只信任
+`Yuze075/UnityEvalTool` 仓库的 `release.yml`，发布 Job 使用短期 OIDC 身份，不保存 npm
+长期写入令牌，也不会在普通构建中自动发生。更完整的打包与发布检查见
+[Broker/README.md](Broker/README.md)。
 
 当这棵源码以 `Game/UnityEvalTool` 嵌入 RelicLight 时，一般 RelicLight 开发者只需把父仓库推送到
 CNB，不需要配置本仓库的 GitHub remote、GitHub 写权限或第二份 checkout。只有同时维护两个仓库的

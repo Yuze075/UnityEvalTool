@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Preserve npm metadata lookup failures through release-preflight pipelines, require publication credentials before expensive builds, and pass tarballs as explicit local paths so unpublished versions are safely classified and uploaded.
+- Preserve npm metadata lookup failures through release-preflight pipelines, pass tarballs as explicit local paths, and bind all seven packages to GitHub OIDC Trusted Publishing so unpublished versions are safely classified and uploaded without a long-lived npm token.
 - Pin .NET SDK 10.0.300 locally and in every release job, exclude repository-specific Git revisions from the SourceGenerator assembly, and regenerate the committed Analyzer so byte-for-byte validation remains stable across the RelicLight and standalone repositories.
 - Fix the release workflow's committed-version output so Bash parses the Node expression correctly before validation and publication.
 - Prepare the immutable `v2.0.2` repository release: UnityEvalTool/Broker/npm use 2.0.2 and UnityDebugTool 1.0.1 depends on UnityEvalTool 2.0.2.

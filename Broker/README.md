@@ -54,9 +54,12 @@ installing an entry version whose matching native dependency is not available ye
    starts every packed native executable, and installs the Linux entry/native tarball pair
    before running `unity --help` and `unity doctor`.
 4. Inspect the retained artifacts when additional platform-specific verification is needed.
-5. Run the workflow with `publish=true` only when the `NPM_TOKEN` repository secret is
-   configured, or download the verified artifacts and publish them locally.
-6. Publish native packages first, entry package last, then create the matching
+5. Configure every npm package's Trusted Publisher for repository
+   `Yuze075/UnityEvalTool`, workflow `release.yml`, and `npm publish` permission. The
+   workflow uses GitHub OIDC and does not require an `NPM_TOKEN` secret.
+6. Run the workflow with `publish=true`; only the publish job receives `id-token: write`,
+   and npm verifies the repository/workflow identity before accepting an artifact.
+7. Publish native packages first, entry package last, then create the matching
    `v<version>` GitHub release and attach all seven tarballs.
 
 Do not replace a published npm version. A failed publish job may be retried with the exact

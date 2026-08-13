@@ -156,8 +156,10 @@ source archive is required and package development does not download an auxiliar
 `version.json` is the release version authority; CI verifies the Broker, Unity package,
 runtime constant and npm package metadata before building six NativeAOT platform packages
 plus the platform-independent npm entry package. Publishing is deliberately gated behind
-an explicit workflow input and npm credentials. See [Broker/README.md](Broker/README.md)
-for package internals and the release checklist.
+an explicit workflow input. All seven npm packages trust only GitHub Actions from
+`Yuze075/UnityEvalTool`'s `release.yml`; the publish job uses short-lived OIDC credentials
+instead of a repository npm token. See [Broker/README.md](Broker/README.md) for package
+internals and the release checklist.
 
 When this tree is embedded under `Game/UnityEvalTool` in RelicLight, ordinary RelicLight
 contributors publish only the parent RelicLight repository to CNB. They do not need this

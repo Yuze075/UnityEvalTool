@@ -28,15 +28,6 @@ jobs:
         run: |
           echo "Publishing is only allowed from refs/heads/main; got ${{ github.ref }}." >&2
           exit 1
-      - name: Require npm credentials for publication
-        if: ${{ inputs.publish }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          test -n "$NODE_AUTH_TOKEN" || {
-            echo "Repository secret NPM_TOKEN is required when publish=true." >&2
-            exit 1
-          }
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.300
@@ -179,11 +170,15 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Use the trusted-publishing npm client
+        run: npm install --global npm@12.0.2
       - uses: actions/download-artifact@v4
         with:
           pattern: npm-*
@@ -280,8 +275,6 @@ jobs:
             exit 1
           fi
       - name: Publish missing native packages, then the entry package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -eu
           while IFS= read -r package; do
