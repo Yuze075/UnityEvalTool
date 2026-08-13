@@ -6,15 +6,20 @@ Native C# Broker, MCP server and `unity` CLI for [UnityEvalTool](https://github.
 
 ```bash
 npm install --global @yuzetoolkit/unityevaltool
+unity service install
 unity doctor
 ```
 
-The install selects the matching NativeAOT package for macOS, Linux or Windows on x64 or arm64, then installs a current-user background service bound to `127.0.0.1:2347`.
+The npm install selects the matching NativeAOT package for macOS, Linux or Windows on
+x64 or arm64. Service setup is intentionally explicit because modern npm versions may
+block dependency lifecycle scripts. `unity service install` creates and starts a
+current-user background service bound to `127.0.0.1:2347`; check its exit status before
+continuing. Do not bypass npm's script policy.
 
 The Unity-side package must also be installed in each project:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.0
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
 ```
 
 ## CLI
@@ -46,5 +51,20 @@ unity service uninstall
 ```
 
 The service is installed for the current user only: LaunchAgent on macOS, systemd user unit on Linux, and Scheduled Task on Windows.
+
+## Uninstall
+
+npm does not run uninstall lifecycle scripts. Remove the current-user service while the
+`unity` executable still exists, check that the command succeeds, and only then remove the
+global package:
+
+```bash
+unity service uninstall
+npm uninstall --global @yuzetoolkit/unityevaltool
+```
+
+If the first command fails, resolve the reported service error before running the second.
+`npm run service:install` and `npm run service:uninstall` inside the package are explicit
+helpers, not automatic lifecycle scripts.
 
 License: MIT.

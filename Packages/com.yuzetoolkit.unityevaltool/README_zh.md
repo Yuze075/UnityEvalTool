@@ -18,21 +18,24 @@ UnityEvalTool 通过一个电脑级 Broker，让 AI Agent 和终端用户操作 
 
 ## 安装
 
-UnityEvalTool 需要 `com.tencent.puerts.core` 和一个 PuerTS backend。先通过 Package
-Manager 添加 Unity 包，然后安装电脑级包：
+UnityEvalTool 需要 `com.tencent.puerts.core` 与且仅需一个 PuerTS backend。本仓库已验证
+`com.tencent.puerts.quickjs` 3.0.2 与其匹配的 core 3.0.2；也可使用同一 PuerTS 发布系列中一组受支持的 V8 backend/core。
+先通过 Package Manager 添加 Unity 包，然后安装电脑级包：
 
 ```bash
 npm install --global @yuzetoolkit/unityevaltool
+unity service install
 unity doctor
 ```
 
 在 Unity Package Manager 中使用这个 Git URL：
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.0
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
 ```
 
-npm 生命周期会安装并启动当前用户的 LaunchAgent（macOS）、systemd user unit
+Service 安装是明确步骤，因为现代 npm 可能阻止 dependency lifecycle script。
+`unity service install` 会安装并启动当前用户的 LaunchAgent（macOS）、systemd user unit
 （Linux）或计划任务（Windows），不需要管理员级系统服务。可使用
 `unity service status|start|stop|restart|uninstall` 显式管理。
 
@@ -87,6 +90,10 @@ unity eval-js --code "return 1 + 2;"
 
 Broker 只绑定 loopback；2347 被占用时会明确失败，不开放局域网模式，也不会静默
 换端口。
+
+非 WebGL 的 Release Player 会有意保留与 Editor 相同、经过认证的任意 JavaScript eval
+能力；它不受 Development Build 开关控制，也不依赖可选的 UnityDebugTool UI Package。
+完整边界见 [Editor 与 Player 注册](docs/RUNTIME_SERVICES_zh.md)。
 
 ## 开发与发行
 

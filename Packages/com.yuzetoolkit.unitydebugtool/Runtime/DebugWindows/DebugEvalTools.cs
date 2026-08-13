@@ -1,16 +1,18 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using UnityEngine.Scripting;
 
 namespace YuzeToolkit
 {
+    [Preserve]
     internal sealed class DebugPanelEvalTool : IEvalTool
     {
         public DebugPanelEvalTool(string name, string description, IReadOnlyList<IEvalTool> subTools)
         {
             Name = name;
             Description = description +
-                          " Common usage: import a field tool directly with tools://DebugRoot/FieldName, call get() to read it, set(value) to change writable fields, and invoke() to press buttons.";
+                          " Discover registered leaf paths through the Tool catalog/subTools, import the exact leaf, then call its advertised get(), set(value), or invoke() function.";
             SubTools = subTools;
         }
 
@@ -23,6 +25,7 @@ namespace YuzeToolkit
         public IReadOnlyList<IEvalTool> SubTools { get; }
     }
 
+    [Preserve]
     internal sealed class DebugGroupEvalTool : IEvalTool
     {
         public DebugGroupEvalTool(string name, string description, IReadOnlyList<IEvalTool> subTools)
@@ -41,6 +44,7 @@ namespace YuzeToolkit
         public IReadOnlyList<IEvalTool> SubTools { get; }
     }
 
+    [Preserve]
     internal sealed class DebugReadOnlyFieldTool<TValue> : IEvalTool
     {
         private readonly Func<TValue> _getter;
@@ -68,15 +72,18 @@ namespace YuzeToolkit
 
         public IReadOnlyList<IEvalTool> SubTools => Array.Empty<IEvalTool>();
 
+        [Preserve]
         public TValue get() => _getter();
     }
 
+    [Preserve]
     internal sealed class DebugWritableFieldTool<TValue> : IEvalTool
     {
         private readonly Func<TValue> _getter;
         private readonly Action<TValue> _setter;
 
-        public DebugWritableFieldTool(string name, string description, Func<TValue> getter, Action<TValue> setter)
+        public DebugWritableFieldTool(string name, string description, Func<TValue> getter, Action<TValue> setter,
+            EvalToolSafety safety = EvalToolSafety.MutatesScene)
         {
             Name = name;
             Description = description;
@@ -101,7 +108,7 @@ namespace YuzeToolkit
                             null,
                             "New debug field value.")
                     },
-                    EvalToolSafety.MutatesScene)
+                    safety)
             };
         }
 
@@ -113,8 +120,10 @@ namespace YuzeToolkit
 
         public IReadOnlyList<IEvalTool> SubTools => Array.Empty<IEvalTool>();
 
+        [Preserve]
         public TValue get() => _getter();
 
+        [Preserve]
         public TValue set(TValue value)
         {
             _setter(value);
@@ -122,6 +131,7 @@ namespace YuzeToolkit
         }
     }
 
+    [Preserve]
     internal sealed class DebugButtonTool : IEvalTool
     {
         private readonly Action _action;
@@ -150,6 +160,7 @@ namespace YuzeToolkit
 
         public IReadOnlyList<IEvalTool> SubTools => Array.Empty<IEvalTool>();
 
+        [Preserve]
         public string invoke()
         {
             _action();

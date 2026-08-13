@@ -8,7 +8,7 @@ namespace YuzeToolkit
     [DisallowMultipleComponent]
     public sealed class RuntimeCliReplTabProvider : MonoBehaviour, IRuntimeConsoleTabProvider
     {
-        [SerializeField, Tooltip("USS used by the Runtime Console CLI REPL tab.")]
+        [SerializeField, Tooltip("Required USS used by the Runtime Console Command Line tab. Initialization fails when it is missing.")]
         private StyleSheet? styleSheet;
 
         [SerializeField, Tooltip("Maximum number of CLI REPL history rows kept in the tab.")]
@@ -16,8 +16,8 @@ namespace YuzeToolkit
 
         public IEnumerable<IRuntimeConsoleTab> CreateTabs(RuntimeConsoleContext context)
         {
-            if (styleSheet != null)
-                context.AddStyleSheet(styleSheet);
+            context.AddStyleSheet(styleSheet ?? throw new MissingReferenceException(
+                $"{nameof(RuntimeCliReplTabProvider)} requires a {nameof(StyleSheet)} reference."));
             yield return new RuntimeCliReplTab(Mathf.Max(1, maxHistoryRows));
         }
     }

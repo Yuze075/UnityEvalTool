@@ -28,10 +28,20 @@ internal sealed class BrokerCliConnection : IAsyncDisposable
         }, cancellationToken);
 
     public Task<JsonElement> StatusAsync(string waitFor, int timeoutSeconds, CancellationToken cancellationToken) =>
+        StatusAsync(waitFor, timeoutSeconds, null, cancellationToken);
+
+    public Task<JsonElement> StatusAsync(string waitFor, int timeoutSeconds, string? compilationCycleId,
+        CancellationToken cancellationToken) =>
+        StatusAsync(waitFor, timeoutSeconds, compilationCycleId, null, cancellationToken);
+
+    public Task<JsonElement> StatusAsync(string waitFor, int timeoutSeconds, string? compilationCycleId,
+        DateTimeOffset? observedAfterUtc, CancellationToken cancellationToken) =>
         RequestAsync("unity/status", new JsonObject
         {
             ["waitFor"] = waitFor,
-            ["timeoutSeconds"] = timeoutSeconds
+            ["timeoutSeconds"] = timeoutSeconds,
+            ["compilationCycleId"] = compilationCycleId,
+            ["observedAfterUtc"] = observedAfterUtc?.ToString("O", System.Globalization.CultureInfo.InvariantCulture)
         }, cancellationToken);
 
     public Task<JsonElement> ExecuteAsync(string line, CancellationToken cancellationToken) =>
@@ -77,12 +87,10 @@ internal sealed class BrokerCliConnection : IAsyncDisposable
         try
         {
             if (_socket.State == WebSocketState.Open)
-                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "CLI closed", CancellationToken.None);
+                await WebSocketJson.CloseOutputAndAbortAsync(_socket, WebSocketCloseStatus.NormalClosure,
+                    "CLI closed");
         }
-        catch (WebSocketException)
-        {
-            // Broker is already gone.
-        }
+        catch (ObjectDisposedException) { }
         _socket.Dispose();
         _requestGate.Dispose();
     }

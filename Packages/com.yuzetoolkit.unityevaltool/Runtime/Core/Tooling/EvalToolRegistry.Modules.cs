@@ -107,6 +107,7 @@ export function describeTool(path, refresh = false) {{
         {
             lock (ModuleSourceCacheSyncRoot)
                 ModuleSourceCache.Clear();
+            ClearJsDescriptorCache();
         }
 
         private static string GenerateCSharpToolModule(EvalToolDescriptor descriptor)
@@ -169,7 +170,32 @@ export async function getSubTool(name) {
             return builder.ToString();
         }
 
-        private static string EscapeJavaScriptString(string value) =>
-            value.Replace("\\", "\\\\").Replace("'", "\\'");
+        private static string EscapeJavaScriptString(string value)
+        {
+            var escaped = new StringBuilder(value.Length + 8);
+            foreach (var character in value)
+            {
+                switch (character)
+                {
+                    case '\\': escaped.Append("\\\\"); break;
+                    case '\'': escaped.Append("\\'"); break;
+                    case '\b': escaped.Append("\\b"); break;
+                    case '\f': escaped.Append("\\f"); break;
+                    case '\n': escaped.Append("\\n"); break;
+                    case '\r': escaped.Append("\\r"); break;
+                    case '\t': escaped.Append("\\t"); break;
+                    case '\u2028': escaped.Append("\\u2028"); break;
+                    case '\u2029': escaped.Append("\\u2029"); break;
+                    default:
+                        if (character < ' ')
+                            escaped.Append("\\u").Append(((int)character).ToString("x4"));
+                        else
+                            escaped.Append(character);
+                        break;
+                }
+            }
+
+            return escaped.ToString();
+        }
     }
 }

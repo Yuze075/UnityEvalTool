@@ -16,7 +16,8 @@ namespace YuzeToolkit
         ReflectionDangerous = 1 << 6,
         NetworkService = 1 << 7,
         LongRunning = 1 << 8,
-        MutatesEditorState = 1 << 9
+        MutatesEditorState = 1 << 9,
+        PersistsData = 1 << 10
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]

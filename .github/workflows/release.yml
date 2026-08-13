@@ -9,9 +9,12 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  group: unityevaltool-release
+  cancel-in-progress: false
+
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
   validate:
@@ -20,6 +23,11 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+      - name: Require main for publication
+        if: ${{ inputs.publish && github.ref != 'refs/heads/main' }}
+        run: |
+          echo "Publishing is only allowed from refs/heads/main; got ${{ github.ref }}." >&2
+          exit 1
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -30,7 +38,7 @@ jobs:
         name: Read committed version
         shell: bash
         run: echo "version=$(node -p \"require('./version.json').version\")" >> "$GITHUB_OUTPUT"
-      - name: Validate synchronized package versions
+      - name: Validate synchronized package versions and protocol
         working-directory: Broker
         run: node --input-type=module -e "import { resolveAndValidateVersion } from './npm/scripts/version.mjs'; console.log(resolveAndValidateVersion(process.cwd()));"
       - name: Build Native Broker
@@ -38,9 +46,9 @@ jobs:
       - name: Test Native Broker
         run: dotnet test Broker/tests/UnityEvalTool.Broker.Tests/UnityEvalTool.Broker.Tests.csproj -c Release --no-build
       - name: Test Roslyn source generator
-        run: dotnet test Roslyn/UnityEvalToolRoslyn.sln -c Release
+        run: dotnet test Roslyn/UnityEvalToolRoslyn.sln -c Release --artifacts-path "$RUNNER_TEMP/unityevaltool-roslyn"
       - name: Verify committed Unity analyzer
-        run: cmp Roslyn/src/UnityEvalTool.SourceGenerator/bin/Release/netstandard2.0/UnityEvalTool.SourceGenerator.dll Packages/com.yuzetoolkit.unityevaltool/Analyzers/UnityEvalTool.SourceGenerator.dll
+        run: cmp "$RUNNER_TEMP/unityevaltool-roslyn/bin/UnityEvalTool.SourceGenerator/release/UnityEvalTool.SourceGenerator.dll" Packages/com.yuzetoolkit.unityevaltool/Analyzers/UnityEvalTool.SourceGenerator.dll
 
   native:
     needs: validate
@@ -49,7 +57,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
+          - runner: macos-15
             platform: darwin
             arch: arm64
           - runner: macos-15-intel
@@ -82,6 +90,23 @@ jobs:
           UNITY_EVAL_TOOL_PLATFORM: ${{ matrix.platform }}
           UNITY_EVAL_TOOL_ARCH: ${{ matrix.arch }}
         run: node npm/scripts/pack-platform.mjs
+      - name: Smoke-test packed native executable
+        shell: bash
+        run: |
+          package=$(find Broker/artifacts/npm -maxdepth 1 -name '*-${{ matrix.platform }}-${{ matrix.arch }}-*.tgz' -print -quit)
+          test -n "$package"
+          mkdir Broker/artifacts/smoke
+          tar -xzf "$package" -C Broker/artifacts/smoke
+          executable=Broker/artifacts/smoke/package/bin/unity
+          if [ "${{ matrix.platform }}" = win32 ]; then executable="${executable}.exe"; fi
+          "$executable" --help
+          # doctor returns 3 when no Broker is running; reaching that documented
+          # diagnostic proves the packed executable starts correctly.
+          set +e
+          "$executable" doctor
+          doctor_status=$?
+          set -e
+          test "$doctor_status" -eq 0 -o "$doctor_status" -eq 3
       - uses: actions/upload-artifact@v4
         with:
           name: npm-${{ matrix.platform }}-${{ matrix.arch }}
@@ -106,10 +131,43 @@ jobs:
           path: Broker/artifacts/npm/*.tgz
           if-no-files-found: error
 
-  publish:
-    if: ${{ inputs.publish }}
+  smoke:
     needs: [validate, native, root]
+    name: packed npm entry smoke test
     runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: npm-*
+          path: packages
+          merge-multiple: true
+      - name: Install packed entry and native packages
+        run: |
+          set -eu
+          mkdir smoke
+          cd smoke
+          npm init --yes >/dev/null
+          npm install --ignore-scripts --omit=optional \
+            ../packages/yuzetoolkit-unityevaltool-${{ needs.validate.outputs.version }}.tgz \
+            ../packages/yuzetoolkit-unityevaltool-linux-x64-${{ needs.validate.outputs.version }}.tgz
+          npm install --ignore-scripts --no-save \
+            ../packages/yuzetoolkit-unityevaltool-linux-x64-${{ needs.validate.outputs.version }}.tgz
+          ./node_modules/.bin/unity --help
+          set +e
+          ./node_modules/.bin/unity doctor
+          doctor_status=$?
+          set -e
+          test "$doctor_status" -eq 0 -o "$doctor_status" -eq 3
+
+  publish:
+    if: ${{ inputs.publish && github.ref == 'refs/heads/main' }}
+    needs: [validate, native, root, smoke]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/setup-node@v4
         with:
@@ -120,15 +178,116 @@ jobs:
           pattern: npm-*
           path: packages
           merge-multiple: true
-      - name: Publish native packages first
+      - id: preflight
+        name: Preflight immutable release state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -eu
+          : > packages/.publish-native
+          : > packages/.publish-root
+          : > packages/.package-names
+          artifact_count=0
+          expected_packages='@yuzetoolkit/unityevaltool
+          @yuzetoolkit/unityevaltool-darwin-arm64
+          @yuzetoolkit/unityevaltool-darwin-x64
+          @yuzetoolkit/unityevaltool-linux-arm64
+          @yuzetoolkit/unityevaltool-linux-x64
+          @yuzetoolkit/unityevaltool-win32-arm64
+          @yuzetoolkit/unityevaltool-win32-x64'
+          for artifact in packages/*.tgz; do
+            artifact_count=$((artifact_count + 1))
+            manifest=$(tar -xOf "$artifact" package/package.json)
+            package_name=$(printf '%s' "$manifest" | node -e "let value=''; process.stdin.on('data', chunk => value += chunk).on('end', () => process.stdout.write(JSON.parse(value).name));")
+            package_version=$(printf '%s' "$manifest" | node -e "let value=''; process.stdin.on('data', chunk => value += chunk).on('end', () => process.stdout.write(JSON.parse(value).version));")
+            test "$package_version" = "$VERSION" || {
+              echo "$artifact contains $package_name@$package_version, expected $VERSION." >&2
+              exit 1
+            }
+            printf '%s\n' "$package_name" >> packages/.package-names
+            local_sha=$(sha1sum "$artifact" | awk '{print $1}')
+            metadata_error=$(mktemp)
+            if remote_sha=$(npm view "$package_name@$VERSION" dist.shasum --json 2>"$metadata_error" | tr -d '"'); then
+              test "$remote_sha" = "$local_sha" || {
+                echo "$package_name@$VERSION already exists with different package bytes." >&2
+                exit 1
+              }
+              echo "$package_name@$VERSION already contains this exact artifact; skipping it."
+            else
+              if ! grep -q 'E404' "$metadata_error"; then
+                cat "$metadata_error" >&2
+                echo "Unable to determine whether $package_name@$VERSION exists." >&2
+                exit 1
+              fi
+              if [ "$package_name" = "@yuzetoolkit/unityevaltool" ]; then
+                printf '%s\n' "$artifact" >> packages/.publish-root
+              else
+                printf '%s\n' "$artifact" >> packages/.publish-native
+              fi
+            fi
+            rm -f "$metadata_error"
+          done
+          test "$artifact_count" -eq 7 || {
+            echo "Expected seven npm artifacts, found $artifact_count." >&2
+            exit 1
+          }
+          test "$(sort -u packages/.package-names | wc -l | tr -d ' ')" -eq 7 || {
+            echo "Expected seven distinct npm package names." >&2
+            exit 1
+          }
+          printf '%s\n' "$expected_packages" | sed 's/^[[:space:]]*//' | sort > packages/.expected-package-names
+          sort -u packages/.package-names > packages/.actual-package-names
+          diff -u packages/.expected-package-names packages/.actual-package-names
+          tag_exists=false
+          tag_error=$(mktemp)
+          if gh api "repos/${{ github.repository }}/git/ref/tags/v$VERSION" >/dev/null 2>"$tag_error"; then
+            tag_exists=true
+            tag_sha=$(gh api "repos/${{ github.repository }}/commits/v$VERSION" --jq .sha)
+            test "$tag_sha" = "${{ github.sha }}" || {
+              echo "v$VERSION already points to $tag_sha, not ${{ github.sha }}." >&2
+              exit 1
+            }
+          elif ! grep -Eqi 'HTTP 404|not found' "$tag_error"; then
+            cat "$tag_error" >&2
+            echo "Unable to determine whether tag v$VERSION exists." >&2
+            exit 1
+          fi
+          rm -f "$tag_error"
+          release_exists=false
+          release_error=$(mktemp)
+          if gh release view "v$VERSION" --repo "${{ github.repository }}" >/dev/null 2>"$release_error"; then
+            release_exists=true
+          elif ! grep -Eqi 'HTTP 404|not found' "$release_error"; then
+            cat "$release_error" >&2
+            echo "Unable to determine whether release v$VERSION exists." >&2
+            exit 1
+          fi
+          rm -f "$release_error"
+          if [ "$release_exists" = true ] && [ "$tag_exists" != true ]; then
+            echo "Release v$VERSION exists but its Git tag is missing; repair the tag explicitly before publishing." >&2
+            exit 1
+          fi
+      - name: Publish missing native packages, then the entry package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          for package in packages/*-darwin-*.tgz packages/*-linux-*.tgz packages/*-win32-*.tgz; do
+          set -eu
+          while IFS= read -r package; do
+            test -n "$package" || continue
             npm publish "$package" --access public
-          done
-          npm publish "packages/yuzetoolkit-unityevaltool-${{ needs.validate.outputs.version }}.tgz" --access public
-      - name: Create GitHub release
+          done < packages/.publish-native
+          while IFS= read -r package; do
+            test -n "$package" || continue
+            npm publish "$package" --access public
+          done < packages/.publish-root
+      - name: Create or repair GitHub release at the built commit
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "v${{ needs.validate.outputs.version }}" packages/*.tgz --repo "${{ github.repository }}" --generate-notes --title "UnityEvalTool v${{ needs.validate.outputs.version }}"
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "v$VERSION" packages/*.tgz --repo "${{ github.repository }}" --clobber
+          else
+            gh release create "v$VERSION" packages/*.tgz --repo "${{ github.repository }}" --target "${{ github.sha }}" --generate-notes --title "UnityEvalTool v$VERSION"
+          fi

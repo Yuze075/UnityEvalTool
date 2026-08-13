@@ -17,6 +17,9 @@ namespace YuzeToolkit
         private DebugGraphElement? _ramGraph;
         private DebugGraphElement? _audioGraph;
         private Label? _audioValue;
+        private readonly GraphSeries[] _fpsSeries = new GraphSeries[1];
+        private readonly GraphSeries[] _ramSeries = new GraphSeries[3];
+        private readonly GraphSeries[] _audioSeries = new GraphSeries[1];
 
         public PerformanceMonitorView(VisualTreeAsset templateAsset)
         {
@@ -95,10 +98,8 @@ namespace YuzeToolkit
             SetTextAndColor(_fpsLabels["onePercent"], $"{snapshot.OnePercent:0}", PerformanceMonitorUss.GetFpsColor(snapshot.OnePercent));
             SetTextAndColor(_fpsLabels["zeroOnePercent"], $"{snapshot.ZeroOnePercent:0}", PerformanceMonitorUss.GetFpsColor(snapshot.ZeroOnePercent));
 
-            _fpsGraph?.SetSeries(new[]
-            {
-                new GraphSeries(snapshot.Samples, fpsColor)
-            }, snapshot.Average, 60f, 30f);
+            _fpsSeries[0] = new GraphSeries(snapshot.Samples, snapshot.SampleCount, fpsColor);
+            _fpsGraph?.SetSeries(_fpsSeries, snapshot.Average, 60f, 30f);
         }
 
         private void ApplyRam(RamSnapshot snapshot)
@@ -109,12 +110,10 @@ namespace YuzeToolkit
             _ramLabels["allocated"].text = $"{snapshot.Allocated:0}";
             _ramLabels["mono"].text = $"{snapshot.Mono:0}";
 
-            _ramGraph?.SetSeries(new[]
-            {
-                new GraphSeries(snapshot.ReservedSamples, PerformanceMonitorUss.RamReservedColor),
-                new GraphSeries(snapshot.AllocatedSamples, PerformanceMonitorUss.RamAllocatedColor),
-                new GraphSeries(snapshot.MonoSamples, PerformanceMonitorUss.RamMonoColor)
-            });
+            _ramSeries[0] = new GraphSeries(snapshot.ReservedSamples, snapshot.SampleCount, PerformanceMonitorUss.RamReservedColor);
+            _ramSeries[1] = new GraphSeries(snapshot.AllocatedSamples, snapshot.SampleCount, PerformanceMonitorUss.RamAllocatedColor);
+            _ramSeries[2] = new GraphSeries(snapshot.MonoSamples, snapshot.SampleCount, PerformanceMonitorUss.RamMonoColor);
+            _ramGraph?.SetSeries(_ramSeries);
         }
 
         private void ApplyAudio(AudioSnapshot snapshot)
@@ -127,10 +126,8 @@ namespace YuzeToolkit
                     SetTextAndColor(_audioValue, $"{snapshot.Decibels.Value:0} dB", PerformanceMonitorUss.TextColor);
             }
 
-            _audioGraph?.SetSeries(new[]
-            {
-                new GraphSeries(snapshot.Samples, new Color(1f, 1f, 1f, 0.65f))
-            });
+            _audioSeries[0] = new GraphSeries(snapshot.Samples, snapshot.SampleCount, new Color(1f, 1f, 1f, 0.65f));
+            _audioGraph?.SetSeries(_audioSeries);
         }
 
         private static void SetTextAndColor(Label label, string text, Color color)

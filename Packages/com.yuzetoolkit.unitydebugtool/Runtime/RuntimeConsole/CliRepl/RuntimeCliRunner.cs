@@ -23,6 +23,9 @@ namespace YuzeToolkit
             if (_cliSession == null || _cancellation == null)
                 return new CliOutput("CLI session is not available.", string.Empty, LogType.Error);
 
+            if (IsGlobalHelp(line))
+                return new CliOutput(EmbeddedHelp, string.Empty, LogType.Log);
+
             try
             {
                 var response = await _cliService.ExecuteLineAsync(
@@ -31,9 +34,12 @@ namespace YuzeToolkit
                     line,
                     _cancellation.Token);
 
+                var exitRequested = EvalData.GetBool(response, "exit");
                 var text = response.TryGetValue("text", out var value)
                     ? Convert.ToString(value) ?? string.Empty
                     : LitJson.Stringify(response);
+                if (exitRequested)
+                    text = "The embedded Command Line has no process to exit. Its session remains open; use the configured Runtime Console toggle key to hide it.";
                 return new CliOutput(text, string.Empty, LogType.Log);
             }
             catch (OperationCanceledException)
@@ -54,6 +60,30 @@ namespace YuzeToolkit
             _cliSession?.Dispose();
             _cliSession = null;
         }
+
+        private static bool IsGlobalHelp(string line)
+        {
+            var command = line.Trim();
+            return command.Equals("help", StringComparison.OrdinalIgnoreCase) ||
+                   command.Equals("-h", StringComparison.OrdinalIgnoreCase) ||
+                   command.Equals("--help", StringComparison.OrdinalIgnoreCase) ||
+                   command.Equals("-help", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private const string EmbeddedHelp = @"Embedded UnityEvalTool Command Line
+
+This page executes one command at a time in the current Unity process and keeps one eval session alive.
+
+Supported here:
+  help [tool] [command]      Show embedded help or Tool command details.
+  tools | refresh           List or refresh the complete Tool command catalog.
+  <tool path> <command>     Invoke a registered Tool command.
+  eval-js --code <js>       Run one inline JavaScript command.
+  eval-js <inline js>       Run inline JavaScript shorthand.
+  session reset             Reset the persistent JavaScript session.
+  logs dump [count]         Print recent Unity logs once.
+
+Computer-level `unity connect`, stdin, heredoc and external REPL exit semantics are not available in this single-line page. Use the configured Runtime Console toggle key to hide it.";
     }
 
     internal readonly struct CliOutput

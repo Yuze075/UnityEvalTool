@@ -47,15 +47,19 @@ installing an entry version whose matching native dependency is not available ye
 
 ## Release checklist
 
-1. Keep the Unity package and npm package versions identical.
+1. Keep `version.json`, UnityEvalTool, Broker and npm versions identical. UnityDebugTool
+   has its own SemVer in `debugPackageVersion`, but its UnityEvalTool dependency must match.
 2. Build `Broker/UnityEvalTool.Broker.slnx` and run its tests in Release configuration.
-3. Run `release.yml` with `publish=false` and verify all seven artifacts.
-4. Install the entry tarball together with the current platform tarball and run
-   `unity --help` and `unity doctor`.
+3. Run `release.yml` with `publish=false`; the workflow verifies all seven artifacts,
+   starts every packed native executable, and installs the Linux entry/native tarball pair
+   before running `unity --help` and `unity doctor`.
+4. Inspect the retained artifacts when additional platform-specific verification is needed.
 5. Run the workflow with `publish=true` only when the `NPM_TOKEN` repository secret is
    configured, or download the verified artifacts and publish them locally.
 6. Publish native packages first, entry package last, then create the matching
    `v<version>` GitHub release and attach all seven tarballs.
 
-Do not reuse a published npm version. If any package in the set was published, advance
-the version for the whole set before rebuilding.
+Do not replace a published npm version. A failed publish job may be retried with the exact
+retained artifacts: preflight verifies each existing npm tarball by SHA-1 and publishes only
+the missing packages. If the artifacts are rebuilt or their bytes differ after any package in
+the set was published, advance the version for the whole set.

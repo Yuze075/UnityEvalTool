@@ -28,7 +28,8 @@ namespace YuzeToolkit
                 ("reflectionDangerous", Has(safety, EvalToolSafety.ReflectionDangerous)),
                 ("networkService", Has(safety, EvalToolSafety.NetworkService)),
                 ("longRunning", Has(safety, EvalToolSafety.LongRunning)),
-                ("mutatesEditorState", Has(safety, EvalToolSafety.MutatesEditorState))
+                ("mutatesEditorState", Has(safety, EvalToolSafety.MutatesEditorState)),
+                ("persistsData", Has(safety, EvalToolSafety.PersistsData))
             );
         }
 
@@ -40,7 +41,8 @@ namespace YuzeToolkit
             if (Has(safety, EvalToolSafety.MutatesProject) ||
                 Has(safety, EvalToolSafety.TriggersReload) ||
                 Has(safety, EvalToolSafety.NetworkService) ||
-                Has(safety, EvalToolSafety.LongRunning))
+                Has(safety, EvalToolSafety.LongRunning) ||
+                Has(safety, EvalToolSafety.PersistsData))
                 return "high";
             if (Has(safety, EvalToolSafety.MutatesScene) ||
                 Has(safety, EvalToolSafety.MutatesEditorState))

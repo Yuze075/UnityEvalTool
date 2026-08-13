@@ -19,23 +19,28 @@ routed through that connection and execute through the existing PuerTS eval/tool
 
 ## Install
 
-UnityEvalTool requires `com.tencent.puerts.core` and one PuerTS backend. Add this Unity
-package through Package Manager, then install the computer-level package:
+UnityEvalTool requires `com.tencent.puerts.core` and exactly one PuerTS backend. This
+repository is validated with `com.tencent.puerts.quickjs` 3.0.2 and its matching core
+3.0.2; a supported V8 backend/core pair from the same PuerTS release is an alternative.
+Add this Unity package through Package Manager, then install the computer-level package:
 
 ```bash
 npm install --global @yuzetoolkit/unityevaltool
+unity service install
 unity doctor
 ```
 
 Use this Git URL in Unity Package Manager:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.0
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
 ```
 
-The npm lifecycle installs and starts a current-user LaunchAgent (macOS), systemd user
-unit (Linux), or Scheduled Task (Windows). It never requires an administrator service.
-Use `unity service status|start|stop|restart|uninstall` for explicit management.
+Service installation is deliberately explicit because modern npm versions may block
+dependency lifecycle scripts. `unity service install` installs and starts a current-user
+LaunchAgent (macOS), systemd user unit (Linux), or Scheduled Task (Windows). It never
+requires an administrator service. Use
+`unity service status|start|stop|restart|uninstall` for explicit management.
 
 The Broker creates `~/.unityevaltool/auth.json` with user-only permissions. MCP clients
 connect to `http://127.0.0.1:2347/mcp` and must send its token as
@@ -91,6 +96,10 @@ Broker commands. Every other line is forwarded unchanged to Unity's
 
 The Broker binds loopback only and fails explicitly if port 2347 is occupied. It does
 not expose a LAN mode or silently choose a different port.
+
+Non-WebGL release Players intentionally keep the same authenticated arbitrary-JavaScript
+eval surface as the Editor; this is not gated by Development Build and does not depend on
+the optional UnityDebugTool UI package. See [Editor and Player registration](docs/RUNTIME_SERVICES.md).
 
 ## Development and release
 

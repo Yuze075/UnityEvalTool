@@ -2,6 +2,16 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 
 internal static class BrokerStatePolicy
 {
+    public static void ValidateWaitFor(string waitFor)
+    {
+        if (string.Equals(waitFor, "snapshot", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(waitFor, "ready", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(waitFor, "compilation-complete", StringComparison.OrdinalIgnoreCase))
+            return;
+        throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest,
+            "waitFor must be snapshot, ready, or compilation-complete.");
+    }
+
     public static bool IsRepairMode(UnityStatus status) =>
         string.Equals(status.Phase, "CompilationFailed", StringComparison.Ordinal);
 

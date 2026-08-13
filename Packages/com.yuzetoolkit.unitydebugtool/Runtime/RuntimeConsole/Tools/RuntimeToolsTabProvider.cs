@@ -8,13 +8,13 @@ namespace YuzeToolkit
     [DisallowMultipleComponent]
     public sealed class RuntimeToolsTabProvider : MonoBehaviour, IRuntimeConsoleTabProvider
     {
-        [SerializeField, Tooltip("USS used by the Runtime Console Tools tab.")]
+        [SerializeField, Tooltip("Required USS used by the Runtime Console Tools tab. Initialization fails when it is missing.")]
         private StyleSheet? styleSheet;
 
         public IEnumerable<IRuntimeConsoleTab> CreateTabs(RuntimeConsoleContext context)
         {
-            if (styleSheet != null)
-                context.AddStyleSheet(styleSheet);
+            context.AddStyleSheet(styleSheet ?? throw new MissingReferenceException(
+                $"{nameof(RuntimeToolsTabProvider)} requires a {nameof(StyleSheet)} reference."));
             yield return new RuntimeToolsTab();
         }
     }

@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 namespace YuzeToolkit
 {
     [RequireComponent(typeof(UIDocument))]
+    [DisallowMultipleComponent]
     [DefaultExecutionOrder(-9000)]
     public sealed class DebugPanel : MonoBehaviour
     {
@@ -24,10 +26,12 @@ namespace YuzeToolkit
 
         private readonly List<IDebugPanelModule> _modules = new();
         private readonly Dictionary<IDebugPanelModule, bool> _moduleVisibility = new();
+        private readonly HashSet<Key> _pressedToggleKeys = new();
         private UIDocument? _uiDocument;
         private VisualElement? _root;
         private DebugPanelContext? _context;
         private bool _modulesInitialized;
+        private bool _moduleInitializationFailed;
         private bool _startupVisibilityApplied;
         private bool _visible;
 
@@ -45,7 +49,13 @@ namespace YuzeToolkit
         {
             if (_instance != null && _instance != this)
             {
-                Destroy(gameObject);
+                // DisallowMultipleComponent prevents new duplicates, but an already serialized
+                // duplicate on the singleton GameObject must not destroy the valid panel and all
+                // of its modules. A duplicate hosted elsewhere still owns a disposable clone GO.
+                if (_instance.gameObject == gameObject)
+                    Destroy(this);
+                else
+                    Destroy(gameObject);
                 return;
             }
 
@@ -57,6 +67,7 @@ namespace YuzeToolkit
 
         private void OnEnable()
         {
+            if (_instance != this) return;
             InitializeDocument();
         }
 
@@ -64,11 +75,13 @@ namespace YuzeToolkit
         {
             if (_instance != this) return;
             ShutdownModules();
+            _moduleInitializationFailed = false;
         }
 
         private void Update()
         {
-            if (_root == null || !_modulesInitialized)
+            if (_instance != this) return;
+            if (_root == null || (!_modulesInitialized && !_moduleInitializationFailed))
                 InitializeDocument();
             if (_root == null) return;
 
@@ -115,10 +128,11 @@ namespace YuzeToolkit
 
                 _root.Clear();
                 PrepareRoot(_root);
+                InstallInteractionPolicy(_root);
                 _context = new DebugPanelContext(_root);
             }
 
-            if (!_modulesInitialized)
+            if (!_modulesInitialized && !_moduleInitializationFailed)
                 InitializeModules();
 
             if (!_startupVisibilityApplied)
@@ -142,35 +156,87 @@ namespace YuzeToolkit
             root.style.flexGrow = 1;
         }
 
+        private void InstallInteractionPolicy(VisualElement root)
+        {
+            root.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                EventSystem.current?.SetSelectedGameObject(null);
+                if (evt.button == 0 && FindTextField(evt.target as VisualElement, root) is { enabledInHierarchy: true })
+                    return;
+
+                if (root.panel?.focusController.focusedElement is VisualElement focused)
+                    focused.Blur();
+            }, TrickleDown.TrickleDown);
+        }
+
+        private static TextField? FindTextField(VisualElement? target, VisualElement root)
+        {
+            for (var current = target; current != null && current != root; current = current.parent)
+                if (current is TextField textField)
+                    return textField;
+            return null;
+        }
+
         private void InitializeModules()
         {
             if (_context == null) return;
 
+            ShutdownModules();
             _modules.Clear();
             _moduleVisibility.Clear();
-            foreach (var module in GetComponents<MonoBehaviour>()
-                         .OfType<IDebugPanelModule>()
-                         .OrderBy(module => module.SortOrder))
+            try
             {
-                module.Initialize(_context);
-                _modules.Add(module);
-                _moduleVisibility[module] = false;
-            }
+                foreach (var behaviour in GetComponents<MonoBehaviour>()
+                             .Where(behaviour => behaviour.isActiveAndEnabled)
+                             .OrderBy(behaviour => (behaviour as IDebugPanelModule)?.SortOrder ?? int.MaxValue))
+                {
+                    if (behaviour is not IDebugPanelModule module) continue;
 
-            _modulesInitialized = true;
+                    // Add before Initialize so a partially initialized module participates in rollback.
+                    _modules.Add(module);
+                    _moduleVisibility[module] = false;
+                    module.Initialize(_context);
+                }
+
+                _modulesInitialized = true;
+                _moduleInitializationFailed = false;
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogException(exception, this);
+                RollbackInitializedModules();
+                _moduleInitializationFailed = true;
+            }
         }
 
         private void ShutdownModules()
         {
-            if (!_modulesInitialized) return;
+            ReleaseInteractionFocus();
+            RollbackInitializedModules();
 
+            _modulesInitialized = false;
+            _visible = false;
+            if (_root != null)
+                _root.style.display = DisplayStyle.None;
+        }
+
+        private void RollbackInitializedModules()
+        {
             for (var i = _modules.Count - 1; i >= 0; i--)
-                _modules[i].Shutdown();
+            {
+                try
+                {
+                    _modules[i].Shutdown();
+                }
+                catch (System.Exception exception)
+                {
+                    Debug.LogException(exception, this);
+                }
+            }
 
             _modules.Clear();
             _moduleVisibility.Clear();
-            _modulesInitialized = false;
-            _visible = false;
+            _pressedToggleKeys.Clear();
         }
 
         private void SetVisible(bool visible)
@@ -189,19 +255,28 @@ namespace YuzeToolkit
         private void HandleToggleInput()
         {
             var keyboard = Keyboard.current;
-            if (keyboard == null) return;
+            if (keyboard == null || IsEditingText()) return;
 
-            var pressedKeys = new List<Key>();
+            _pressedToggleKeys.Clear();
             for (var i = 0; i < _modules.Count; i++)
             {
                 var toggleKey = _modules[i].ToggleKey;
-                if (pressedKeys.Contains(toggleKey)) continue;
+                if (!_pressedToggleKeys.Add(toggleKey)) continue;
                 if (IsTogglePressed(keyboard, toggleKey))
-                    pressedKeys.Add(toggleKey);
+                    ToggleModulesByKey(toggleKey);
             }
+        }
 
-            for (var i = 0; i < pressedKeys.Count; i++)
-                ToggleModulesByKey(pressedKeys[i]);
+        private bool IsEditingText()
+        {
+            if (_root?.panel?.focusController.focusedElement is not VisualElement focused)
+                return false;
+
+            for (var current = focused; current != null; current = current.parent)
+                if (current is TextField)
+                    return true;
+
+            return false;
         }
 
         private void ToggleModulesByKey(Key toggleKey)
@@ -244,8 +319,20 @@ namespace YuzeToolkit
             _visible = _modules.Any(IsModuleVisible);
             if (_root == null) return;
 
+            if (!_visible)
+                ReleaseInteractionFocus();
             _root.style.display = _visible ? DisplayStyle.Flex : DisplayStyle.None;
             _root.pickingMode = PickingMode.Ignore;
+        }
+
+        private void ReleaseInteractionFocus()
+        {
+            if (_root?.panel?.focusController.focusedElement is VisualElement focused)
+                focused.Blur();
+
+            var eventSystem = EventSystem.current;
+            if (eventSystem != null && eventSystem.currentSelectedGameObject == gameObject)
+                eventSystem.SetSelectedGameObject(null);
         }
 
         private bool IsTogglePressed(Keyboard keyboard, Key toggleKey)

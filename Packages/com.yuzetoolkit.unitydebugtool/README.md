@@ -9,7 +9,7 @@ Runtime UI Toolkit debug panel for Unity projects using `UnityEvalTool`.
 Install `com.yuzetoolkit.unityevaltool` first, then add this package with Unity Package Manager's **Add package from git URL** command:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#main
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
 ```
 
 For a repository embedded at `Game/UnityEvalTool`, use the local working tree:
@@ -32,14 +32,16 @@ Place `Runtime/Core/Prefabs/DebugPanel.prefab` in a scene or persistent prefab t
   - Runtime registration through `SystemInfoRegistry.Register(key, Func<string>)`.
 - Registered Runtime Console tabs:
   - `Log`: Unity Console-style log toolbar, filters, collapse, list, and detail view.
-  - `Command Line`: embedded UnityEvalTool command input and output history.
+  - `Command Line`: an in-process, persistent, single-line UnityEvalTool CLI session and output history.
   - `EvalTool`: UnityEvalTool enable, reconnect, Broker registration, Unity state, and evaluation availability.
-  - `Tools`: complete runtime tool catalog with paths, descriptions, sources, functions, parameters, sub tools, and independent enable controls.
+  - `Tools`: the recursively flattened runtime tool catalog with every path, function, parameter, safety declaration, and effective enable state.
 - Runtime Console uses a resizable UI Toolkit shell. Its tabs do not use UI Toolkit `ScrollView`; overflowing tab content is handled by the package's lightweight pan view with mouse-wheel panning and a compact custom scrollbar.
 
-Default module toggles: `F10` shows or hides Performance and System Info, `F11` shows or hides Debug Windows, and `F12` shows or hides Runtime Console. `Ctrl` / `Alt` modifier requirements are still configured on `DebugPanel`; modules assigned to the same key are shown and hidden together.
+Default module toggles: `F10` shows or hides Performance and System Info, `F9` shows or hides Debug Windows, and `F8` shows or hides Runtime Console. `Ctrl` / `Alt` modifier requirements are still configured on `DebugPanel`; modules assigned to the same key are shown and hidden together.
 
-`DebugPanel` is not created automatically. Place this package's `Runtime/Core/Prefabs/DebugPanel.prefab` in a scene or persistent prefab. Static `DebugWindowModule.RegisterWindow(...)` calls can happen before that prefab instance exists, but UI and EvalTool roots are activated only while the component is present and enabled. Window registrations stay registered across `DebugPanel` host teardown and Editor Play Mode transitions until their returned `IDisposable` handle is disposed.
+`DebugPanel` is not created automatically. Place this package's `Runtime/Core/Prefabs/DebugPanel.prefab` in a scene or persistent prefab. Keep exactly one active `DebugPanel` / `DebugWindowModule` host per process; duplicate active hosts fail initialization explicitly so one Tool root never has ambiguous ownership. Static `DebugWindowModule.RegisterWindow(...)` calls can happen before that prefab instance exists, but UI and EvalTool roots are activated only while the component is present and enabled. Window registrations survive a `DebugPanel` host teardown inside the same managed runtime until their returned `IDisposable` handle is disposed. A normal Unity Domain Reload resets static registrations, so their owners must register again through their normal initialization lifecycle.
+
+Debug Windows are pointer-oriented. Buttons, foldouts, sliders, numeric fields, and window background do not acquire keyboard or gamepad focus; numeric fields remain adjustable with their pointer-drag affordance, while unsupported object-like values render read-only. A writable string field accepts keyboard input only after a left mouse click inside that exact field; Enter, clicking elsewhere, changing tabs, or hiding the panel ends editing and clears the EventSystem selection. Runtime Console search and Command Line fields use the same explicit mouse-entry rule. This policy prevents retained UI focus from turning later Submit/navigation input into an accidental debug action; it cannot by itself disable independent gameplay `InputAction` callbacks, so host projects that require modal text entry should gate their gameplay action map while a console text field is active.
 
 ## Runtime Structure
 
@@ -89,15 +91,17 @@ Runtime/
     Tools/
       UnityDebugTool.RuntimeConsole.Tools.asmdef
       runtime tool catalog and control tab
+Tests/Editor/       registration, safety, catalog, and bounded-log contract tests
+link.xml            IL2CPP preservation for reflection-invoked Debug Eval Tool adapters
 ```
 
 Assembly boundaries:
 
-- `UnityDebugTool`: Core assembly in `Runtime/Core`. Depends on `Unity.InputSystem`; does not depend on `UnityEvalTool`.
-- `UnityDebugTool.DebugWindows`: debug window builder/module and EvalTool adapter. Depends on `UnityEvalTool`.
+- `UnityDebugTool`: Core assembly in `Runtime/Core`. Depends on `Unity.InputSystem` and Unity EventSystem APIs for root-level focus cleanup; it does not depend on `UnityEvalTool`.
+- `UnityDebugTool.DebugWindows`: debug window builder/module and EvalTool adapter. Depends on `UnityEvalTool`, Input System, and Unity EventSystem APIs.
 - `UnityDebugTool.Performance`: top-right FPS/RAM/audio HUD module. Does not depend on `UnityEvalTool`.
 - `UnityDebugTool.SystemInfo`: bottom-right system information HUD module and public registry API. Does not depend on `UnityDebugTool.Performance` or `UnityEvalTool`.
-- `UnityDebugTool.RuntimeConsole`: Runtime Console Core. Depends only on `UnityDebugTool`.
+- `UnityDebugTool.RuntimeConsole`: Runtime Console Core. Depends on `UnityDebugTool`, Input System, and Unity EventSystem APIs for focus cleanup.
 - `UnityDebugTool.RuntimeConsole.Log`: Unity log tab. Depends on Runtime Console Core.
 - `UnityDebugTool.RuntimeConsole.CliRepl`: Command Line tab. Depends on `UnityEvalTool` and `UnityEvalTool.CLI`.
 - `UnityDebugTool.RuntimeConsole.EvalTool`: UnityEvalTool state and connection controls. Depends on `UnityEvalTool.Broker`.
@@ -127,12 +131,15 @@ Styles are owned by the module that uses them. Core does not provide a shared ro
 
 Built-in modules and Runtime Console tab providers receive their USS through serialized prefab references. No runtime UI asset is loaded through `Resources`. `DebugPanel` only clears and exposes the `UIDocument` root, then drives module lifecycle.
 
-## Basic Usage
+A built-in module or tab provider is active only when its `MonoBehaviour` is enabled. Missing required UXML/USS references fail that initialization explicitly. If any module throws while initializing, `DebugPanel` shuts down already-started modules in reverse order and does not retry every frame.
+
+## Recommended Explicit Visual And Tool Trees
 
 ```csharp
+using System;
 using YuzeToolkit;
 
-public sealed class PlayerDebugHandle
+public sealed class PlayerDebugHandle : IDisposable
 {
     private int _hp = 10;
     private bool _invincible;
@@ -140,29 +147,23 @@ public sealed class PlayerDebugHandle
 
     public PlayerDebugHandle()
     {
-        _registration = DebugWindowModule.RegisterWindow(
+        var tool = new DebugEvalToolBuilder(
             "PlayerDebug",
-            "Runtime player debug controls.",
+            "Stable runtime player debug controls.");
+        tool.AddWritable("Hp", "Read or set the player's HP.", () => _hp, value => _hp = value)
+            .AddWritable("Invincible", "Read or set invincibility.", () => _invincible,
+                value => _invincible = value)
+            .AddButton("Kill", "Set player HP to zero.", () => _hp = 0,
+                EvalToolSafety.Destructive | EvalToolSafety.RequiresConfirmation);
+
+        _registration = DebugWindowModule.RegisterWindow(
+            tool,
             window =>
             {
                 window.SetTitle("Player");
-                window.AddValue(
-                    "HP",
-                    () => _hp,
-                    value => _hp = value,
-                    "Hp",
-                    "Read or set the player's debug HP.");
-                window.AddValue(
-                    "Invincible",
-                    () => _invincible,
-                    value => _invincible = value,
-                    "Invincible",
-                    "Read or set player invincibility.");
-                window.AddButton(
-                    "Kill",
-                    () => _hp = 0,
-                    "Kill",
-                    "Set player HP to zero.");
+                window.AddSegmentedInt("HP", 0, 10, () => _hp, value => _hp = value);
+                window.AddBoolButton("Invincible", () => _invincible, value => _invincible = value);
+                window.AddButton("Kill", () => _hp = 0);
             });
     }
 
@@ -172,6 +173,10 @@ public sealed class PlayerDebugHandle
     }
 }
 ```
+
+The visual tree owns layout; the explicit `DebugEvalToolBuilder` owns stable automation paths. Both must reuse the same getters, setters, and actions, but a Foldout or horizontal layout never decides Tool identity. With this overload, visual node `toolName` metadata is ignored. Dispose the returned handle when the represented runtime owner goes away; disposal removes both the window and its exact owned root Tool.
+
+The legacy `RegisterWindow(toolName, description, configure)` overload is obsolete. It now creates a visual-only window and keeps the supplied name only as visual metadata; it never registers an Eval Tool. Migrate every automation surface to the explicit two-tree overload. Visual builder `toolName` / `description` arguments remain source-compatible but are ignored for Tool registration.
 
 Windows registered without a tool name and description are UI-only:
 
@@ -192,7 +197,7 @@ SystemInfoRegistry.Unregister("Player State");
 
 ## EvalTool Usage
 
-When a window is registered with `toolName` and `description`, fields and buttons that also provide `toolName` and `description` become sub tools.
+The explicit example above creates stable `PlayerDebug/Hp`, `PlayerDebug/Invincible`, and `PlayerDebug/Kill` paths regardless of visual grouping.
 
 ```javascript
 async function execute() {
@@ -231,6 +236,10 @@ Use `tools://` and `getToolDetails("PlayerDebug")` to inspect the full tree.
 - `AddVerticalGroup(...)`
 
 Tool names and descriptions must be provided together. Tool names are validated by `EvalToolRegistry`.
+
+`DebugEvalToolBuilder` provides `AddGroup`, `AddReadOnly`, `AddWritable`, `AddButton`, and `AddDestructiveButton`. `AddWritable(..., EvalToolSafety safety)` and `AddButton(..., EvalToolSafety safety)` accept the complete UnityEvalTool safety flags; use `PersistsData` for local saves/settings, `LongRunning` for asynchronous flows, and the appropriate mutation flags for scene, project, editor, network, or reload effects. A destructive action must also declare `RequiresConfirmation`.
+
+The embedded Command Line accepts one line per submission. Its local `help` lists only supported embedded semantics. Computer-level `unity connect`, stdin, heredoc, and external REPL exit are intentionally unavailable; `exit` reports this rather than silently ending a non-existent process.
 
 ## Notes
 

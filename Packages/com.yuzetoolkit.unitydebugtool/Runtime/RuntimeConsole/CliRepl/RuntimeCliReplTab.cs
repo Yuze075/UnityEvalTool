@@ -22,6 +22,7 @@ namespace YuzeToolkit
         private TextField _input = null!;
         private Button _runButton = null!;
         private bool _running;
+        private bool _shutdown;
 
         public RuntimeCliReplTab(int maxHistoryRows) : base("command-line", "Command Line", 10)
         {
@@ -32,6 +33,7 @@ namespace YuzeToolkit
 
         public override void Shutdown()
         {
+            _shutdown = true;
             _runner.Dispose();
             base.Shutdown();
         }
@@ -57,6 +59,7 @@ namespace YuzeToolkit
             Root.Add(inputRow);
 
             _input = new TextField { tooltip = "Enter a UnityEvalTool command and press Enter." };
+            _input.tabIndex = -1;
             _input.AddToClassList(InputFieldClass);
             _input.style.flexGrow = 1;
             _input.style.flexShrink = 1;
@@ -65,7 +68,9 @@ namespace YuzeToolkit
             {
                 if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter) return;
                 Submit();
-                evt.StopPropagation();
+                _input.Blur();
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
             });
             inputRow.Add(_input);
 
@@ -101,6 +106,7 @@ namespace YuzeToolkit
             try
             {
                 var result = await _runner.ExecuteLineAsync(line);
+                if (_shutdown) return;
                 AddRow(result.Message, GetColor(result.LogType));
                 if (!string.IsNullOrWhiteSpace(result.StackTrace))
                     AddRow(result.StackTrace, RuntimeConsoleUi.ErrorColor);
@@ -108,7 +114,8 @@ namespace YuzeToolkit
             finally
             {
                 _running = false;
-                _runButton.SetEnabled(true);
+                if (!_shutdown)
+                    _runButton.SetEnabled(true);
             }
         }
 

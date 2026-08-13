@@ -19,6 +19,8 @@ namespace YuzeToolkit
                 text = text,
                 tooltip = tooltip
             };
+            button.focusable = false;
+            button.tabIndex = -1;
             button.AddToClassList(RuntimeConsoleUss.ButtonClass);
             button.style.width = width;
             return button;
@@ -26,30 +28,38 @@ namespace YuzeToolkit
 
         public static TextField CreateTextField(string label, string value, string tooltip, bool isPassword = false)
         {
-            return new TextField(label)
+            var field = new TextField(label)
             {
                 value = value,
                 tooltip = tooltip,
                 isPasswordField = isPassword
             };
+            field.tabIndex = -1;
+            return field;
         }
 
         public static IntegerField CreateIntegerField(string label, int value, string tooltip)
         {
-            return new IntegerField(label)
+            var field = new IntegerField(label)
             {
                 value = Mathf.Max(0, value),
                 tooltip = tooltip
             };
+            field.focusable = false;
+            field.tabIndex = -1;
+            return field;
         }
 
         public static Toggle CreateToggle(string label, bool value, string tooltip)
         {
-            return new Toggle(label)
+            var toggle = new Toggle(label)
             {
                 value = value,
                 tooltip = tooltip
             };
+            toggle.focusable = false;
+            toggle.tabIndex = -1;
+            return toggle;
         }
 
         public static VisualElement CreateToolbar()

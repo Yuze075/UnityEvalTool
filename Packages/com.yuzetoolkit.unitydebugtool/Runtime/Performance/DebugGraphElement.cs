@@ -69,14 +69,15 @@ namespace YuzeToolkit
 
         private void DrawFps(MeshGenerationContext context, Rect rect)
         {
-            if (_series.Length == 0 || _series[0].Values.Length == 0)
+            if (_series.Length == 0 || _series[0].Count == 0)
             {
                 DrawGraphLine(context, rect, 0.08f, PerformanceMonitorUss.CautionColor, 0.95f);
                 return;
             }
 
             var values = _series[0].Values;
-            var max = Mathf.Max(FindMax(values), _goodThreshold, 1f);
+            var valueCount = _series[0].Count;
+            var max = Mathf.Max(FindMax(values, valueCount), _goodThreshold, 1f);
             var averageNormalized = Mathf.Clamp01(_average / max);
             var goodNormalized = Mathf.Clamp01(_goodThreshold / max);
             var cautionNormalized = Mathf.Clamp01(_cautionThreshold / max);
@@ -85,8 +86,8 @@ namespace YuzeToolkit
             DrawGraphLine(context, rect, cautionNormalized, PerformanceMonitorUss.CautionColor, 0.95f);
             DrawGraphLine(context, rect, averageNormalized, new Color(1f, 1f, 1f, 0.72f), 0.85f);
 
-            var start = Mathf.Max(0, values.Length - PerformanceHudConstants.GraphSamples);
-            var count = values.Length - start;
+            var start = Mathf.Max(0, valueCount - PerformanceHudConstants.GraphSamples);
+            var count = valueCount - start;
             var step = rect.width / Mathf.Max(1, PerformanceHudConstants.GraphSamples - 1);
             for (var i = 0; i < count; i++)
             {
@@ -108,10 +109,14 @@ namespace YuzeToolkit
             if (_series.Length < 3)
                 return;
 
-            var max = Mathf.Max(FindMax(_series[0].Values), FindMax(_series[1].Values), FindMax(_series[2].Values), 1f);
+            var max = Mathf.Max(
+                FindMax(_series[0].Values, _series[0].Count),
+                FindMax(_series[1].Values, _series[1].Count),
+                FindMax(_series[2].Values, _series[2].Count),
+                1f);
             var count = 0;
             for (var i = 0; i < _series.Length; i++)
-                count = Mathf.Max(count, _series[i].Values.Length);
+                count = Mathf.Max(count, _series[i].Count);
 
             var start = Mathf.Max(0, count - PerformanceHudConstants.GraphSamples);
             var visibleCount = count - start;
@@ -124,7 +129,7 @@ namespace YuzeToolkit
                 for (var seriesIndex = 0; seriesIndex < _series.Length; seriesIndex++)
                 {
                     var values = _series[seriesIndex].Values;
-                    if (sampleIndex >= values.Length) continue;
+                    if (sampleIndex >= _series[seriesIndex].Count) continue;
 
                     var normalized = Mathf.Clamp01(values[sampleIndex] / max);
                     var y = Mathf.Lerp(rect.yMax - 2f, rect.yMin, normalized);
@@ -141,12 +146,13 @@ namespace YuzeToolkit
         {
             DrawRect(context, new Rect(rect.xMin, rect.yMax - 2f, rect.width, 1f), new Color(1f, 1f, 1f, 0.50f));
 
-            if (_series.Length == 0 || _series[0].Values.Length == 0)
+            if (_series.Length == 0 || _series[0].Count == 0)
                 return;
 
             var values = _series[0].Values;
-            var start = Mathf.Max(0, values.Length - PerformanceHudConstants.GraphSamples);
-            var count = values.Length - start;
+            var valueCount = _series[0].Count;
+            var start = Mathf.Max(0, valueCount - PerformanceHudConstants.GraphSamples);
+            var count = valueCount - start;
             var step = rect.width / Mathf.Max(1, count);
             for (var i = 0; i < count; i++)
             {
@@ -207,10 +213,10 @@ namespace YuzeToolkit
             mesh.SetNextIndex(0);
         }
 
-        private static float FindMax(float[] values)
+        private static float FindMax(float[] values, int count)
         {
             var max = 0f;
-            for (var i = 0; i < values.Length; i++)
+            for (var i = 0; i < count; i++)
                 max = Mathf.Max(max, values[i]);
             return max;
         }

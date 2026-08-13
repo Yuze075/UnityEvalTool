@@ -19,6 +19,16 @@ namespace UnityEvalTool.SourceGenerator
         private const string EvalParameterAttributeName = "YuzeToolkit.EvalParameterAttribute";
         private const string EvalSubToolAttributeName = "YuzeToolkit.EvalSubToolAttribute";
 
+        private static readonly HashSet<string> JavaScriptReservedIdentifiers = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "arguments", "await", "break", "case", "catch", "class", "const", "continue",
+            "debugger", "default", "delete", "do", "else", "enum", "eval", "export", "extends",
+            "false", "finally", "for", "function", "if", "implements", "import", "in",
+            "instanceof", "interface", "let", "new", "null", "package", "private", "protected",
+            "public", "return", "static", "super", "switch", "this", "throw", "true", "try",
+            "typeof", "var", "void", "while", "with", "yield"
+        };
+
         private static readonly DiagnosticDescriptor ToolMustBePartial = new DiagnosticDescriptor(
             "UET001",
             "Eval tool type must be partial",
@@ -61,8 +71,8 @@ namespace UnityEvalTool.SourceGenerator
 
         private static readonly DiagnosticDescriptor InvalidFunctionName = new DiagnosticDescriptor(
             "UET006",
-            "Eval function name must be a JavaScript identifier",
-            "Eval function '{0}' cannot be exported because it is not a valid JavaScript identifier",
+            "Eval function name must be a non-reserved JavaScript identifier",
+            "Eval function '{0}' cannot be exported because it is not a valid non-reserved JavaScript identifier",
             "UnityEvalTool",
             DiagnosticSeverity.Error,
             true);
@@ -73,6 +83,22 @@ namespace UnityEvalTool.SourceGenerator
             "Default value for parameter '{0}' on function '{1}' cannot be represented in generated metadata and will be emitted as null",
             "UnityEvalTool",
             DiagnosticSeverity.Warning,
+            true);
+
+        private static readonly DiagnosticDescriptor NestedToolIsUnsupported = new DiagnosticDescriptor(
+            "UET008",
+            "Nested eval tool types are not supported",
+            "Eval tool type '{0}' must be declared at namespace scope; nested tool types are not supported",
+            "UnityEvalTool",
+            DiagnosticSeverity.Error,
+            true);
+
+        private static readonly DiagnosticDescriptor AsyncFunctionIsUnsupported = new DiagnosticDescriptor(
+            "UET009",
+            "Eval functions must complete synchronously",
+            "Eval function '{0}' returns asynchronously; Task, ValueTask, and async methods are not supported by generated JavaScript wrappers",
+            "UnityEvalTool",
+            DiagnosticSeverity.Error,
             true);
 
         public void Initialize(GeneratorInitializationContext context)
@@ -115,6 +141,12 @@ namespace UnityEvalTool.SourceGenerator
                 return null;
             }
 
+            if (typeSymbol.ContainingType != null)
+            {
+                Report(context, NestedToolIsUnsupported, declaration.Identifier.GetLocation(), typeSymbol.ToDisplayString());
+                return null;
+            }
+
             if (!HasParameterlessConstructor(typeSymbol))
             {
                 Report(context, ToolMustHaveUsableConstructor, declaration.Identifier.GetLocation(), typeSymbol.ToDisplayString());
@@ -147,6 +179,13 @@ namespace UnityEvalTool.SourceGenerator
                 if (!IsValidJavaScriptIdentifier(member.Name))
                 {
                     Report(context, InvalidFunctionName, location, member.Name);
+                    hasFatalError = true;
+                    continue;
+                }
+
+                if (member.IsAsync || IsTaskLike(member.ReturnType))
+                {
+                    Report(context, AsyncFunctionIsUnsupported, location, member.Name);
                     hasFatalError = true;
                     continue;
                 }
@@ -265,6 +304,19 @@ namespace UnityEvalTool.SourceGenerator
             return constructors.Any(constructor =>
                 constructor.Parameters.Length == 0 &&
                 constructor.DeclaredAccessibility == Accessibility.Public);
+        }
+
+        private static bool IsTaskLike(ITypeSymbol type)
+        {
+            if (!(type is INamedTypeSymbol namedType)) return false;
+            var definition = namedType.OriginalDefinition;
+            if (!string.Equals(definition.ContainingNamespace?.ToDisplayString(), "System.Threading.Tasks",
+                    StringComparison.Ordinal))
+                return false;
+            return string.Equals(definition.MetadataName, "Task", StringComparison.Ordinal) ||
+                   string.Equals(definition.MetadataName, "Task`1", StringComparison.Ordinal) ||
+                   string.Equals(definition.MetadataName, "ValueTask", StringComparison.Ordinal) ||
+                   string.Equals(definition.MetadataName, "ValueTask`1", StringComparison.Ordinal);
         }
 
         private static string BuildDefaultValueLiteral(IParameterSymbol parameter, GeneratorExecutionContext context, string functionName)
@@ -464,6 +516,7 @@ namespace UnityEvalTool.SourceGenerator
         private static bool IsValidJavaScriptIdentifier(string value)
         {
             if (string.IsNullOrEmpty(value)) return false;
+            if (JavaScriptReservedIdentifiers.Contains(value)) return false;
             if (!(char.IsLetter(value[0]) || value[0] == '_' || value[0] == '$')) return false;
             for (var i = 1; i < value.Length; i++)
             {

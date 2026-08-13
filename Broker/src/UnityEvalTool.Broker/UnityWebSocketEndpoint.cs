@@ -13,12 +13,20 @@ internal static class UnityWebSocketEndpoint
             return;
         }
 
+        if (!WebSocketAuthenticationGate.TryEnter(out var authenticationLease))
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            return;
+        }
+
+        using var authenticationSlot = authenticationLease!;
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
         UnityConnection? connection = null;
         var sendGate = new SemaphoreSlim(1, 1);
         try
         {
-            using var firstDocument = await WebSocketJson.ReceiveAsync(socket, context.RequestAborted);
+            using var firstDocument = await WebSocketAuthenticationGate.ReceiveFirstMessageAsync(socket,
+                context.RequestAborted);
             if (firstDocument == null) return;
             var envelope = WebSocketJson.ParseEnvelope(firstDocument);
             if (!string.Equals(envelope.Type, "request", StringComparison.Ordinal) ||
@@ -31,6 +39,7 @@ internal static class UnityWebSocketEndpoint
                                    "Unity registration payload is empty.");
             if (!tokens.IsValid(registration.AuthToken))
                 throw new BrokerOperationException(BrokerErrorCodes.AuthenticationFailed, "Unity Broker token is invalid.");
+            authenticationSlot.Dispose();
             connection = registry.Register(socket, registration);
             var responsePayload = JsonSerializer.SerializeToElement(new Dictionary<string, string>
             {
@@ -48,10 +57,8 @@ internal static class UnityWebSocketEndpoint
             if (socket.State == WebSocketState.Open)
             {
                 var error = new ProtocolError(ex.Code, ex.Message, ex.MayHaveExecuted);
-                await WebSocketJson.SendAsync(socket,
-                    WebSocketJson.CreateEnvelope("response", "unity/register", null, WebSocketJson.EmptyObject(), error),
-                    sendGate, CancellationToken.None);
-                await socket.CloseAsync(WebSocketCloseStatus.PolicyViolation, ex.Code, CancellationToken.None);
+                await WebSocketAuthenticationGate.SendErrorAndRejectAsync(socket, "unity/register", null, error,
+                    sendGate);
             }
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)

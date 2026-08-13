@@ -4,6 +4,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <UnityEvalToolPackageRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../../Packages'))</UnityEvalToolPackageRoot>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +15,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\UnityEvalTool.SourceGenerator\UnityEvalTool.SourceGenerator.csproj" />
+    <ProjectReference Include="../../src/UnityEvalTool.SourceGenerator/UnityEvalTool.SourceGenerator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>UnityEvalToolPackageRoot</_Parameter1>
+      <_Parameter2>$(UnityEvalToolPackageRoot)</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>

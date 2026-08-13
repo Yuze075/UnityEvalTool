@@ -5,12 +5,13 @@ using UnityEngine.UIElements;
 
 namespace YuzeToolkit
 {
+    [DisallowMultipleComponent]
     public sealed class SystemInfoModule : MonoBehaviour, IDebugPanelModule
     {
-        [SerializeField, Tooltip("UXML template used by the system information module.")]
+        [SerializeField, Tooltip("Required UXML template for system information. Initialization fails when it is missing.")]
         private VisualTreeAsset? template;
 
-        [SerializeField, Tooltip("USS used by the system information module.")]
+        [SerializeField, Tooltip("Required USS for system information. Initialization fails when it is missing.")]
         private StyleSheet? styleSheet;
 
         [SerializeField, Tooltip("Keyboard key used with the DebugPanel modifiers to show or hide the system information module.")]
@@ -28,17 +29,23 @@ namespace YuzeToolkit
         public void Initialize(DebugPanelContext context)
         {
             if (template == null || styleSheet == null)
-            {
-                Debug.LogError($"{nameof(SystemInfoModule)} requires UXML and USS references.", this);
-                return;
-            }
+                throw new MissingReferenceException(
+                    $"{nameof(SystemInfoModule)} requires both UXML and USS references.");
 
-            context.AddStyleSheet(styleSheet);
-            _layer = context.CreateLayer("unity-debug-tool-system-info-layer");
-            SystemInfoUss.ApplyLayer(_layer);
-            _view = new SystemInfoView(template);
-            _view.AttachTo(_layer);
-            Refresh();
+            try
+            {
+                context.AddStyleSheet(styleSheet);
+                _layer = context.CreateLayer("unity-debug-tool-system-info-layer");
+                SystemInfoUss.ApplyLayer(_layer);
+                _view = new SystemInfoView(template);
+                _view.AttachTo(_layer);
+                Refresh();
+            }
+            catch
+            {
+                Shutdown();
+                throw;
+            }
         }
 
         public void SetVisible(bool visible)

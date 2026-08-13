@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UIElements;
 
 namespace YuzeToolkit
@@ -8,15 +9,18 @@ namespace YuzeToolkit
     internal sealed class RuntimeConsoleView
     {
         private readonly IReadOnlyList<IRuntimeConsoleTab> _tabs;
+        private readonly GameObject _eventSystemOwner;
         private readonly Dictionary<string, Button> _buttons = new();
         private VisualElement? _layer;
         private VisualElement? _window;
         private VisualElement? _content;
         private IRuntimeConsoleTab? _activeTab;
+        private TextField? _activeTextField;
 
-        public RuntimeConsoleView(IReadOnlyList<IRuntimeConsoleTab> tabs)
+        public RuntimeConsoleView(IReadOnlyList<IRuntimeConsoleTab> tabs, GameObject eventSystemOwner)
         {
             _tabs = tabs;
+            _eventSystemOwner = eventSystemOwner;
         }
 
         public void AttachTo(VisualElement layer)
@@ -30,6 +34,7 @@ namespace YuzeToolkit
                 pickingMode = PickingMode.Position
             };
             _window.AddToClassList(RuntimeConsoleUss.WindowClass);
+            InstallInteractionPolicy(_window);
             layer.Add(_window);
             layer.RegisterCallback<GeometryChangedEvent>(OnLayerGeometryChanged);
 
@@ -51,6 +56,7 @@ namespace YuzeToolkit
                     tooltip = $"Show {tab.Title} tab."
                 };
                 button.AddToClassList(RuntimeConsoleUss.TabButtonClass);
+                DisableKeyboardFocus(button);
                 tabBar.Add(button);
                 _buttons[tab.Id] = button;
 
@@ -72,17 +78,21 @@ namespace YuzeToolkit
 
         public void Detach()
         {
+            ReleaseInteractionFocus();
             _layer?.UnregisterCallback<GeometryChangedEvent>(OnLayerGeometryChanged);
             _layer = null;
             _window?.RemoveFromHierarchy();
             _window = null;
             _content = null;
             _activeTab = null;
+            _activeTextField = null;
             _buttons.Clear();
         }
 
         public void SetVisible(bool visible)
         {
+            if (!visible)
+                ReleaseInteractionFocus();
             if (_window != null)
                 _window.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             _activeTab?.SetVisible(visible);
@@ -95,6 +105,7 @@ namespace YuzeToolkit
 
         private void SetActiveTab(IRuntimeConsoleTab tab)
         {
+            ReleaseInteractionFocus();
             _activeTab?.SetVisible(false);
             _activeTab = tab;
             _activeTab.SetVisible(true);
@@ -126,6 +137,115 @@ namespace YuzeToolkit
             var height = Mathf.Clamp(_window.resolvedStyle.height, RuntimeConsoleResizeManipulator.MinHeight, maxHeight);
             _window.style.width = width;
             _window.style.height = height;
+        }
+
+        private void InstallInteractionPolicy(VisualElement root)
+        {
+            root.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                ClearEventSystemSelection(force: true);
+                var textField = evt.button == 0 ? FindTextField(evt.target as VisualElement, root) : null;
+                if (textField != null && textField.enabledInHierarchy)
+                {
+                    _activeTextField = textField;
+                    return;
+                }
+
+                ReleaseInteractionFocus();
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerUpEvent>(evt =>
+            {
+                ClearEventSystemSelection(force: true);
+                if (FindTextField(evt.target as VisualElement, root) == null)
+                    ReleaseInteractionFocus();
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<FocusInEvent>(evt =>
+            {
+                if (_activeTextField != null && IsDescendantOf(evt.target as VisualElement, _activeTextField)) return;
+                if (evt.target is VisualElement focused)
+                    focused.schedule.Execute(focused.Blur);
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<FocusOutEvent>(evt =>
+            {
+                if (_activeTextField != null && IsDescendantOf(evt.target as VisualElement, _activeTextField))
+                    _activeTextField = null;
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (_activeTextField != null && IsDescendantOf(evt.target as VisualElement, _activeTextField))
+                {
+                    if (evt.keyCode is KeyCode.Return or KeyCode.KeypadEnter)
+                    {
+                        var submittedField = _activeTextField;
+                        _activeTextField = null;
+                        submittedField.schedule.Execute(() =>
+                        {
+                            submittedField.Blur();
+                            ClearEventSystemSelection(force: false);
+                        });
+                    }
+
+                    // Keep propagating so a Command Line field can submit at its target callback.
+                    return;
+                }
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<KeyUpEvent>(evt =>
+            {
+                if (_activeTextField != null && IsDescendantOf(evt.target as VisualElement, _activeTextField)) return;
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<NavigationMoveEvent>(SuppressNavigation, TrickleDown.TrickleDown);
+            root.RegisterCallback<NavigationSubmitEvent>(SuppressNavigation, TrickleDown.TrickleDown);
+            root.RegisterCallback<NavigationCancelEvent>(SuppressNavigation, TrickleDown.TrickleDown);
+        }
+
+        private void ReleaseInteractionFocus()
+        {
+            _activeTextField?.Blur();
+            _activeTextField = null;
+            if (_window?.panel?.focusController.focusedElement is VisualElement focused &&
+                IsDescendantOf(focused, _window))
+                focused.Blur();
+            ClearEventSystemSelection(force: false);
+        }
+
+        private void ClearEventSystemSelection(bool force)
+        {
+            var eventSystem = EventSystem.current;
+            if (eventSystem == null) return;
+            if (force || eventSystem.currentSelectedGameObject == _eventSystemOwner)
+                eventSystem.SetSelectedGameObject(null);
+        }
+
+        private static TextField? FindTextField(VisualElement? target, VisualElement root)
+        {
+            for (var current = target; current != null && current != root; current = current.parent)
+                if (current is TextField textField)
+                    return textField;
+            return null;
+        }
+
+        private static bool IsDescendantOf(VisualElement? target, VisualElement ancestor)
+        {
+            for (var current = target; current != null; current = current.parent)
+                if (current == ancestor)
+                    return true;
+            return false;
+        }
+
+        private static void DisableKeyboardFocus(VisualElement element)
+        {
+            element.focusable = false;
+            element.tabIndex = -1;
+        }
+
+        private static void SuppressNavigation(EventBase evt)
+        {
+            evt.PreventDefault();
+            evt.StopImmediatePropagation();
         }
     }
 

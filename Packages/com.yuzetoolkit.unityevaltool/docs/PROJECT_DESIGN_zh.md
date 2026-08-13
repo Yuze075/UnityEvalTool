@@ -17,13 +17,13 @@ CLI 命令解析。
 | 区域 | 源码 | 职责 |
 |---|---|---|
 | 原生 Broker | 仓库 `Broker/src/UnityEvalTool.Broker` | 2347、注册表、MCP、CLI、用户服务管理 |
-| npm 发行 | 仓库 `Broker/npm` | 平台选择、生命周期脚本、RID 平台包 |
+| npm 发行 | 仓库 `Broker/npm` | 平台选择、显式用户服务 helper、RID 平台包 |
 | Unity 传输 | `Runtime/Broker` | 认证注册、心跳、中转请求、session |
 | Editor 生命周期 | `Editor/Broker` | 稳定进程身份、编译/重载状态、拉起 Broker |
 | Eval 引擎 | `Runtime/Core` 与 `Runtime/Tools` | PuerTS 执行和生成的 helper module |
 | CLI 解析 | `Runtime/CLI/EvalCliCommandService*` | 现有命令语法和打印结果 |
 
-目录名末尾的 `~` 让 Unity 忽略 .NET/npm 源码。
+`Broker` 与 `Roslyn` 位于独立仓库根目录，不在 UPM Package 或 Unity 项目的 `Assets` 树中，因此 Unity 不会导入这些 .NET/npm 源码。
 
 ## 注册与选择
 

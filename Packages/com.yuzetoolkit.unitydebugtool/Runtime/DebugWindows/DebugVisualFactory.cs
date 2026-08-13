@@ -30,7 +30,7 @@ namespace YuzeToolkit
             if (allowDragging && node.Draggable && header != null)
                 header.AddManipulator(new DebugDragManipulator(header, window));
 
-            var content = new VisualElement();
+            var content = new ScrollView(ScrollViewMode.Vertical);
             DebugWindowUss.ApplyWindowContent(content);
             for (var index = 0; index < node.Children.Count; index++)
             {
@@ -49,24 +49,91 @@ namespace YuzeToolkit
 
         private static void SuppressKeyboardInteraction(VisualElement root)
         {
-            root.RegisterCallback<PointerDownEvent>(ReleaseEventSystemSelection, TrickleDown.TrickleDown);
-            root.RegisterCallback<PointerUpEvent>(ReleaseEventSystemSelection, TrickleDown.TrickleDown);
-            root.RegisterCallback<KeyDownEvent>(SuppressEvent, TrickleDown.TrickleDown);
-            root.RegisterCallback<KeyUpEvent>(SuppressEvent, TrickleDown.TrickleDown);
+            TextField? activeTextField = null;
+
+            root.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                ReleaseEventSystemSelection();
+                var textField = evt.button == 0 ? FindTextField(evt.target as VisualElement, root) : null;
+                if (textField != null && textField.enabledInHierarchy)
+                {
+                    activeTextField = textField;
+                    return;
+                }
+
+                activeTextField?.Blur();
+                activeTextField = null;
+                BlurFocusedElement(root);
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerUpEvent>(evt =>
+            {
+                ReleaseEventSystemSelection();
+                if (FindTextField(evt.target as VisualElement, root) == null)
+                    BlurFocusedElement(root);
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<FocusInEvent>(evt =>
+            {
+                if (activeTextField != null && IsDescendantOf(evt.target as VisualElement, activeTextField)) return;
+                if (evt.target is VisualElement focused)
+                    focused.schedule.Execute(focused.Blur);
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<FocusOutEvent>(evt =>
+            {
+                if (activeTextField != null && IsDescendantOf(evt.target as VisualElement, activeTextField))
+                    activeTextField = null;
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (activeTextField != null && IsDescendantOf(evt.target as VisualElement, activeTextField))
+                {
+                    if (evt.keyCode is KeyCode.Return or KeyCode.KeypadEnter)
+                    {
+                        evt.PreventDefault();
+                        evt.StopImmediatePropagation();
+                        var submittedField = activeTextField;
+                        activeTextField = null;
+                        submittedField.schedule.Execute(submittedField.Blur);
+                        ReleaseEventSystemSelection();
+                    }
+
+                    return;
+                }
+
+                SuppressEvent(evt);
+            }, TrickleDown.TrickleDown);
+            root.RegisterCallback<KeyUpEvent>(evt =>
+            {
+                if (activeTextField != null && IsDescendantOf(evt.target as VisualElement, activeTextField)) return;
+                SuppressEvent(evt);
+            }, TrickleDown.TrickleDown);
             root.RegisterCallback<NavigationMoveEvent>(SuppressEvent, TrickleDown.TrickleDown);
             root.RegisterCallback<NavigationSubmitEvent>(SuppressEvent, TrickleDown.TrickleDown);
             root.RegisterCallback<NavigationCancelEvent>(SuppressEvent, TrickleDown.TrickleDown);
         }
 
-        private static void ReleaseEventSystemSelection(PointerDownEvent evt)
+        private static TextField? FindTextField(VisualElement? target, VisualElement root)
         {
-            EventSystem.current?.SetSelectedGameObject(null);
+            for (var current = target; current != null && current != root; current = current.parent)
+                if (current is TextField textField)
+                    return textField;
+            return null;
         }
 
-        private static void ReleaseEventSystemSelection(PointerUpEvent evt)
+        private static bool IsDescendantOf(VisualElement? target, VisualElement ancestor)
         {
-            EventSystem.current?.SetSelectedGameObject(null);
+            for (var current = target; current != null; current = current.parent)
+                if (current == ancestor)
+                    return true;
+            return false;
         }
+
+        private static void BlurFocusedElement(VisualElement root)
+        {
+            if (root.panel?.focusController.focusedElement is VisualElement focused && IsDescendantOf(focused, root))
+                focused.Blur();
+        }
+
+        private static void ReleaseEventSystemSelection() => EventSystem.current?.SetSelectedGameObject(null);
 
         private static void SuppressEvent(KeyDownEvent evt)
         {

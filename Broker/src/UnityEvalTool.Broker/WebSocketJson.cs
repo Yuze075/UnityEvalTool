@@ -7,6 +7,7 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 internal static class WebSocketJson
 {
     private const int MaxMessageBytes = 4 * 1024 * 1024;
+    private static readonly TimeSpan CloseOutputTimeout = TimeSpan.FromSeconds(1);
 
     public static async Task<JsonDocument?> ReceiveAsync(WebSocket socket, CancellationToken cancellationToken)
     {
@@ -40,6 +41,36 @@ internal static class WebSocketJson
         finally
         {
             sendGate.Release();
+        }
+    }
+
+    public static async Task CloseOutputAndAbortAsync(WebSocket socket, WebSocketCloseStatus closeStatus,
+        string reason)
+    {
+        if (socket.State is not (WebSocketState.Open or WebSocketState.CloseReceived))
+        {
+            socket.Abort();
+            return;
+        }
+
+        using var timeout = new CancellationTokenSource(CloseOutputTimeout);
+        try
+        {
+            // Sending the close frame is courteous, but waiting for an unresponsive peer's
+            // close handshake must never keep a Broker request or shutdown path alive.
+            await socket.CloseOutputAsync(closeStatus, reason, timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // The bounded close interval elapsed.
+        }
+        catch (WebSocketException)
+        {
+            // The peer disconnected while the close frame was being sent.
+        }
+        finally
+        {
+            socket.Abort();
         }
     }
 

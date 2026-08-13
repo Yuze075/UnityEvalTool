@@ -20,6 +20,13 @@ builds. It reports runtime heartbeat/play state, registers the executable folder
 project path, and publishes `Exiting` on application quit. The installed user service is
 still responsible for hosting the Broker.
 
+This is an intentional production contract, not an Editor-only or Development Build
+fallback: supported release Players register and accept the same authenticated arbitrary
+JavaScript eval requests. Removing the optional UnityDebugTool UI package does not remove
+this UnityEvalTool runtime client. Trust is bounded to the local user's loopback Broker and
+its user-only token; projects embedding this package must preserve that contract unless
+they deliberately fork the product design.
+
 WebGL is excluded because it cannot use the required local ClientWebSocket/service model.
 
 ## Public runtime surface
@@ -30,5 +37,6 @@ WebGL is excluded because it cannot use the required local ClientWebSocket/servi
 - `UnityBrokerClient.Shared.GetSessionSnapshots("cli:")`
 - `UnityBrokerClient.Shared.Stop()` / `Start()` for an explicit reconnect
 
-DebugTool Runtime Console service and conversation tabs consume this surface. They no
-longer start listeners; they show Broker registration and routed PuerTS sessions.
+DebugTool's Runtime Console consumes the shared Broker client for its Command Line,
+EvalTool, and Tools tabs. It does not own service discovery, process launch, or a
+separate listener.

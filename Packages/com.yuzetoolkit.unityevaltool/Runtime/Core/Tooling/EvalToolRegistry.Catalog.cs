@@ -47,7 +47,7 @@ namespace YuzeToolkit
             if (refresh) RefreshToolMetadataCaches();
             return ListCSharpRoots()
                 .Select(ToDescriptor)
-                .Concat(ListJsRoots().Select(ToDescriptor))
+                .Concat(ListJsRoots().Select(GetRequiredJsRootDescriptor))
                 .OrderBy(tool => tool.Path, StringComparer.Ordinal)
                 .ToList();
         }
@@ -73,7 +73,9 @@ namespace YuzeToolkit
             {
                 var path = queue.Dequeue();
                 if (!seen.Add(path)) continue;
-                if (!TryGetDescriptor(path, out var descriptor)) continue;
+                if (!TryGetDescriptor(path, out var descriptor))
+                    throw new InvalidOperationException(
+                        $"Tool metadata for '{path}' could not be loaded or failed validation.");
                 result.Add(descriptor);
                 foreach (var subTool in descriptor.SubTools)
                     queue.Enqueue(subTool.Path);
@@ -107,15 +109,12 @@ namespace YuzeToolkit
             );
         }
 
-        private static EvalToolDescriptor ToDescriptor(JsToolRegistration tool) =>
-            new(
-                tool.Name,
-                tool.Name,
-                tool.Description,
-                false,
-                IsEnabled(tool.Name),
-                "js",
-                EvalToolFunctionDescriptor.Empty);
+        private static EvalToolDescriptor GetRequiredJsRootDescriptor(JsToolRegistration tool)
+        {
+            if (TryGetJsDescriptor(tool.Name, out var descriptor)) return descriptor;
+            throw new InvalidOperationException(
+                $"Registered JS tool '{tool.Name}' from module '{tool.ModulePath}' no longer provides valid metadata.");
+        }
 
         private static EvalToolSummaryDescriptor ToSummaryDescriptor(IEvalTool tool, string path)
         {

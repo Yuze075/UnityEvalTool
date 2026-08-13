@@ -3,6 +3,7 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using UnityEvalTool.SourceGenerator;
@@ -86,6 +87,82 @@ public sealed partial class BadTool
         }
 
         [Fact]
+        public void ReportsDiagnosticForReservedJavaScriptFunctionName()
+        {
+            var result = RunGenerator(@"
+using YuzeToolkit;
+
+[EvalTool(""bad"", ""Bad tool."")]
+public sealed partial class BadTool
+{
+    [EvalFunction(""Cannot be emitted as an ES module declaration."")]
+    public void @delete() {}
+}");
+
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "UET006");
+            Assert.Empty(result.GeneratedSources);
+        }
+
+        [Fact]
+        public void ReportsDiagnosticForNestedTool()
+        {
+            var result = RunGenerator(@"
+using YuzeToolkit;
+
+public partial class Container<T>
+{
+    [EvalTool(""nested"", ""Nested tool."")]
+    public sealed partial class NestedTool
+    {
+        [EvalFunction(""Do work."")]
+        public void run() {}
+    }
+}");
+
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "UET008");
+            Assert.Empty(result.GeneratedSources);
+        }
+
+        [Theory]
+        [InlineData("Task")]
+        [InlineData("Task<int>")]
+        [InlineData("ValueTask")]
+        [InlineData("ValueTask<int>")]
+        public void ReportsDiagnosticForTaskReturningFunction(string returnType)
+        {
+            var result = RunGenerator(@"
+using System.Threading.Tasks;
+using YuzeToolkit;
+
+[EvalTool(""async"", ""Async tool."")]
+public sealed partial class AsyncTool
+{
+    [EvalFunction(""Do work."")]
+    public " + returnType + @" run() => default;
+}");
+
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "UET009");
+            Assert.Empty(result.GeneratedSources);
+        }
+
+        [Fact]
+        public void ReportsDiagnosticForAsyncVoidFunction()
+        {
+            var result = RunGenerator(@"
+using YuzeToolkit;
+
+[EvalTool(""async"", ""Async tool."")]
+public sealed partial class AsyncTool
+{
+    [EvalFunction(""Do work."")]
+    public async void run() { await System.Threading.Tasks.Task.Yield(); }
+}");
+
+            Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Id == "UET009");
+            Assert.Empty(result.GeneratedSources);
+        }
+
+        [Fact]
         public void GeneratesMetadataForBuiltInUnityEvalToolSources()
         {
             var packageRoot = FindPackageRoot();
@@ -148,7 +225,8 @@ namespace YuzeToolkit
         ReflectionDangerous = 1 << 6,
         NetworkService = 1 << 7,
         LongRunning = 1 << 8,
-        MutatesEditorState = 1 << 9
+        MutatesEditorState = 1 << 9,
+        PersistsData = 1 << 10
     }
 
     [AttributeUsage(AttributeTargets.Parameter)]
@@ -199,16 +277,14 @@ namespace YuzeToolkit
 
         private static string FindPackageRoot()
         {
-            var directory = new DirectoryInfo(AppContext.BaseDirectory);
-            while (directory != null)
-            {
-                var packages = Path.Combine(directory.FullName, "Packages");
-                if (Directory.Exists(Path.Combine(packages, "com.yuzetoolkit.unityevaltool")))
-                    return packages;
-                directory = directory.Parent;
-            }
-
-            throw new DirectoryNotFoundException("Could not locate the repository Packages directory.");
+            var configured = Assembly.GetExecutingAssembly()
+                .GetCustomAttributes<AssemblyMetadataAttribute>()
+                .SingleOrDefault(attribute => attribute.Key == "UnityEvalToolPackageRoot")?.Value;
+            if (!string.IsNullOrWhiteSpace(configured) &&
+                Directory.Exists(Path.Combine(configured, "com.yuzetoolkit.unityevaltool")))
+                return configured;
+            throw new DirectoryNotFoundException(
+                $"Could not locate the configured UnityEvalTool Packages directory '{configured}'.");
         }
 
         private sealed class TestGeneratorResult

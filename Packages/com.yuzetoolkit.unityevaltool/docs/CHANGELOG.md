@@ -5,6 +5,13 @@ for the Unity package, computer-level Broker/CLI, npm packages and Roslyn genera
 
 ## Unreleased
 
+- Prepare package version 2.0.2 and pin Git URL installation to the immutable repository tag `v2.0.2`.
+- Keep the committed source-generator analyzer as a real Git blob for UPM Git installs and release validation.
+- Eval results now cross the Broker as native MCP text/image/error content; per-Unity serialization prevents a queued request from executing after its caller already received a timeout.
+- Tool registration recursively validates JavaScript descriptors, callable child resolution, safety flags and export identifiers. `PersistsData` describes durable non-project writes.
+- Broker auth-token creation is atomic across processes, unauthenticated sockets are bounded, and stalled close handshakes are aborted after a deadline.
+- Source generation reports nested Tool types, async/Task-like functions and reserved JavaScript export names before runtime registration.
+- Supported non-WebGL Release Players intentionally retain authenticated arbitrary JavaScript eval independently of UnityDebugTool.
 - `CompilationFailed` is now an executable repair mode backed by the last successfully
   loaded assemblies, allowing MCP/CLI to read errors, edit source, and refresh again.
 - Agent guidance now waits through Broker status instead of eval polling and keeps the

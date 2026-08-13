@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Profiling;
 
@@ -8,18 +7,28 @@ namespace YuzeToolkit
 {
     internal sealed class PerformanceSampler
     {
-        private readonly Queue<float> _fpsSamples = new();
-        private readonly Queue<float> _reservedSamples = new();
-        private readonly Queue<float> _allocatedSamples = new();
-        private readonly Queue<float> _monoSamples = new();
+        private readonly FixedSampleBuffer _fpsSamples = new(PerformanceHudConstants.SampleCapacity);
+        private readonly FixedSampleBuffer _reservedSamples = new(PerformanceHudConstants.SampleCapacity);
+        private readonly FixedSampleBuffer _allocatedSamples = new(PerformanceHudConstants.SampleCapacity);
+        private readonly FixedSampleBuffer _monoSamples = new(PerformanceHudConstants.SampleCapacity);
         private readonly float[] _spectrum = new float[PerformanceHudConstants.SpectrumSamples];
+        private readonly float[] _sortedFpsScratch = new float[PerformanceHudConstants.SampleCapacity];
+        private readonly float[] _fpsGraphSamples = new float[PerformanceHudConstants.GraphSamples];
+        private readonly float[] _reservedGraphSamples = new float[PerformanceHudConstants.GraphSamples];
+        private readonly float[] _allocatedGraphSamples = new float[PerformanceHudConstants.GraphSamples];
+        private readonly float[] _monoGraphSamples = new float[PerformanceHudConstants.GraphSamples];
+        private readonly float[] _audioGraphSamples = new float[PerformanceHudConstants.GraphSamples];
         private float _metricsTimer;
 
         public PerformanceUpdate Tick(float unscaledDeltaTime)
         {
-            var delta = Mathf.Max(unscaledDeltaTime, 0.000001f);
+            if (float.IsNaN(unscaledDeltaTime) || float.IsInfinity(unscaledDeltaTime) ||
+                unscaledDeltaTime <= 0.000001f)
+                return new PerformanceUpdate(null);
+
+            var delta = unscaledDeltaTime;
             var fps = 1f / delta;
-            EnqueueSample(_fpsSamples, fps);
+            _fpsSamples.Add(fps);
 
             _metricsTimer += unscaledDeltaTime;
 
@@ -45,26 +54,35 @@ namespace YuzeToolkit
             _monoSamples.Clear();
             _metricsTimer = 0f;
             Array.Clear(_spectrum, 0, _spectrum.Length);
+            Array.Clear(_sortedFpsScratch, 0, _sortedFpsScratch.Length);
+            Array.Clear(_fpsGraphSamples, 0, _fpsGraphSamples.Length);
+            Array.Clear(_reservedGraphSamples, 0, _reservedGraphSamples.Length);
+            Array.Clear(_allocatedGraphSamples, 0, _allocatedGraphSamples.Length);
+            Array.Clear(_monoGraphSamples, 0, _monoGraphSamples.Length);
+            Array.Clear(_audioGraphSamples, 0, _audioGraphSamples.Length);
         }
 
         private FpsSnapshot CaptureFps(float delta, float fps)
         {
-            var values = _fpsSamples.ToArray();
-            Array.Sort(values);
+            var sampleCount = _fpsSamples.Count;
+            _fpsSamples.CopyTo(_sortedFpsScratch);
+            Array.Sort(_sortedFpsScratch, 0, sampleCount);
+            var graphSampleCount = _fpsSamples.CopyLatestTo(_fpsGraphSamples);
 
             var average = 0f;
-            for (var i = 0; i < values.Length; i++)
-                average += values[i];
-            if (values.Length > 0)
-                average /= values.Length;
+            for (var i = 0; i < sampleCount; i++)
+                average += _sortedFpsScratch[i];
+            if (sampleCount > 0)
+                average /= sampleCount;
 
             return new FpsSnapshot(
                 fps,
                 delta * 1000f,
                 average,
-                LowAverage(values, 0.01f),
-                LowAverage(values, 0.001f),
-                _fpsSamples.ToArray());
+                LowAverage(_sortedFpsScratch, sampleCount, 0.01f),
+                LowAverage(_sortedFpsScratch, sampleCount, 0.001f),
+                _fpsGraphSamples,
+                graphSampleCount);
         }
 
         private RamSnapshot CaptureRam()
@@ -73,17 +91,22 @@ namespace YuzeToolkit
             var reserved = Profiler.GetTotalReservedMemoryLong() / 1048576f;
             var mono = Profiler.GetMonoUsedSizeLong() / 1048576f;
 
-            EnqueueSample(_allocatedSamples, allocated);
-            EnqueueSample(_reservedSamples, reserved);
-            EnqueueSample(_monoSamples, mono);
+            _allocatedSamples.Add(allocated);
+            _reservedSamples.Add(reserved);
+            _monoSamples.Add(mono);
+
+            var sampleCount = _reservedSamples.CopyLatestTo(_reservedGraphSamples);
+            _allocatedSamples.CopyLatestTo(_allocatedGraphSamples);
+            _monoSamples.CopyLatestTo(_monoGraphSamples);
 
             return new RamSnapshot(
                 reserved,
                 allocated,
                 mono,
-                _reservedSamples.ToArray(),
-                _allocatedSamples.ToArray(),
-                _monoSamples.ToArray());
+                _reservedGraphSamples,
+                _allocatedGraphSamples,
+                _monoGraphSamples,
+                sampleCount);
         }
 
         private AudioSnapshot CaptureAudio()
@@ -98,35 +121,79 @@ namespace YuzeToolkit
             if (highest > 0.000001f)
                 decibels = Mathf.Clamp(20f * Mathf.Log10(highest), -80f, 0f);
 
-            var samples = new float[PerformanceHudConstants.GraphSamples];
-            for (var i = 0; i < samples.Length; i++)
+            for (var i = 0; i < _audioGraphSamples.Length; i++)
             {
                 var index = Mathf.Clamp(
-                    Mathf.RoundToInt(i / (float)(samples.Length - 1) * (_spectrum.Length - 1)),
+                    Mathf.RoundToInt(i / (float)(_audioGraphSamples.Length - 1) * (_spectrum.Length - 1)),
                     0,
                     _spectrum.Length - 1);
-                samples[i] = Mathf.Sqrt(Mathf.Clamp01(_spectrum[index] * 80f));
+                _audioGraphSamples[i] = Mathf.Sqrt(Mathf.Clamp01(_spectrum[index] * 80f));
             }
 
-            return new AudioSnapshot(decibels, samples);
+            return new AudioSnapshot(decibels, _audioGraphSamples, _audioGraphSamples.Length);
         }
 
-        private static void EnqueueSample(Queue<float> queue, float value)
+        private static float LowAverage(float[] sortedValues, int valueCount, float ratio)
         {
-            queue.Enqueue(value);
-            while (queue.Count > PerformanceHudConstants.SampleCapacity)
-                queue.Dequeue();
-        }
-
-        private static float LowAverage(float[] sortedValues, float ratio)
-        {
-            if (sortedValues.Length == 0) return 0f;
-            var count = Mathf.Clamp(Mathf.CeilToInt(sortedValues.Length * ratio), 1, sortedValues.Length);
+            if (valueCount == 0) return 0f;
+            var count = Mathf.Clamp(Mathf.CeilToInt(valueCount * ratio), 1, valueCount);
             var total = 0f;
             for (var i = 0; i < count; i++)
                 total += sortedValues[i];
             return total / count;
         }
 
+        private sealed class FixedSampleBuffer
+        {
+            private readonly float[] _values;
+            private int _start;
+
+            public FixedSampleBuffer(int capacity)
+            {
+                _values = new float[capacity];
+            }
+
+            public int Count { get; private set; }
+
+            public void Add(float value)
+            {
+                if (Count < _values.Length)
+                {
+                    _values[(_start + Count) % _values.Length] = value;
+                    Count++;
+                    return;
+                }
+
+                _values[_start] = value;
+                _start = (_start + 1) % _values.Length;
+            }
+
+            public void Clear()
+            {
+                Array.Clear(_values, 0, _values.Length);
+                _start = 0;
+                Count = 0;
+            }
+
+            public int CopyTo(float[] destination)
+            {
+                var count = Mathf.Min(Count, destination.Length);
+                CopyRange(0, count, destination);
+                return count;
+            }
+
+            public int CopyLatestTo(float[] destination)
+            {
+                var count = Mathf.Min(Count, destination.Length);
+                CopyRange(Count - count, count, destination);
+                return count;
+            }
+
+            private void CopyRange(int sourceOffset, int count, float[] destination)
+            {
+                for (var i = 0; i < count; i++)
+                    destination[i] = _values[(_start + sourceOffset + i) % _values.Length];
+            }
+        }
     }
 }

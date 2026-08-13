@@ -13,6 +13,13 @@ internal static class CliWebSocketEndpoint
             return;
         }
 
+        if (!WebSocketAuthenticationGate.TryEnter(out var authenticationLease))
+        {
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            return;
+        }
+
+        using var authenticationSlot = authenticationLease!;
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
         using var sendGate = new SemaphoreSlim(1, 1);
         var consoleId = Guid.NewGuid().ToString("N");
@@ -22,7 +29,9 @@ internal static class CliWebSocketEndpoint
         {
             while (socket.State == WebSocketState.Open && !context.RequestAborted.IsCancellationRequested)
             {
-                using var document = await WebSocketJson.ReceiveAsync(socket, context.RequestAborted);
+                using var document = authorized
+                    ? await WebSocketJson.ReceiveAsync(socket, context.RequestAborted)
+                    : await WebSocketAuthenticationGate.ReceiveFirstMessageAsync(socket, context.RequestAborted);
                 if (document == null) break;
                 var envelope = WebSocketJson.ParseEnvelope(document);
                 if (!string.Equals(envelope.Type, "request", StringComparison.Ordinal) || string.IsNullOrWhiteSpace(envelope.Id))
@@ -43,6 +52,7 @@ internal static class CliWebSocketEndpoint
                             throw new BrokerOperationException(BrokerErrorCodes.AuthenticationFailed,
                                 "CLI Broker token is invalid.");
                         authorized = true;
+                        authenticationSlot.Dispose();
                         result = JsonDocument.Parse($"{{\"consoleId\":\"{consoleId}\",\"protocolVersion\":\"{BrokerConstants.ProtocolVersion}\"}}")
                             .RootElement.Clone();
                     }
@@ -68,10 +78,17 @@ internal static class CliWebSocketEndpoint
                 }
                 catch (BrokerOperationException ex)
                 {
+                    var error = new ProtocolError(ex.Code, ex.Message, ex.MayHaveExecuted);
+                    if (!authorized)
+                    {
+                        await WebSocketAuthenticationGate.SendErrorAndRejectAsync(socket, envelope.Method,
+                            envelope.Id, error, sendGate);
+                        break;
+                    }
+
                     await WebSocketJson.SendAsync(socket,
                         WebSocketJson.CreateEnvelope("response", envelope.Method, envelope.Id,
-                            WebSocketJson.EmptyObject(), new ProtocolError(ex.Code, ex.Message, ex.MayHaveExecuted)),
-                        sendGate, context.RequestAborted);
+                            WebSocketJson.EmptyObject(), error), sendGate, context.RequestAborted);
                 }
             }
         }
@@ -82,6 +99,15 @@ internal static class CliWebSocketEndpoint
         catch (WebSocketException)
         {
             // Peer disconnected.
+        }
+        catch (BrokerOperationException ex)
+        {
+            if (socket.State == WebSocketState.Open)
+            {
+                var error = new ProtocolError(ex.Code, ex.Message, ex.MayHaveExecuted);
+                await WebSocketAuthenticationGate.SendErrorAndRejectAsync(socket, "cli/hello", null, error,
+                    sendGate);
+            }
         }
         finally
         {
@@ -102,7 +128,7 @@ internal static class CliWebSocketEndpoint
         var result = registry.Connect(instanceId, revision, "cli:" + consoleId);
         handle = result.ConnectionHandle;
         if (!string.IsNullOrWhiteSpace(previousHandle))
-            registry.ReleaseLease(previousHandle, releaseSession: false);
+            registry.ReleaseSupersededLease(previousHandle, handle);
         return JsonSerializer.SerializeToElement(result, BrokerJsonContext.Default.ConnectionLeaseResult);
     }
 
@@ -112,14 +138,47 @@ internal static class CliWebSocketEndpoint
         var waitFor = payload.TryGetProperty("waitFor", out var waitElement)
             ? waitElement.GetString() ?? "snapshot"
             : "snapshot";
-        var requestId = payload.TryGetProperty("requestId", out var requestElement)
-            ? requestElement.GetString()
-            : null;
+        var selectedCompilationCycleId = ResolveCompilationCycleId(payload);
+        var observedAfterUtc = ResolveObservedAfterUtc(payload);
         var timeout = payload.TryGetProperty("timeoutSeconds", out var timeoutElement)
             ? TimeSpan.FromSeconds(Math.Clamp(timeoutElement.GetInt32(), 0, 3600))
             : TimeSpan.Zero;
-        var snapshot = await registry.WaitAsync(handle, null, waitFor, requestId, null, timeout, cancellationToken);
+        var snapshot = await registry.WaitAsync(handle, null, waitFor, selectedCompilationCycleId, observedAfterUtc, timeout,
+            cancellationToken);
         return Serialize(snapshot);
+    }
+
+    internal static string? ResolveCompilationCycleId(JsonElement payload)
+    {
+        var compilationCycleId = ReadOptionalString(payload, "compilationCycleId");
+        var requestId = ReadOptionalString(payload, "requestId");
+        if (!string.IsNullOrWhiteSpace(compilationCycleId) && !string.IsNullOrWhiteSpace(requestId) &&
+            !string.Equals(compilationCycleId, requestId, StringComparison.Ordinal))
+            throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest,
+                "compilationCycleId and its deprecated requestId alias must match when both are provided.");
+        return string.IsNullOrWhiteSpace(compilationCycleId) ? requestId : compilationCycleId;
+    }
+
+    internal static DateTimeOffset? ResolveObservedAfterUtc(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("observedAfterUtc", out var value) || value.ValueKind == JsonValueKind.Null)
+            return null;
+        if (value.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(value.GetString()))
+            return null;
+        if (value.ValueKind != JsonValueKind.String || !value.TryGetDateTimeOffset(out var parsed))
+            throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest,
+                "observedAfterUtc must be an ISO-8601 timestamp returned as capturedAtUtc by unity_status.");
+        return parsed;
+    }
+
+    private static string? ReadOptionalString(JsonElement payload, string propertyName)
+    {
+        if (!payload.TryGetProperty(propertyName, out var value) || value.ValueKind == JsonValueKind.Null)
+            return null;
+        if (value.ValueKind != JsonValueKind.String)
+            throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest,
+                $"{propertyName} must be a string when provided.");
+        return value.GetString();
     }
 
     private static async Task<JsonElement> ExecuteAsync(BrokerRegistry registry, string? handle, string consoleId,

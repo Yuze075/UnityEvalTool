@@ -14,8 +14,6 @@ namespace YuzeToolkit
         }
 
         public string Label { get; }
-
-        public abstract IEvalTool? CreateEvalTool();
     }
 
     internal class DebugGroupNode : DebugNode
@@ -23,44 +21,15 @@ namespace YuzeToolkit
         public DebugGroupNode(string label, string? toolName, string? description, bool parentToolRooted)
             : base(label)
         {
-            ToolName = string.IsNullOrWhiteSpace(toolName) ? null : toolName;
-            Description = string.IsNullOrWhiteSpace(description) ? null : description;
-            IsToolRooted = parentToolRooted && ToolName != null;
         }
 
         protected DebugGroupNode(string? toolName, string? description)
             : base(string.IsNullOrWhiteSpace(toolName) ? "Debug" : toolName!)
         {
-            ToolName = string.IsNullOrWhiteSpace(toolName) ? null : toolName;
-            Description = string.IsNullOrWhiteSpace(description) ? null : description;
-            IsToolRooted = ToolName != null;
         }
-
-        public string? ToolName { get; }
-
-        public string? Description { get; }
-
-        public bool IsToolRooted { get; }
 
         public List<DebugNode> Children { get; } = new();
 
-        public override IEvalTool? CreateEvalTool()
-        {
-            if (ToolName == null || Description == null) return null;
-            return new DebugGroupEvalTool(ToolName, Description, CreateChildTools());
-        }
-
-        protected IReadOnlyList<IEvalTool> CreateChildTools()
-        {
-            var subTools = new List<IEvalTool>();
-            foreach (var child in Children)
-            {
-                if (child.CreateEvalTool() is { } tool)
-                    subTools.Add(tool);
-            }
-
-            return subTools;
-        }
     }
 
     internal sealed class DebugWindowNode : DebugGroupNode
@@ -75,11 +44,6 @@ namespace YuzeToolkit
 
         public bool Draggable { get; set; } = true;
 
-        public override IEvalTool? CreateEvalTool()
-        {
-            if (ToolName == null || Description == null) return null;
-            return new DebugPanelEvalTool(ToolName, Description, CreateChildTools());
-        }
     }
 
     internal sealed class DebugInlineGroupNode : DebugGroupNode
@@ -99,7 +63,6 @@ namespace YuzeToolkit
         {
         }
 
-        public override IEvalTool? CreateEvalTool() => null;
     }
 
     internal sealed class DebugSectionNode : DebugNode
@@ -108,7 +71,6 @@ namespace YuzeToolkit
         {
         }
 
-        public override IEvalTool? CreateEvalTool() => null;
     }
 
     internal sealed class DebugDynamicLabelNode : DebugNode
@@ -120,7 +82,6 @@ namespace YuzeToolkit
 
         public Func<string> Getter { get; }
 
-        public override IEvalTool? CreateEvalTool() => null;
     }
 
     internal sealed class DebugTagNode : DebugNode
@@ -129,7 +90,6 @@ namespace YuzeToolkit
         {
         }
 
-        public override IEvalTool? CreateEvalTool() => null;
     }
 
     internal sealed class DebugSpaceNode : DebugNode
@@ -141,7 +101,6 @@ namespace YuzeToolkit
 
         public float Height { get; }
 
-        public override IEvalTool? CreateEvalTool() => null;
     }
 
     internal sealed class DebugImageNode : DebugNode
@@ -153,7 +112,6 @@ namespace YuzeToolkit
 
         public Func<Background> BackgroundGetter { get; }
 
-        public override IEvalTool? CreateEvalTool() => null;
     }
 
     internal sealed class DebugButtonNode : DebugNode
@@ -162,22 +120,11 @@ namespace YuzeToolkit
             : base(label)
         {
             Action = action ?? throw new ArgumentNullException(nameof(action));
-            ToolName = string.IsNullOrWhiteSpace(toolName) ? null : toolName;
-            Description = string.IsNullOrWhiteSpace(description) ? null : description;
         }
 
         public Action Action { get; }
 
-        public string? ToolName { get; }
 
-        public string? Description { get; }
-
-        public override IEvalTool? CreateEvalTool()
-        {
-            return ToolName == null || Description == null
-                ? null
-                : new DebugButtonTool(ToolName, Description, Action);
-        }
     }
 
     internal sealed class DebugStateButtonNode : DebugNode
@@ -195,8 +142,6 @@ namespace YuzeToolkit
             StateGetter = stateGetter ?? throw new ArgumentNullException(nameof(stateGetter));
             Action = action ?? throw new ArgumentNullException(nameof(action));
             Tone = tone;
-            ToolName = string.IsNullOrWhiteSpace(toolName) ? null : toolName;
-            Description = string.IsNullOrWhiteSpace(description) ? null : description;
         }
 
         public Func<string> LabelGetter { get; }
@@ -207,16 +152,7 @@ namespace YuzeToolkit
 
         public DebugTone Tone { get; }
 
-        public string? ToolName { get; }
 
-        public string? Description { get; }
-
-        public override IEvalTool? CreateEvalTool()
-        {
-            return ToolName == null || Description == null
-                ? null
-                : new DebugButtonTool(ToolName, Description, Action);
-        }
     }
 
     internal interface IDebugFieldNode
@@ -242,17 +178,12 @@ namespace YuzeToolkit
         {
             Getter = getter ?? throw new ArgumentNullException(nameof(getter));
             Setter = setter;
-            ToolName = string.IsNullOrWhiteSpace(toolName) ? null : toolName;
-            Description = string.IsNullOrWhiteSpace(description) ? null : description;
         }
 
         public Func<TValue> Getter { get; }
 
         public Action<TValue>? Setter { get; }
 
-        public string? ToolName { get; }
-
-        public string? Description { get; }
 
         public bool IsReadOnly => Setter == null;
 
@@ -288,13 +219,6 @@ namespace YuzeToolkit
             Setter((TValue)Convert.ChangeType(value, targetType));
         }
 
-        public override IEvalTool? CreateEvalTool()
-        {
-            if (ToolName == null || Description == null) return null;
-            return Setter == null
-                ? new DebugReadOnlyFieldTool<TValue>(ToolName, Description, Getter)
-                : new DebugWritableFieldTool<TValue>(ToolName, Description, Getter, Setter);
-        }
     }
 
     internal sealed class DebugStateLabelNode : DebugFieldNode<bool>
@@ -424,6 +348,5 @@ namespace YuzeToolkit
 
         public string Format { get; }
 
-        public override IEvalTool? CreateEvalTool() => null;
     }
 }

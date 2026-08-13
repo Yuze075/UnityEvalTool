@@ -3,11 +3,12 @@
   "rootNamespace": "YuzeToolkit",
   "references": [
     "UnityDebugTool",
-    "Unity.InputSystem"
+    "Unity.InputSystem",
+    "UnityEngine.UI"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
-  "allowUnsafeCode": true,
+  "allowUnsafeCode": false,
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": true,

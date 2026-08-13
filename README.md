@@ -34,10 +34,10 @@ Each package owns its package-specific setup and API documentation. This README 
 
 #### UnityEvalTool
 
-UnityEvalTool requires `com.tencent.puerts.core` 3.0.0 and one PuerTS JavaScript backend. Add the package with Unity Package Manager's **Add package from git URL** command:
+UnityEvalTool requires `com.tencent.puerts.core` 3.0.2 and exactly one PuerTS JavaScript backend. This repository is validated with `com.tencent.puerts.quickjs` 3.0.2; alternatively use one supported V8 backend/core pair from the same PuerTS release. Do not install multiple backends at once. Then add UnityEvalTool with Unity Package Manager's **Add package from git URL** command:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.0
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
 ```
 
 Or add it to `Packages/manifest.json`:
@@ -45,7 +45,7 @@ Or add it to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.0"
+    "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2"
   }
 }
 ```
@@ -59,10 +59,11 @@ working tree directly instead of copying the package:
 
 #### UnityDebugTool
 
-Install UnityEvalTool first, then add the optional runtime debug UI package:
+Repository tag `v2.0.2` contains UnityDebugTool package version `1.0.1`, which depends on
+UnityEvalTool `2.0.2`. Install UnityEvalTool first, then add the optional runtime debug UI package:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#main
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
 ```
 
 For an embedded development checkout, reference both working-tree packages:
@@ -78,10 +79,15 @@ UnityDebugTool usage, prefab setup, modules and APIs are documented in its [pack
 
 ```bash
 npm install --global @yuzetoolkit/unityevaltool
+unity service install
 unity doctor
 ```
 
-The npm package installs the native `unity` executable and a current-user background service. It does not install a system-wide privileged daemon. Supported targets are macOS, Linux and Windows on both x64 and arm64.
+The npm package installs the native `unity` executable for macOS, Linux or Windows on x64
+and arm64. Service setup is an explicit second step because modern npm versions may block
+dependency lifecycle scripts. `unity service install` creates and starts a current-user
+service, never a system-wide privileged daemon. Check that it succeeds before running
+`unity doctor`; do not disable npm's install-script security policy.
 
 ## CLI quick start
 
@@ -125,6 +131,15 @@ unity service uninstall
 
 The service uses a LaunchAgent on macOS, a systemd user unit on Linux, and a current-user Scheduled Task on Windows. The Broker binds loopback port 2347 only and fails explicitly if that port is already owned by another process.
 
+To uninstall, remove the current-user service while the `unity` executable still exists,
+verify that this first command succeeds, and only then remove the npm package. npm does not
+run uninstall lifecycle scripts:
+
+```bash
+unity service uninstall
+npm uninstall --global @yuzetoolkit/unityevaltool
+```
+
 ## Development and release
 
 ```bash
@@ -143,6 +158,14 @@ runtime constant and npm package metadata before building six NativeAOT platform
 plus the platform-independent npm entry package. Publishing is deliberately gated behind
 an explicit workflow input and npm credentials. See [Broker/README.md](Broker/README.md)
 for package internals and the release checklist.
+
+When this tree is embedded under `Game/UnityEvalTool` in RelicLight, ordinary RelicLight
+contributors publish only the parent RelicLight repository to CNB. They do not need this
+repository's GitHub remote, GitHub write access or a second checkout. Only a machine that
+maintains both repositories explicitly enables the parent repository's mirror hooks; those
+hooks reconcile the complete tree and publish GitHub only after CNB has accepted the exact
+RelicLight source commit. A GitHub failure is retained as recoverable pending state and is
+never reported as though the already-successful CNB update had been rolled back.
 
 ## License
 

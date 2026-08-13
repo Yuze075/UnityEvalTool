@@ -1,0 +1,9 @@
+<linker>
+    <assembly fullname="UnityDebugTool.DebugWindows">
+        <type fullname="YuzeToolkit.DebugPanelEvalTool" preserve="all"/>
+        <type fullname="YuzeToolkit.DebugGroupEvalTool" preserve="all"/>
+        <type fullname="YuzeToolkit.DebugReadOnlyFieldTool`1" preserve="all"/>
+        <type fullname="YuzeToolkit.DebugWritableFieldTool`1" preserve="all"/>
+        <type fullname="YuzeToolkit.DebugButtonTool" preserve="all"/>
+    </assembly>
+</linker>

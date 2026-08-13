@@ -5,12 +5,13 @@ using UnityEngine.UIElements;
 
 namespace YuzeToolkit
 {
+    [DisallowMultipleComponent]
     public sealed class PerformanceMonitorModule : MonoBehaviour, IDebugPanelModule
     {
-        [SerializeField, Tooltip("UXML template used by the performance monitor module.")]
+        [SerializeField, Tooltip("Required UXML template for the performance monitor. Initialization fails when it is missing.")]
         private VisualTreeAsset? template;
 
-        [SerializeField, Tooltip("USS used by the performance monitor module.")]
+        [SerializeField, Tooltip("Required USS for the performance monitor. Initialization fails when it is missing.")]
         private StyleSheet? styleSheet;
 
         [SerializeField, Tooltip("Keyboard key used with the DebugPanel modifiers to show or hide the performance monitor module.")]
@@ -27,10 +28,8 @@ namespace YuzeToolkit
         public void Initialize(DebugPanelContext context)
         {
             if (template == null || styleSheet == null)
-            {
-                Debug.LogError($"{nameof(PerformanceMonitorModule)} requires UXML and USS references.", this);
-                return;
-            }
+                throw new MissingReferenceException(
+                    $"{nameof(PerformanceMonitorModule)} requires both UXML and USS references.");
 
             context.AddStyleSheet(styleSheet);
             try
@@ -40,10 +39,10 @@ namespace YuzeToolkit
                 _view = new PerformanceMonitorView(template);
                 _view.AttachTo(_layer);
             }
-            catch (System.Exception exception)
+            catch
             {
-                Debug.LogError($"{nameof(PerformanceMonitorModule)} failed to initialize: {exception.Message}", this);
                 Shutdown();
+                throw;
             }
         }
 

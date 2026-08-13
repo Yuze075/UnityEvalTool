@@ -11,6 +11,16 @@ namespace YuzeToolkit
     [UnityEngine.Scripting.Preserve]
     public static partial class EvalToolRegistry
     {
+        private static readonly HashSet<string> JavaScriptReservedIdentifiers = new(StringComparer.Ordinal)
+        {
+            "arguments", "await", "break", "case", "catch", "class", "const", "continue",
+            "debugger", "default", "delete", "do", "else", "enum", "eval", "export", "extends",
+            "false", "finally", "for", "function", "if", "implements", "import", "in",
+            "instanceof", "interface", "let", "new", "null", "package", "private", "protected",
+            "public", "return", "static", "super", "switch", "this", "throw", "true", "try",
+            "typeof", "var", "void", "while", "with", "yield"
+        };
+
         private const string EditorPrefPrefix = nameof(YuzeToolkit) + ".McpTool.Enabled.";
         private static readonly Dictionary<string, IEvalTool> CSharpRoots = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, JsToolRegistration> JsRoots = new(StringComparer.Ordinal);
@@ -51,6 +61,25 @@ namespace YuzeToolkit
             bool removed;
             lock (SyncRoot)
                 removed = CSharpRoots.Remove(normalized) || JsRoots.Remove(normalized);
+
+            if (!removed) return false;
+            ClearGeneratedModuleCache();
+            Changed?.Invoke();
+            return true;
+        }
+
+        [UnityEngine.Scripting.Preserve]
+        public static bool TryUnregisterRoot(IEvalTool expected)
+        {
+            if (expected == null) throw new ArgumentNullException(nameof(expected));
+            var normalized = NormalizePath(expected.Name);
+            var removed = false;
+            lock (SyncRoot)
+            {
+                if (CSharpRoots.TryGetValue(normalized, out var registered) &&
+                    ReferenceEquals(registered, expected))
+                    removed = CSharpRoots.Remove(normalized);
+            }
 
             if (!removed) return false;
             ClearGeneratedModuleCache();
@@ -238,11 +267,7 @@ namespace YuzeToolkit
         private static bool ToolExists(string path)
         {
             if (TryResolveCSharp(path, out _)) return true;
-            lock (SyncRoot)
-            {
-                var rootName = GetRootName(path);
-                return JsRoots.ContainsKey(rootName);
-            }
+            return TryGetJsDescriptor(path, out _);
         }
 
         private static IEvalTool? FindSubTool(IEvalTool parent, string name)
@@ -346,6 +371,9 @@ namespace YuzeToolkit
         private static bool IsValidJavaScriptIdentifier(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return false;
+            // Generated Tool modules declare one ES-module export per function. Keywords and
+            // strict-mode binding names can be valid property keys but are not valid declarations.
+            if (JavaScriptReservedIdentifiers.Contains(value)) return false;
             if (!IsIdentifierStart(value[0])) return false;
             for (var i = 1; i < value.Length; i++)
             {

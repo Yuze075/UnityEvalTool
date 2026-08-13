@@ -1,18 +1,25 @@
 #nullable enable
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 namespace YuzeToolkit
 {
     internal sealed class RuntimeLogStore : IDisposable
     {
-        private readonly ConcurrentQueue<DebugLogEntry> _pendingEntries = new();
+        private readonly Queue<DebugLogEntry> _pendingEntries = new();
+        private readonly object _pendingSyncRoot = new();
         private readonly List<DebugLogEntry> _entries = new();
+        private int _maxEntries = 500;
+        private int _droppedCount;
         private bool _subscribed;
 
-        public int MaxEntries { get; set; } = 500;
+        public int MaxEntries
+        {
+            get => Volatile.Read(ref _maxEntries);
+            set => Volatile.Write(ref _maxEntries, Math.Max(1, value));
+        }
 
         public IReadOnlyList<DebugLogEntry> Entries => _entries;
 
@@ -29,21 +36,41 @@ namespace YuzeToolkit
             DebugLogKind kind,
             LogType type = LogType.Log)
         {
-            _pendingEntries.Enqueue(new DebugLogEntry(DateTime.Now, message, stackTrace, type, kind));
+            Enqueue(new DebugLogEntry(DateTime.Now, message, stackTrace, type, kind));
         }
 
         public bool Pump()
         {
             var changed = false;
-            while (_pendingEntries.TryDequeue(out var entry))
+            const int pumpBudget = 128;
+            var dropped = 0;
+            lock (_pendingSyncRoot)
             {
-                _entries.Add(entry);
+                for (var index = 0; index < pumpBudget && _pendingEntries.Count > 0; index++)
+                {
+                    _entries.Add(_pendingEntries.Dequeue());
+                    changed = true;
+                }
+
+                dropped = _droppedCount;
+                _droppedCount = 0;
+            }
+
+            if (dropped > 0)
+            {
+                _entries.Add(new DebugLogEntry(
+                    DateTime.Now,
+                    $"Runtime Console dropped {dropped} log entries while its bounded capture queue was full.",
+                    string.Empty,
+                    LogType.Warning,
+                    DebugLogKind.Internal));
                 changed = true;
             }
 
-            while (_entries.Count > Mathf.Max(1, MaxEntries))
+            var overflow = _entries.Count - MaxEntries;
+            if (overflow > 0)
             {
-                _entries.RemoveAt(0);
+                _entries.RemoveRange(0, overflow);
                 changed = true;
             }
 
@@ -53,8 +80,10 @@ namespace YuzeToolkit
         public void Clear()
         {
             _entries.Clear();
-            while (_pendingEntries.TryDequeue(out _))
+            lock (_pendingSyncRoot)
             {
+                _pendingEntries.Clear();
+                _droppedCount = 0;
             }
         }
 
@@ -67,12 +96,27 @@ namespace YuzeToolkit
 
         private void OnLogMessageReceived(string message, string stackTrace, LogType type)
         {
-            _pendingEntries.Enqueue(new DebugLogEntry(
+            Enqueue(new DebugLogEntry(
                 DateTime.Now,
                 message ?? string.Empty,
                 stackTrace ?? string.Empty,
                 type,
                 DebugLogKind.Unity));
+        }
+
+        private void Enqueue(DebugLogEntry entry)
+        {
+            var maxEntries = MaxEntries;
+            var capacity = maxEntries > int.MaxValue / 2 ? int.MaxValue : Math.Max(64, maxEntries * 2);
+            lock (_pendingSyncRoot)
+            {
+                _pendingEntries.Enqueue(entry);
+                while (_pendingEntries.Count > capacity)
+                {
+                    _pendingEntries.Dequeue();
+                    _droppedCount++;
+                }
+            }
         }
     }
 }

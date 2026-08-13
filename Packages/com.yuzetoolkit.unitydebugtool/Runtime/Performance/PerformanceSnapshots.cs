@@ -39,7 +39,8 @@ namespace YuzeToolkit
 
     internal readonly struct FpsSnapshot
     {
-        public FpsSnapshot(float fps, float deltaMs, float average, float onePercent, float zeroOnePercent, float[] samples)
+        public FpsSnapshot(float fps, float deltaMs, float average, float onePercent, float zeroOnePercent,
+            float[] samples, int sampleCount)
         {
             Fps = fps;
             DeltaMs = deltaMs;
@@ -47,6 +48,7 @@ namespace YuzeToolkit
             OnePercent = onePercent;
             ZeroOnePercent = zeroOnePercent;
             Samples = samples;
+            SampleCount = sampleCount;
         }
 
         public float Fps { get; }
@@ -61,11 +63,14 @@ namespace YuzeToolkit
 
         public float[] Samples { get; }
 
+        public int SampleCount { get; }
+
     }
 
     internal readonly struct RamSnapshot
     {
-        public RamSnapshot(float reserved, float allocated, float mono, float[] reservedSamples, float[] allocatedSamples, float[] monoSamples)
+        public RamSnapshot(float reserved, float allocated, float mono, float[] reservedSamples,
+            float[] allocatedSamples, float[] monoSamples, int sampleCount)
         {
             Reserved = reserved;
             Allocated = allocated;
@@ -73,6 +78,7 @@ namespace YuzeToolkit
             ReservedSamples = reservedSamples;
             AllocatedSamples = allocatedSamples;
             MonoSamples = monoSamples;
+            SampleCount = sampleCount;
         }
 
         public float Reserved { get; }
@@ -86,30 +92,38 @@ namespace YuzeToolkit
         public float[] AllocatedSamples { get; }
 
         public float[] MonoSamples { get; }
+
+        public int SampleCount { get; }
     }
 
     internal readonly struct AudioSnapshot
     {
-        public AudioSnapshot(float? decibels, float[] samples)
+        public AudioSnapshot(float? decibels, float[] samples, int sampleCount)
         {
             Decibels = decibels;
             Samples = samples;
+            SampleCount = sampleCount;
         }
 
         public float? Decibels { get; }
 
         public float[] Samples { get; }
+
+        public int SampleCount { get; }
     }
 
     internal readonly struct GraphSeries
     {
-        public GraphSeries(float[] values, Color color)
+        public GraphSeries(float[] values, int count, Color color)
         {
             Values = values;
+            Count = Mathf.Clamp(count, 0, values.Length);
             Color = color;
         }
 
         public float[] Values { get; }
+
+        public int Count { get; }
 
         public Color Color { get; }
     }

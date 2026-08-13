@@ -8,6 +8,7 @@ internal sealed class UnityConnection : IAsyncDisposable
 {
     private readonly WebSocket _socket;
     private readonly SemaphoreSlim _sendGate = new(1, 1);
+    private readonly SemaphoreSlim _executionGate = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ProtocolEnvelope>> _pending = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _lifetime = new();
     private readonly Action<UnityConnection, UnityStatus> _onStatus;
@@ -35,33 +36,40 @@ internal sealed class UnityConnection : IAsyncDisposable
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
-        while (!linked.Token.IsCancellationRequested && _socket.State == WebSocketState.Open)
+        try
         {
-            using var document = await WebSocketJson.ReceiveAsync(_socket, linked.Token);
-            if (document == null) break;
-            LastTransportHeartbeatAtUtc = DateTimeOffset.UtcNow;
-            _onHeartbeat(this);
-            var envelope = WebSocketJson.ParseEnvelope(document);
-            if (string.Equals(envelope.Type, "response", StringComparison.Ordinal))
+            while (!linked.Token.IsCancellationRequested && _socket.State == WebSocketState.Open)
             {
-                if (!string.IsNullOrWhiteSpace(envelope.Id) && _pending.TryRemove(envelope.Id, out var completion))
-                    completion.TrySetResult(envelope);
-                continue;
-            }
+                using var document = await WebSocketJson.ReceiveAsync(_socket, linked.Token);
+                if (document == null) break;
+                LastTransportHeartbeatAtUtc = DateTimeOffset.UtcNow;
+                _onHeartbeat(this);
+                var envelope = WebSocketJson.ParseEnvelope(document);
+                if (string.Equals(envelope.Type, "response", StringComparison.Ordinal))
+                {
+                    if (!string.IsNullOrWhiteSpace(envelope.Id) && _pending.TryRemove(envelope.Id, out var completion))
+                        completion.TrySetResult(envelope);
+                    continue;
+                }
 
-            if (string.Equals(envelope.Type, "event", StringComparison.Ordinal) &&
-                string.Equals(envelope.Method, "unity/status", StringComparison.Ordinal))
-            {
-                var status = envelope.Payload.Deserialize(BrokerJsonContext.Default.UnityStatus)
-                             ?? throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest, "Unity status payload is empty.");
-                Status = status;
-                _onStatus(this, status);
-                continue;
-            }
+                if (string.Equals(envelope.Type, "event", StringComparison.Ordinal) &&
+                    string.Equals(envelope.Method, "unity/status", StringComparison.Ordinal))
+                {
+                    var status = envelope.Payload.Deserialize(BrokerJsonContext.Default.UnityStatus)
+                                 ?? throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest, "Unity status payload is empty.");
+                    Status = status;
+                    _onStatus(this, status);
+                    continue;
+                }
 
-            if (string.Equals(envelope.Type, "event", StringComparison.Ordinal) &&
-                string.Equals(envelope.Method, "unity/heartbeat", StringComparison.Ordinal))
-                continue;
+                if (string.Equals(envelope.Type, "event", StringComparison.Ordinal) &&
+                    string.Equals(envelope.Method, "unity/heartbeat", StringComparison.Ordinal))
+                    continue;
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            // The connection was deliberately invalidated after an ambiguous transport send.
         }
     }
 
@@ -72,39 +80,102 @@ internal sealed class UnityConnection : IAsyncDisposable
             throw new BrokerOperationException(BrokerErrorCodes.UnityDisconnected,
                 $"Unity instance '{Registration.InstanceId}' is disconnected.");
 
-        var id = Guid.NewGuid().ToString("N");
-        var completion = new TaskCompletionSource<ProtocolEnvelope>(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!_pending.TryAdd(id, completion)) throw new InvalidOperationException("Duplicate Broker request id.");
-        var payload = WebSocketJson.ToElement(request, BrokerJsonContext.Default.UnityCommandRequest);
-        var message = WebSocketJson.CreateEnvelope("request", method, id, payload);
-        var sent = false;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        deadline.CancelAfter(timeout);
+        var gateAcquired = false;
+        var lateCompletionOwnsGate = false;
         try
         {
-            await WebSocketJson.SendAsync(_socket, message, _sendGate, cancellationToken);
-            sent = true;
-            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutSource.CancelAfter(timeout);
-            var envelope = await completion.Task.WaitAsync(timeoutSource.Token);
-            if (envelope.Error != null)
-                throw new BrokerOperationException(envelope.Error.Code, envelope.Error.Message, envelope.Error.MayHaveExecuted);
-            return envelope.Payload.Clone();
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new BrokerOperationException(sent ? BrokerErrorCodes.ExecutionOutcomeUnknown : BrokerErrorCodes.RequestTimedOut,
-                sent
-                    ? $"Unity did not return a response for '{method}'. The command may have executed."
-                    : $"Unity request '{method}' timed out before it was sent.",
-                sent);
-        }
-        catch (WebSocketException ex)
-        {
-            throw new BrokerOperationException(sent ? BrokerErrorCodes.ExecutionOutcomeUnknown : BrokerErrorCodes.UnityDisconnected,
-                sent ? $"Unity connection was lost after '{method}' was sent: {ex.Message}" : ex.Message, sent);
+            try
+            {
+                await _executionGate.WaitAsync(deadline.Token);
+                gateAcquired = true;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                if (_lifetime.IsCancellationRequested)
+                    throw new BrokerOperationException(BrokerErrorCodes.UnityDisconnected,
+                        $"Unity disconnected while '{method}' was queued; the command was not sent.");
+                throw new BrokerOperationException(BrokerErrorCodes.RequestTimedOut,
+                    $"Unity request '{method}' timed out while queued and was not sent.");
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsConnected)
+                throw new BrokerOperationException(BrokerErrorCodes.UnityDisconnected,
+                    $"Unity instance '{Registration.InstanceId}' disconnected before '{method}' was sent.");
+
+            var id = Guid.NewGuid().ToString("N");
+            var completion = new TaskCompletionSource<ProtocolEnvelope>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!_pending.TryAdd(id, completion)) throw new InvalidOperationException("Duplicate Broker request id.");
+            var payload = WebSocketJson.ToElement(request, BrokerJsonContext.Default.UnityCommandRequest);
+            var message = WebSocketJson.CreateEnvelope("request", method, id, payload);
+            var sendAttempted = false;
+            var sendCompleted = false;
+            var lateCompletionOwnsPending = false;
+            try
+            {
+                sendAttempted = true;
+                await WebSocketJson.SendAsync(_socket, message, _sendGate, deadline.Token);
+                sendCompleted = true;
+                var envelope = await completion.Task.WaitAsync(deadline.Token);
+                if (envelope.Error != null)
+                    throw new BrokerOperationException(envelope.Error.Code, envelope.Error.Message, envelope.Error.MayHaveExecuted);
+                return envelope.Payload.Clone();
+            }
+            catch (OperationCanceledException)
+            {
+                if (sendAttempted)
+                {
+                    _ = ObserveLateCompletionAsync(id, completion);
+                    lateCompletionOwnsPending = true;
+                    lateCompletionOwnsGate = true;
+                    if (!sendCompleted)
+                    {
+                        _socket.Abort();
+                        _lifetime.Cancel();
+                    }
+                    throw new BrokerOperationException(BrokerErrorCodes.ExecutionOutcomeUnknown,
+                        $"Unity '{method}' was interrupted after sending began. The command may have executed.",
+                        true);
+                }
+                if (cancellationToken.IsCancellationRequested) throw;
+                if (_lifetime.IsCancellationRequested)
+                    throw new BrokerOperationException(BrokerErrorCodes.UnityDisconnected,
+                        $"Unity disconnected before '{method}' was sent.");
+                throw new BrokerOperationException(BrokerErrorCodes.RequestTimedOut,
+                    $"Unity request '{method}' timed out before it was sent.");
+            }
+            catch (WebSocketException ex)
+            {
+                if (sendAttempted)
+                {
+                    _socket.Abort();
+                    _lifetime.Cancel();
+                }
+                throw new BrokerOperationException(sendAttempted ? BrokerErrorCodes.ExecutionOutcomeUnknown : BrokerErrorCodes.UnityDisconnected,
+                    sendAttempted ? $"Unity connection was lost after sending '{method}' began: {ex.Message}" : ex.Message,
+                    sendAttempted);
+            }
+            finally
+            {
+                if (!lateCompletionOwnsPending) _pending.TryRemove(id, out _);
+            }
         }
         finally
         {
+            if (gateAcquired && !lateCompletionOwnsGate) _executionGate.Release();
+        }
+    }
+
+    private async Task ObserveLateCompletionAsync(string id, TaskCompletionSource<ProtocolEnvelope> completion)
+    {
+        try { await completion.Task.WaitAsync(_lifetime.Token); }
+        catch (Exception) { }
+        finally
+        {
             _pending.TryRemove(id, out _);
+            _executionGate.Release();
         }
     }
 
@@ -147,12 +218,10 @@ internal sealed class UnityConnection : IAsyncDisposable
         try
         {
             if (_socket.State == WebSocketState.Open)
-                await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Broker connection closed", CancellationToken.None);
+                await WebSocketJson.CloseOutputAndAbortAsync(_socket, WebSocketCloseStatus.NormalClosure,
+                    "Broker connection closed");
         }
-        catch (WebSocketException)
-        {
-            // The peer is already gone.
-        }
+        catch (ObjectDisposedException) { }
         _socket.Dispose();
         _sendGate.Dispose();
         _lifetime.Dispose();

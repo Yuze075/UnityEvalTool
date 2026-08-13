@@ -54,19 +54,52 @@ namespace YuzeToolkit
                 throw new InvalidOperationException(
                     $"Debug root tool '{registration.RootTool.Name}' is already registered.");
 
-            Registrations.Add(registration);
-            foreach (var host in Hosts)
-                host.AttachRegistration(registration);
+            var attachedHosts = new List<DebugWindowModule>();
+            try
+            {
+                foreach (var host in Hosts)
+                {
+                    host.AttachRegistration(registration);
+                    attachedHosts.Add(host);
+                }
+
+                Registrations.Add(registration);
+            }
+            catch
+            {
+                for (var i = attachedHosts.Count - 1; i >= 0; i--)
+                    attachedHosts[i].DetachRegistration(registration);
+                registration.DisposeVisualElement();
+                throw;
+            }
 
             return new Handle(registration);
         }
 
         public static void AddHost(DebugWindowModule host)
         {
+            if (Hosts.Count > 0 && !Hosts.Contains(host))
+                throw new InvalidOperationException(
+                    $"Only one active {nameof(DebugWindowModule)} host is supported per process. " +
+                    "Disable or shut down the existing DebugPanel before enabling another host.");
             if (!Hosts.Add(host)) return;
 
-            foreach (var registration in Registrations)
-                host.AttachRegistration(registration);
+            var attachedRegistrations = new List<DebugWindowRegistration>();
+            try
+            {
+                foreach (var registration in Registrations)
+                {
+                    host.AttachRegistration(registration);
+                    attachedRegistrations.Add(registration);
+                }
+            }
+            catch
+            {
+                for (var i = attachedRegistrations.Count - 1; i >= 0; i--)
+                    host.DetachRegistration(attachedRegistrations[i]);
+                Hosts.Remove(host);
+                throw;
+            }
         }
 
         public static void RemoveHost(DebugWindowModule host)
@@ -79,10 +112,11 @@ namespace YuzeToolkit
 
         private static void Unregister(DebugWindowRegistration registration)
         {
-            if (!Registrations.Remove(registration)) return;
+            if (!Registrations.Contains(registration)) return;
 
             foreach (var host in Hosts)
                 host.DetachRegistration(registration);
+            Registrations.Remove(registration);
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -112,11 +146,7 @@ namespace YuzeToolkit
             }
 
             foreach (var registration in registrations)
-            {
-                if (registration.RootTool != null)
-                    EvalToolRegistry.UnregisterRoot(registration.RootTool.Name);
                 registration.DisposeVisualElement();
-            }
 
             Hosts.Clear();
         }

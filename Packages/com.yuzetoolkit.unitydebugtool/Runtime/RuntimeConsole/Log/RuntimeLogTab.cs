@@ -90,6 +90,8 @@ namespace YuzeToolkit
                 text = "Collapse",
                 tooltip = "Collapse identical log messages."
             };
+            _collapse.focusable = false;
+            _collapse.tabIndex = -1;
             _collapse.AddToClassList(ToolbarButtonClass);
             _collapse.AddToClassList(FilterButtonClass);
             _collapse.AddToClassList(CollapseButtonClass);
@@ -101,6 +103,7 @@ namespace YuzeToolkit
             toolbar.Add(spacer);
 
             _search = new TextField { tooltip = "Filter logs by message or stack trace." };
+            _search.tabIndex = -1;
             _search.AddToClassList(SearchClass);
             _search.style.width = 180;
             _search.style.maxWidth = 260;
@@ -146,6 +149,8 @@ namespace YuzeToolkit
             {
                 tooltip = $"Show {label} entries."
             };
+            button.focusable = false;
+            button.tabIndex = -1;
             button.AddToClassList(ToolbarButtonClass);
             button.AddToClassList(FilterButtonClass);
             button.AddToClassList(GetFilterClass(type));

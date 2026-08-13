@@ -67,6 +67,12 @@ namespace YuzeToolkit
         public static void ApplyWindowContent(VisualElement content)
         {
             content.AddToClassList(WindowContentClass);
+            DisableKeyboardFocus(content);
+            if (content is ScrollView scrollView)
+            {
+                DisableKeyboardFocus(scrollView.horizontalScroller);
+                DisableKeyboardFocus(scrollView.verticalScroller);
+            }
         }
 
         public static void ApplyFoldout(Foldout foldout)
@@ -120,7 +126,16 @@ namespace YuzeToolkit
         public static void ApplyField<TValue>(BaseField<TValue> field)
         {
             field.AddToClassList(FieldClass);
-            DisableKeyboardFocus(field);
+            if (field is TextField)
+            {
+                // Pointer focus is admitted by DebugVisualFactory only after a left-click in this field.
+                field.focusable = true;
+                field.tabIndex = -1;
+            }
+            else
+            {
+                DisableKeyboardFocus(field);
+            }
         }
 
         public static void ApplyFieldWithoutLabel<TValue>(BaseField<TValue> field)

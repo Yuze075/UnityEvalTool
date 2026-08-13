@@ -158,19 +158,29 @@ internal static class UserServiceManager
 """;
     }
 
-    private static string BuildSystemdUnit(string executable) => $"""
+    internal static string BuildSystemdUnit(string executable) => $"""
 [Unit]
 Description=UnityEvalTool local Broker
 After=default.target
 
 [Service]
-ExecStart={executable.Replace("%", "%%", StringComparison.Ordinal)} broker
+ExecStart={QuoteSystemdArgument(executable)} broker
 Restart=on-failure
 RestartSec=1
 
 [Install]
 WantedBy=default.target
 """;
+
+    private static string QuoteSystemdArgument(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsControl))
+            throw new InvalidOperationException("The systemd executable path is empty or contains control characters.");
+        return "\"" + value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal)
+            .Replace("%", "%%", StringComparison.Ordinal) + "\"";
+    }
 
     private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
 }

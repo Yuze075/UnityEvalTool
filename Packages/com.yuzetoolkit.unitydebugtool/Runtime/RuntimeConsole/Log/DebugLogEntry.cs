@@ -6,7 +6,8 @@ namespace YuzeToolkit
 {
     internal enum DebugLogKind
     {
-        Unity
+        Unity,
+        Internal
     }
 
     internal sealed class DebugLogEntry

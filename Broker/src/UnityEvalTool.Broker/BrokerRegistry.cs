@@ -128,8 +128,9 @@ internal sealed class BrokerRegistry
     }
 
     public async Task<RegistrySnapshot> WaitAsync(string? connectionHandle, string? instanceId, string waitFor,
-        string? requestId, DateTimeOffset? observedAfterUtc, TimeSpan timeout, CancellationToken cancellationToken)
+        string? compilationCycleId, DateTimeOffset? observedAfterUtc, TimeSpan timeout, CancellationToken cancellationToken)
     {
+        BrokerStatePolicy.ValidateWaitFor(waitFor);
         if (string.Equals(waitFor, "snapshot", StringComparison.OrdinalIgnoreCase) || timeout <= TimeSpan.Zero)
             return GetSnapshot(connectionHandle, instanceId);
         var deadline = DateTimeOffset.UtcNow + timeout;
@@ -140,7 +141,7 @@ internal sealed class BrokerRegistry
             lock (_syncRoot)
             {
                 snapshot = GetSnapshot(connectionHandle, instanceId);
-                if (BrokerStatePolicy.MatchesWait(snapshot.SelectedUnity, waitFor, requestId, observedAfterUtc))
+                if (BrokerStatePolicy.MatchesWait(snapshot.SelectedUnity, waitFor, compilationCycleId, observedAfterUtc))
                     return snapshot;
                 changedTask = _changed.Task;
             }
@@ -195,6 +196,23 @@ internal sealed class BrokerRegistry
         {
             if (!_leases.Remove(connectionHandle, out var lease)) return;
             if (releaseSession) QueueSessionRelease(lease);
+            Cleanup();
+        }
+    }
+
+    public void ReleaseSupersededLease(string previousHandle, string replacementHandle)
+    {
+        if (string.IsNullOrWhiteSpace(previousHandle) ||
+            string.Equals(previousHandle, replacementHandle, StringComparison.Ordinal)) return;
+        lock (_syncRoot)
+        {
+            if (!_leases.Remove(previousHandle, out var previous)) return;
+            var preserveSession = _leases.TryGetValue(replacementHandle, out var replacement) &&
+                                  previous.ProcessId == replacement.ProcessId &&
+                                  previous.ProcessStartedAtUtc == replacement.ProcessStartedAtUtc &&
+                                  string.Equals(previous.InstanceId, replacement.InstanceId, StringComparison.Ordinal) &&
+                                  string.Equals(previous.SessionId, replacement.SessionId, StringComparison.Ordinal);
+            if (!preserveSession) QueueSessionRelease(previous);
             Cleanup();
         }
     }

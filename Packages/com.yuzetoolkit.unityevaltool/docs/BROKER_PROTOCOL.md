@@ -91,8 +91,9 @@ available and therefore returns for normal `Ready` or `CompilationFailed` repair
 `compilation-complete` returns after either a successful or failed compilation. Callers must
 inspect `phase`, `canEval`, and compiler counts. Before selection, wait by `instanceId`; after
 selection, prefer the existing opaque handle. Waiting is event-driven in the Broker and never
-runs inside Unity eval. `requestId` here refers to `compilationCycleId`, never the Unity-side
-request id returned by `scheduleAssetRefresh`. Immediately before an eval that may compile,
+runs inside Unity eval. Use `compilationCycleId` for cycle matching; the legacy `requestId`
+status parameter is only a deprecated alias and never means the Unity-side request id returned
+by `scheduleAssetRefresh`. Immediately before an eval that may compile,
 retain a fresh snapshot's `capturedAtUtc` and pass it as `observedAfterUtc`; this prevents an
 older cycle or stale `Ready` sample from completing the wait.
 

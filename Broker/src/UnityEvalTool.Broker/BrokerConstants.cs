@@ -12,6 +12,8 @@ internal static class BrokerConstants
     public static readonly TimeSpan MainThreadStallAfter = TimeSpan.FromSeconds(10);
     public static readonly TimeSpan DisconnectedRetention = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan LeaseIdleTimeout = TimeSpan.FromMinutes(30);
+    public static readonly TimeSpan AuthenticationTimeout = TimeSpan.FromSeconds(10);
+    public const int MaxPendingAuthenticationConnections = 32;
 }
 
 internal static class BrokerErrorCodes

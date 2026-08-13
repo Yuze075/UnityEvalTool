@@ -367,22 +367,30 @@ namespace YuzeToolkit
             return this;
         }
 
-        public new DebugWindowBuilder AddGroup(
-            string label,
-            Action<DebugGroupBuilder> configure,
-            bool registerAsTool = true)
+        public new DebugWindowBuilder AddGroup(string label, Action<DebugGroupBuilder> configure)
         {
-            base.AddGroup(label, configure, registerAsTool);
+            base.AddGroup(label, configure);
             return this;
         }
 
+        [Obsolete("Visual groups no longer register Eval Tools. Use DebugEvalToolBuilder.AddGroup for the explicit Tool tree.")]
+        public new DebugWindowBuilder AddGroup(
+            string label,
+            Action<DebugGroupBuilder> configure,
+            bool registerAsTool)
+        {
+            base.AddGroup(label, configure);
+            return this;
+        }
+
+        [Obsolete("Visual metadata no longer registers Eval Tools. Use DebugEvalToolBuilder.AddGroup for the explicit Tool tree.")]
         public new DebugWindowBuilder AddGroup(
             string label,
             string toolName,
             string description,
             Action<DebugGroupBuilder> configure)
         {
-            base.AddGroup(label, toolName, description, configure);
+            base.AddGroup(label, configure);
             return this;
         }
 
@@ -730,16 +738,20 @@ namespace YuzeToolkit
             return this;
         }
 
-        public DebugGroupBuilder AddGroup(string label, Action<DebugGroupBuilder> configure, bool registerAsTool = true)
+        public DebugGroupBuilder AddGroup(string label, Action<DebugGroupBuilder> configure)
         {
             if (configure == null) throw new ArgumentNullException(nameof(configure));
-            var toolName = registerAsTool && GroupNode.IsToolRooted
-                ? DebugToolUtility.ToGeneratedToolName(label)
-                : null;
-            var description = toolName == null ? null : $"Debug group for {label}.";
-            return AddGroupInternal(label, toolName, description, configure);
+            return AddGroupInternal(label, null, null, configure);
         }
 
+        [Obsolete("Visual groups no longer register Eval Tools. Use DebugEvalToolBuilder.AddGroup for the explicit Tool tree.")]
+        public DebugGroupBuilder AddGroup(string label, Action<DebugGroupBuilder> configure, bool registerAsTool)
+        {
+            if (configure == null) throw new ArgumentNullException(nameof(configure));
+            return AddGroupInternal(label, null, null, configure);
+        }
+
+        [Obsolete("Visual metadata no longer registers Eval Tools. Use DebugEvalToolBuilder.AddGroup for the explicit Tool tree.")]
         public DebugGroupBuilder AddGroup(
             string label,
             string toolName,
@@ -748,12 +760,12 @@ namespace YuzeToolkit
         {
             if (configure == null) throw new ArgumentNullException(nameof(configure));
             DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
-            return AddGroupInternal(label, toolName, description, configure);
+            return AddGroupInternal(label, null, null, configure);
         }
 
         public DebugGroupBuilder AddFoldout(string label, Action<DebugGroupBuilder> configure)
         {
-            return AddGroup(label, configure, false);
+            return AddGroup(label, configure);
         }
 
         public DebugGroupBuilder AddHorizontalGroup(Action<DebugGroupBuilder> configure)
@@ -780,7 +792,7 @@ namespace YuzeToolkit
             string? description,
             Action<DebugGroupBuilder> configure)
         {
-            var node = new DebugGroupNode(label, toolName, description, GroupNode.IsToolRooted);
+            var node = new DebugGroupNode(label, toolName, description, false);
             configure(new DebugGroupBuilder(node));
             GroupNode.Children.Add(node);
             return this;

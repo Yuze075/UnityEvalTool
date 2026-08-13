@@ -125,7 +125,10 @@ namespace YuzeToolkit
             if (completedTask != completion.Task)
             {
                 if (completedTask == cancellationWait.Task)
-                    return Error("eval was canceled.");
+                {
+                    await MainThreadDispatcher.RunAsync(() => DisposeEnv("eval canceled"));
+                    return Error("eval was canceled. The eval VM for this session was reset.");
+                }
                 await MainThreadDispatcher.RunAsync(() => DisposeEnv("eval timeout"));
                 return Error($"Execution timed out after {timeoutSeconds}s. The eval VM for this session was reset.");
             }

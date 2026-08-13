@@ -25,8 +25,7 @@ namespace YuzeToolkit
         public static DebugWindowRegistration Create(DebugWindowBuilder builder, IEvalTool? explicitRootTool = null)
         {
             if (builder == null) throw new ArgumentNullException(nameof(builder));
-            var rootTool = explicitRootTool ?? builder.WindowNode.CreateEvalTool();
-            return new DebugWindowRegistration(builder.WindowNode, rootTool);
+            return new DebugWindowRegistration(builder.WindowNode, explicitRootTool);
         }
 
         public void BuildVisualElement(bool allowDragging)

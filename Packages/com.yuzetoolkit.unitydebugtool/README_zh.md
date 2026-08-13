@@ -9,7 +9,7 @@
 先安装 `com.yuzetoolkit.unityevaltool`，再通过 Unity Package Manager 的 **Add package from git URL** 添加本包：
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#main
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
 ```
 
 仓库放在项目的 `Game/UnityEvalTool` 时，开发期间直接引用本地工作树：
@@ -32,14 +32,16 @@ https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unit
   - 通过 `SystemInfoRegistry.Register(key, Func<string>)` 在运行时注册自定义信息。
 - 注册式 Runtime Console 页签：
   - `Log`：Unity Console 风格工具栏、过滤、Collapse、列表与详情区。
-  - `Command Line`：内嵌 UnityEvalTool 命令输入与输出历史。
+  - `Command Line`：当前进程内持久、逐行提交的 UnityEvalTool CLI session 与输出历史。
   - `EvalTool`：UnityEvalTool 启停、重连、Broker 注册、Unity 状态和可执行性。
-  - `Tools`：完整 Runtime Tool 目录，包含路径、描述、来源、函数、参数、子 Tool 和独立启用开关。
+  - `Tools`：递归展开的完整 Runtime Tool 目录，包含每条路径、函数、参数、安全声明和有效启用状态。
 - Runtime Console 使用可手动缩放的 UI Toolkit 外壳。各页签不使用 UI Toolkit `ScrollView`；超出内容由包内轻量 PanView 处理，支持鼠标滚轮平移和紧凑自定义滚动条。
 
-默认模块快捷键：`F10` 打开/关闭 Performance 与 System Info，`F11` 打开/关闭 Debug Windows，`F12` 打开/关闭 Runtime Console。`Ctrl` / `Alt` 修饰键仍由 `DebugPanel` 统一配置；多个模块配置为同一个按键时会一起打开、一起关闭。
+默认模块快捷键：`F10` 打开/关闭 Performance 与 System Info，`F9` 打开/关闭 Debug Windows，`F8` 打开/关闭 Runtime Console。`Ctrl` / `Alt` 修饰键仍由 `DebugPanel` 统一配置；多个模块配置为同一个按键时会一起打开、一起关闭。
 
-`DebugPanel` 不会自动创建。需要在场景或常驻 prefab 中放置本包自带的 `Runtime/Core/Prefabs/DebugPanel.prefab`；静态 `DebugWindowModule.RegisterWindow(...)` 可以先调用，但只有该 prefab 实例存在并启用后，UI 和 EvalTool 才会激活。窗口注册会跨 `DebugPanel` Host 销毁和 Editor Play Mode 切换保留，直到调用返回的 `IDisposable` 句柄 `Dispose()`。
+`DebugPanel` 不会自动创建。需要在场景或常驻 prefab 中放置本包自带的 `Runtime/Core/Prefabs/DebugPanel.prefab`；同一进程只允许一个启用中的 `DebugPanel` / `DebugWindowModule` Host，重复 Host 会显式初始化失败，避免同一个 Tool 根出现所有权歧义。静态 `DebugWindowModule.RegisterWindow(...)` 可以先调用，但只有该 prefab 实例存在并启用后，UI 和 EvalTool 才会激活。同一托管运行时内，窗口注册可跨 `DebugPanel` Host 销毁保留，直到调用返回的 `IDisposable` 句柄 `Dispose()`；正常 Unity Domain Reload 会重置静态注册，持有者应在自身正常初始化流程中重新注册。
+
+Debug Window 以指针交互为主。Button、Foldout、Slider、数值字段和窗口空白不会获得键盘或手柄焦点；数值字段仍可通过自身的指针拖动区域调整，不支持指针编辑的对象类值会显示为只读。只有鼠标左键明确点击某个可写字符串字段后，该字段才接收键盘输入；按 Enter、点击其它位置、切换页签或隐藏面板都会结束编辑并清理 EventSystem selection。Runtime Console 的搜索框和 Command Line 输入框遵循同一规则。此策略避免遗留 UI 焦点把后续 Submit/导航变成误操作；它无法阻止项目独立注册的 gameplay `InputAction` callback，需要模态文本输入的宿主项目仍应在编辑期间门禁自己的 gameplay action map。
 
 ## 运行时结构
 
@@ -89,15 +91,17 @@ Runtime/
     Tools/
       UnityDebugTool.RuntimeConsole.Tools.asmdef
       Runtime Tool 目录与控制页签
+Tests/Editor/       注册、安全声明、目录与有界日志契约测试
+link.xml            IL2CPP 下反射调用 Debug Eval Tool 适配器的保留规则
 ```
 
 程序集边界：
 
-- `UnityDebugTool`：位于 `Runtime/Core` 的 Core assembly。只依赖 `Unity.InputSystem`，不依赖 `UnityEvalTool`。
-- `UnityDebugTool.DebugWindows`：Debug window builder/module 与 EvalTool 适配，依赖 `UnityEvalTool`。
+- `UnityDebugTool`：位于 `Runtime/Core` 的 Core assembly。依赖 `Unity.InputSystem` 与用于根级焦点清理的 Unity EventSystem API，不依赖 `UnityEvalTool`。
+- `UnityDebugTool.DebugWindows`：Debug window builder/module 与 EvalTool 适配，依赖 `UnityEvalTool`、Input System 与 Unity EventSystem API。
 - `UnityDebugTool.Performance`：右上角 FPS/RAM/Audio HUD 模块，不依赖 `UnityEvalTool`。
 - `UnityDebugTool.SystemInfo`：右下角系统信息 HUD 模块与公开注册 API，不依赖 `UnityDebugTool.Performance` 或 `UnityEvalTool`。
-- `UnityDebugTool.RuntimeConsole`：Runtime Console Core，只依赖 `UnityDebugTool`。
+- `UnityDebugTool.RuntimeConsole`：Runtime Console Core，依赖 `UnityDebugTool`、Input System 与用于焦点清理的 Unity EventSystem API。
 - `UnityDebugTool.RuntimeConsole.Log`：Unity 日志页签，依赖 Runtime Console Core。
 - `UnityDebugTool.RuntimeConsole.CliRepl`：Command Line 页签，依赖 `UnityEvalTool` 和 `UnityEvalTool.CLI`。
 - `UnityDebugTool.RuntimeConsole.EvalTool`：UnityEvalTool 状态与连接控制页签，依赖 `UnityEvalTool.Broker`。
@@ -127,12 +131,15 @@ USS 由使用它的模块自己持有。Core 不再提供共享 root USS。`Runt
 
 内置模块和 Runtime Console 页签 provider 通过 prefab 序列化字段显式引用自己的 USS，不使用 `Resources` 运行时加载。`DebugPanel` 只清空并暴露 `UIDocument` 根节点，然后驱动模块生命周期。
 
-## 基础用法
+内置模块或页签 provider 只有在自身 `MonoBehaviour` 启用时才会初始化；缺失必需 UXML/USS 会显式失败。任一模块初始化抛异常时，`DebugPanel` 会按逆序关闭已经启动的模块，并且不会逐帧反复重试。
+
+## 推荐的显式视觉树与 Tool 树
 
 ```csharp
+using System;
 using YuzeToolkit;
 
-public sealed class PlayerDebugHandle
+public sealed class PlayerDebugHandle : IDisposable
 {
     private int _hp = 10;
     private bool _invincible;
@@ -140,29 +147,23 @@ public sealed class PlayerDebugHandle
 
     public PlayerDebugHandle()
     {
-        _registration = DebugWindowModule.RegisterWindow(
+        var tool = new DebugEvalToolBuilder(
             "PlayerDebug",
-            "Runtime player debug controls.",
+            "Stable runtime player debug controls.");
+        tool.AddWritable("Hp", "Read or set the player's HP.", () => _hp, value => _hp = value)
+            .AddWritable("Invincible", "Read or set invincibility.", () => _invincible,
+                value => _invincible = value)
+            .AddButton("Kill", "Set player HP to zero.", () => _hp = 0,
+                EvalToolSafety.Destructive | EvalToolSafety.RequiresConfirmation);
+
+        _registration = DebugWindowModule.RegisterWindow(
+            tool,
             window =>
             {
                 window.SetTitle("Player");
-                window.AddValue(
-                    "HP",
-                    () => _hp,
-                    value => _hp = value,
-                    "Hp",
-                    "Read or set the player's debug HP.");
-                window.AddValue(
-                    "Invincible",
-                    () => _invincible,
-                    value => _invincible = value,
-                    "Invincible",
-                    "Read or set player invincibility.");
-                window.AddButton(
-                    "Kill",
-                    () => _hp = 0,
-                    "Kill",
-                    "Set player HP to zero.");
+                window.AddSegmentedInt("HP", 0, 10, () => _hp, value => _hp = value);
+                window.AddBoolButton("Invincible", () => _invincible, value => _invincible = value);
+                window.AddButton("Kill", () => _hp = 0);
             });
     }
 
@@ -172,6 +173,10 @@ public sealed class PlayerDebugHandle
     }
 }
 ```
+
+视觉树只负责布局，显式 `DebugEvalToolBuilder` 负责稳定自动化路径。两棵树必须复用同一组 getter、setter 和 action，但 Foldout 或横向布局绝不能决定 Tool 身份。使用该重载时，视觉节点上的 `toolName` metadata 会被忽略。代表的运行时对象销毁时必须 Dispose 返回句柄；该操作会同时删除窗口及它准确持有的根 Tool。
+
+旧 `RegisterWindow(toolName, description, configure)` 重载已经废弃。它现在只创建视觉窗口，传入名称仅作为视觉 metadata，绝不会注册 Eval Tool；所有自动化入口都应迁移到显式双树重载。视觉 builder 的 `toolName` / `description` 参数暂时保留源码兼容，但不会参与 Tool 注册。
 
 没有填写工具名和说明的窗口只显示 UI，不注册 EvalTool：
 
@@ -192,7 +197,7 @@ SystemInfoRegistry.Unregister("Player State");
 
 ## EvalTool 用法
 
-窗口注册时填写 `toolName` 和 `description` 后，字段和按钮也可以填写 `toolName` 和 `description`，生成子 Tool。
+上面的显式示例会稳定生成 `PlayerDebug/Hp`、`PlayerDebug/Invincible` 和 `PlayerDebug/Kill`，不受视觉分组变化影响。
 
 ```javascript
 async function execute() {
@@ -231,6 +236,10 @@ async function execute() {
 - `AddVerticalGroup(...)`
 
 工具名和说明必须同时填写。工具名使用 `EvalToolRegistry` 的规则校验。
+
+`DebugEvalToolBuilder` 提供 `AddGroup`、`AddReadOnly`、`AddWritable`、`AddButton` 与 `AddDestructiveButton`。`AddWritable(..., EvalToolSafety safety)` 和 `AddButton(..., EvalToolSafety safety)` 接收 UnityEvalTool 的完整安全标记：本地存档/设置使用 `PersistsData`，异步长流程使用 `LongRunning`，场景、工程、Editor、网络和重载影响使用各自对应标记。破坏性动作必须同时声明 `RequiresConfirmation`。
+
+内嵌 Command Line 每次只提交一行；本地 `help` 只列出适用于该页面的语义。电脑级 `unity connect`、stdin、heredoc 与外部 REPL exit 明确不可用；输入 `exit` 会说明这一点，不再静默忽略。
 
 ## 说明
 

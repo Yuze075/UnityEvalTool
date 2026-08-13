@@ -61,6 +61,16 @@ public sealed class BrokerStatePolicyTests
             "compilation-complete", "cycle", StartedAt.AddSeconds(1)));
     }
 
+    [Fact]
+    public async Task RegistryRejectsUnknownWaitModeEvenForImmediateSnapshot()
+    {
+        var registry = new BrokerRegistry();
+        var error = await Assert.ThrowsAsync<BrokerOperationException>(() =>
+            registry.WaitAsync(null, null, "compilaton-complete", null, null, TimeSpan.Zero,
+                CancellationToken.None));
+        Assert.Equal(BrokerErrorCodes.InvalidRequest, error.Code);
+    }
+
     private static UnityInstanceSnapshot CreateSnapshot(string phase, bool canEval, bool connected = true)
     {
         var status = new UnityStatus(phase, canEval, canEval ? string.Empty : "busy", 1, StartedAt,

@@ -18,13 +18,13 @@ and CLI command parsing.
 | Area | Source | Responsibility |
 |---|---|---|
 | Native Broker | Repository `Broker/src/UnityEvalTool.Broker` | Port 2347, registry, MCP tools, CLI, service management |
-| npm release | Repository `Broker/npm` | Platform selection, lifecycle scripts, per-RID packages |
+| npm release | Repository `Broker/npm` | Platform selection, explicit user-service helpers, per-RID packages |
 | Unity transport | `Runtime/Broker` | Authenticated registration, heartbeat, routed requests, sessions |
 | Editor lifecycle | `Editor/Broker` | Stable process identity, compile/reload state, Broker startup |
 | Eval engine | `Runtime/Core` and `Runtime/Tools` | PuerTS execution and generated helper modules |
 | CLI parser | `Runtime/CLI/EvalCliCommandService*` | Existing command grammar and printable results |
 
-The trailing `~` keeps .NET/npm source out of Unity import.
+`Broker` and `Roslyn` live at the standalone repository root, outside the UPM package and a Unity project's `Assets` tree, so Unity does not import their .NET/npm sources.
 
 ## Registry and selection
 
