@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix the release workflow's committed-version output so Bash parses the Node expression correctly before validation and publication.
 - Prepare the immutable `v2.0.2` repository release: UnityEvalTool/Broker/npm use 2.0.2 and UnityDebugTool 1.0.1 depends on UnityEvalTool 2.0.2.
 - Make release publication SHA-bound, concurrency-safe, smoke-tested, version-preflighted and recoverable when npm packages or a GitHub release already exist.
 - Store the committed Unity analyzer as a real Git blob instead of inheriting the embedding repository's DLL LFS rule.

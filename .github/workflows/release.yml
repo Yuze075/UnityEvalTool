@@ -37,7 +37,9 @@ jobs:
       - id: version
         name: Read committed version
         shell: bash
-        run: echo "version=$(node -p \"require('./version.json').version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(node -p "require('./version.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Validate synchronized package versions and protocol
         working-directory: Broker
         run: node --input-type=module -e "import { resolveAndValidateVersion } from './npm/scripts/version.mjs'; console.log(resolveAndValidateVersion(process.cwd()));"
