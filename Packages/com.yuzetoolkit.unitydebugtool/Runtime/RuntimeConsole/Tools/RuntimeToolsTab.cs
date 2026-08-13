@@ -13,8 +13,6 @@ namespace YuzeToolkit
         private const string ToolItemClass = "yuzu-runtime-tool-item";
         private const string ToolHeaderClass = "yuzu-runtime-tool-header";
         private const string ToolDescriptionClass = "yuzu-runtime-tool-description";
-        private static readonly Color DisabledColor = new(0.4f, 0.44f, 0.5f);
-
         private readonly RuntimeConsolePanView _content = RuntimeConsoleUi.CreatePanView();
         private bool _dirty = true;
 
@@ -106,10 +104,11 @@ namespace YuzeToolkit
             var foldout = new Foldout
             {
                 text = tool.Path,
-                value = false,
-                tooltip = tool.Description
+                value = false
             };
+            RuntimeConsoleUss.ApplyOwnedControl(foldout);
             foldout.AddToClassList(ToolItemClass);
+            RuntimeConsoleUi.AttachHelp(foldout, tool.Description);
             DisableKeyboardFocus(foldout);
             if (foldout.Q<Toggle>() is { } foldoutToggle)
                 DisableKeyboardFocus(foldoutToggle);
@@ -167,7 +166,7 @@ namespace YuzeToolkit
                 var signature = function.MethodName + "(" + string.Join(", ", function.Parameters.Select(FormatParameter)) + ")";
                 var value = RuntimeConsoleUi.AddField(parent, signature);
                 value.text = string.IsNullOrWhiteSpace(function.Description) ? "—" : function.Description;
-                value.tooltip = BuildFunctionTooltip(function);
+                RuntimeConsoleUi.AttachHelp(value, BuildFunctionHelp(function));
                 if (function.RequiresConfirmation)
                     value.style.color = RuntimeConsoleUi.WarningColor;
             }
@@ -200,13 +199,14 @@ namespace YuzeToolkit
             return $"{parameter.Name}{optional}: {parameter.Type}{defaultValue}";
         }
 
-        private static string BuildFunctionTooltip(EvalToolFunctionDescriptor function)
+        private static string BuildFunctionHelp(EvalToolFunctionDescriptor function)
         {
             var details = new List<string>();
             if (!string.IsNullOrWhiteSpace(function.Description))
                 details.Add(function.Description);
             if (function.Safety != EvalToolSafety.Unspecified)
-                details.Add("Risk: " + function.RiskLevel + (function.RequiresConfirmation ? " (confirmation required)" : string.Empty));
+                details.Add("Risk: " + function.RiskLevel +
+                            (function.RequiresConfirmation ? " (confirmation required)" : string.Empty));
             details.AddRange(function.Parameters
                 .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Description))
                 .Select(parameter => parameter.Name + ": " + parameter.Description));
@@ -216,15 +216,10 @@ namespace YuzeToolkit
         private static void SetSwitchStyle(Button button, bool enabled, bool blockedByAncestor = false)
         {
             button.text = blockedByAncestor ? "○  Blocked" : enabled ? "●  Enabled" : "○  Disabled";
-            button.style.backgroundColor = enabled && !blockedByAncestor
-                ? RuntimeConsoleUi.RunningColor
-                : DisabledColor;
-            button.style.color = Color.white;
-            button.style.unityFontStyleAndWeight = FontStyle.Bold;
-            button.style.borderTopLeftRadius = 12;
-            button.style.borderTopRightRadius = 12;
-            button.style.borderBottomLeftRadius = 12;
-            button.style.borderBottomRightRadius = 12;
+            button.AddToClassList(RuntimeConsoleUss.SwitchClass);
+            button.EnableInClassList(RuntimeConsoleUss.SwitchOnClass, enabled && !blockedByAncestor);
+            button.EnableInClassList(RuntimeConsoleUss.SwitchOffClass, !enabled && !blockedByAncestor);
+            button.EnableInClassList(RuntimeConsoleUss.SwitchBlockedClass, blockedByAncestor);
         }
 
         internal static IReadOnlyList<EvalToolDescriptor> ReadCompleteCatalog(bool refresh)

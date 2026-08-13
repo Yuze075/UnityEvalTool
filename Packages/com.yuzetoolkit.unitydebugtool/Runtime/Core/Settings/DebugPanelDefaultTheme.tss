@@ -1,1 +1,632 @@
-@import url("unity-theme://default");
+/*
+ * UnityDebugTool owns its complete runtime look.  Do not import unity-theme://default:
+ * native UI Toolkit controls are used only for input/accessibility semantics and every
+ * visible sub-element is reset here before module-specific USS is applied.
+ */
+
+.unity-label {
+    margin: 0;
+    padding: 0;
+    color: rgb(224, 224, 226);
+    font-size: 12px;
+    -unity-font-style: normal;
+}
+
+.unity-button {
+    min-height: 30px;
+    margin: 0;
+    padding: 4px 12px;
+    background-color: rgb(45, 45, 47);
+    color: rgb(235, 235, 237);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgb(67, 67, 70);
+    border-right-color: rgb(67, 67, 70);
+    border-bottom-color: rgb(67, 67, 70);
+    border-left-color: rgb(67, 67, 70);
+    border-radius: 8px;
+    -unity-text-align: middle-center;
+    -unity-font-style: normal;
+    background-image: none;
+}
+
+.unity-button:hover {
+    background-color: rgb(55, 55, 58);
+    color: rgb(255, 255, 255);
+    border-top-color: rgb(91, 91, 95);
+    border-right-color: rgb(91, 91, 95);
+    border-bottom-color: rgb(91, 91, 95);
+    border-left-color: rgb(91, 91, 95);
+}
+
+.unity-button:active,
+.unity-button:checked {
+    background-color: rgb(65, 49, 40);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.unity-button:focus {
+    background-color: rgb(57, 50, 46);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.unity-button:disabled {
+    background-color: rgb(35, 35, 37);
+    color: rgb(103, 103, 107);
+    border-top-color: rgb(48, 48, 50);
+    border-right-color: rgb(48, 48, 50);
+    border-bottom-color: rgb(48, 48, 50);
+    border-left-color: rgb(48, 48, 50);
+}
+
+.unity-base-field {
+    min-width: 0;
+    min-height: 34px;
+    margin: 0;
+    padding: 0;
+    color: rgb(225, 225, 227);
+    flex-shrink: 1;
+}
+
+.unity-base-field__label {
+    min-width: 132px;
+    margin: 0 10px 0 0;
+    padding: 0;
+    color: rgb(151, 151, 156);
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+}
+
+.unity-base-field__input,
+.unity-base-text-field__input,
+.unity-integer-field__input,
+.unity-float-field__input,
+.unity-double-field__input,
+.unity-enum-field__input,
+.unity-base-popup-field__input,
+.unity-popup-field__input {
+    min-width: 0;
+    min-height: 30px;
+    margin: 0;
+    padding: 4px 9px;
+    background-color: rgb(36, 36, 38);
+    color: rgb(235, 235, 237);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgb(62, 62, 65);
+    border-right-color: rgb(62, 62, 65);
+    border-bottom-color: rgb(62, 62, 65);
+    border-left-color: rgb(62, 62, 65);
+    border-radius: 8px;
+    --unity-cursor-color: rgb(255, 255, 255);
+    --unity-selection-color: rgba(255, 122, 69, 0.34);
+    background-image: none;
+}
+
+.unity-base-field__input:hover,
+.unity-base-text-field__input:hover,
+.unity-enum-field__input:hover,
+.unity-base-popup-field__input:hover {
+    background-color: rgb(42, 42, 44);
+    border-top-color: rgb(82, 82, 86);
+    border-right-color: rgb(82, 82, 86);
+    border-bottom-color: rgb(82, 82, 86);
+    border-left-color: rgb(82, 82, 86);
+}
+
+.unity-base-field__input:focus,
+.unity-base-text-field__input:focus,
+.unity-integer-field__input:focus,
+.unity-float-field__input:focus,
+.unity-double-field__input:focus,
+.unity-enum-field__input:focus,
+.unity-base-popup-field__input:focus {
+    background-color: rgb(39, 36, 34);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.unity-base-field:disabled .unity-base-field__label {
+    color: rgb(92, 92, 96);
+}
+
+.unity-base-field:disabled .unity-base-field__input,
+.unity-base-field:disabled .unity-base-text-field__input,
+.unity-base-field:disabled .unity-enum-field__input {
+    background-color: rgb(31, 31, 33);
+    color: rgb(105, 105, 109);
+    border-top-color: rgb(45, 45, 48);
+    border-right-color: rgb(45, 45, 48);
+    border-bottom-color: rgb(45, 45, 48);
+    border-left-color: rgb(45, 45, 48);
+}
+
+.unity-base-field--invalid .unity-base-field__input,
+.unity-base-field--invalid .unity-base-text-field__input,
+.yuzu-debug-invalid .unity-base-field__input,
+.yuzu-debug-invalid .unity-base-text-field__input {
+    background-color: rgb(53, 34, 35);
+    border-top-color: rgb(239, 91, 91);
+    border-right-color: rgb(239, 91, 91);
+    border-bottom-color: rgb(239, 91, 91);
+    border-left-color: rgb(239, 91, 91);
+}
+
+.unity-composite-field__input,
+.unity-composite-field__field {
+    min-width: 0;
+    margin: 0 0 0 4px;
+    padding: 0;
+    flex-grow: 1;
+}
+
+.unity-toggle {
+    min-height: 30px;
+    margin: 0;
+    padding: 0;
+    color: rgb(224, 224, 226);
+}
+
+.unity-toggle__input {
+    min-width: 0;
+    min-height: 30px;
+    margin: 0;
+    padding: 0;
+    flex-direction: row;
+    align-items: center;
+}
+
+.unity-toggle__checkmark {
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    min-height: 18px;
+    margin: 0 8px 0 0;
+    padding: 0;
+    background-image: none;
+    background-color: rgb(35, 35, 37);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgb(77, 77, 81);
+    border-right-color: rgb(77, 77, 81);
+    border-bottom-color: rgb(77, 77, 81);
+    border-left-color: rgb(77, 77, 81);
+    border-radius: 5px;
+}
+
+.unity-toggle:hover .unity-toggle__checkmark {
+    background-color: rgb(44, 44, 47);
+    border-top-color: rgb(111, 111, 116);
+    border-right-color: rgb(111, 111, 116);
+    border-bottom-color: rgb(111, 111, 116);
+    border-left-color: rgb(111, 111, 116);
+}
+
+.unity-toggle:checked .unity-toggle__checkmark {
+    background-image: none;
+    background-color: rgb(255, 122, 69);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.unity-toggle:focus .unity-toggle__checkmark {
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.unity-toggle:disabled .unity-toggle__checkmark {
+    background-color: rgb(31, 31, 33);
+    border-top-color: rgb(46, 46, 49);
+    border-right-color: rgb(46, 46, 49);
+    border-bottom-color: rgb(46, 46, 49);
+    border-left-color: rgb(46, 46, 49);
+}
+
+.unity-toggle:disabled .unity-toggle__label {
+    color: rgb(96, 96, 100);
+}
+
+.unity-foldout {
+    margin: 0;
+    padding: 0;
+}
+
+.unity-foldout__toggle {
+    min-height: 32px;
+    margin: 0;
+    padding: 0 8px;
+    background-color: rgb(42, 42, 44);
+    border-radius: 8px;
+}
+
+.unity-foldout__toggle:hover {
+    background-color: rgb(50, 50, 53);
+}
+
+.unity-foldout__toggle > .unity-toggle__input {
+    min-height: 32px;
+}
+
+.unity-foldout__toggle .unity-foldout__checkmark {
+    width: 12px;
+    min-width: 12px;
+    height: 12px;
+    min-height: 12px;
+    margin: 0 9px 0 0;
+    background-image: none;
+    background-color: rgb(63, 63, 67);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 4px;
+}
+
+.unity-foldout__toggle:checked .unity-foldout__checkmark,
+.unity-foldout__toggle .unity-toggle:checked .unity-foldout__checkmark {
+    background-image: none;
+    background-color: rgb(255, 122, 69);
+}
+
+.unity-foldout__content {
+    margin: 4px 0 0 8px;
+    padding: 0 0 0 10px;
+    border-left-width: 1px;
+    border-left-color: rgb(65, 65, 68);
+}
+
+.unity-base-slider {
+    min-height: 30px;
+    margin: 0;
+    padding: 0;
+}
+
+.unity-base-slider__input,
+.unity-base-slider__drag-container {
+    min-width: 0;
+    min-height: 30px;
+    flex-grow: 1;
+}
+
+.unity-base-slider__tracker {
+    height: 8px;
+    margin-top: -4px;
+    background-color: rgb(46, 46, 49);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 4px;
+    background-image: none;
+}
+
+.unity-base-slider__dragger {
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    background-color: rgb(238, 238, 240);
+    border-top-width: 3px;
+    border-right-width: 3px;
+    border-bottom-width: 3px;
+    border-left-width: 3px;
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+    border-radius: 8px;
+    background-image: none;
+}
+
+.unity-base-slider__dragger-border {
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    background-image: none;
+    background-color: rgba(0, 0, 0, 0);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 8px;
+}
+
+.unity-base-slider:hover .unity-base-slider__tracker,
+.unity-base-slider:focus .unity-base-slider__tracker {
+    background-color: rgb(63, 55, 51);
+}
+
+.unity-base-slider:disabled .unity-base-slider__dragger {
+    background-color: rgb(95, 95, 99);
+    border-top-color: rgb(95, 95, 99);
+    border-right-color: rgb(95, 95, 99);
+    border-bottom-color: rgb(95, 95, 99);
+    border-left-color: rgb(95, 95, 99);
+}
+
+.unity-progress-bar {
+    min-height: 24px;
+    margin: 0;
+    padding: 0;
+}
+
+.unity-progress-bar__background {
+    background-color: rgb(38, 38, 40);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgb(62, 62, 65);
+    border-right-color: rgb(62, 62, 65);
+    border-bottom-color: rgb(62, 62, 65);
+    border-left-color: rgb(62, 62, 65);
+    border-radius: 7px;
+}
+
+.unity-progress-bar__progress {
+    background-color: rgb(255, 122, 69);
+    border-radius: 6px;
+}
+
+.unity-progress-bar__title {
+    color: rgb(239, 239, 241);
+    font-size: 11px;
+    -unity-font-style: bold;
+}
+
+.unity-scroll-view,
+.unity-scroll-view__content-viewport,
+.unity-scroll-view__content-container {
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+}
+
+.unity-scroller {
+    width: 10px;
+    margin: 2px;
+    padding: 0;
+    background-color: rgb(31, 31, 33);
+    border-radius: 5px;
+}
+
+.unity-scroller__low-button,
+.unity-scroller__high-button {
+    display: none;
+}
+
+.unity-scroller .unity-base-slider__tracker {
+    width: 8px;
+    height: auto;
+    margin: 0;
+    background-color: rgb(31, 31, 33);
+    border-radius: 4px;
+    background-image: none;
+}
+
+.unity-scroller .unity-base-slider__dragger {
+    width: 8px;
+    min-height: 30px;
+    margin: 0;
+    background-color: rgb(83, 83, 87);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 4px;
+    background-image: none;
+}
+
+.unity-scroller .unity-base-slider__dragger-border {
+    width: 8px;
+    min-height: 30px;
+    margin: 0;
+    background-image: none;
+    background-color: rgba(0, 0, 0, 0);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 4px;
+}
+
+.unity-scroller .unity-base-slider__dragger:hover,
+.unity-scroller .unity-base-slider__dragger:active {
+    background-color: rgb(255, 122, 69);
+}
+
+.unity-base-popup-field__text,
+.unity-popup-field__text,
+.unity-enum-field__text {
+    color: rgb(235, 235, 237);
+    -unity-text-align: middle-left;
+}
+
+.unity-base-popup-field__arrow,
+.unity-popup-field__arrow,
+.unity-enum-field__arrow {
+    width: 8px;
+    height: 8px;
+    margin: 0 3px 3px 8px;
+    background-image: none;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-right-color: rgb(174, 174, 179);
+    border-bottom-color: rgb(174, 174, 179);
+    rotate: 45deg;
+}
+
+.unity-base-dropdown {
+    padding: 5px;
+    background-image: none;
+    background-color: rgb(38, 38, 40);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgb(73, 73, 77);
+    border-right-color: rgb(73, 73, 77);
+    border-bottom-color: rgb(73, 73, 77);
+    border-left-color: rgb(73, 73, 77);
+    border-radius: 10px;
+}
+
+.unity-base-dropdown__container-inner {
+    padding: 0;
+    background-image: none;
+    background-color: rgb(38, 38, 40);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+}
+
+.unity-base-dropdown__container-outer {
+    padding: 0;
+    background-image: none;
+    background-color: rgb(38, 38, 40);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 10px;
+}
+
+.unity-base-dropdown__item {
+    min-height: 30px;
+    margin: 1px 0;
+    padding: 5px 10px;
+    background-color: rgb(38, 38, 40);
+    background-image: none;
+    color: rgb(225, 225, 227);
+    border-radius: 7px;
+}
+
+.unity-base-dropdown__item:hover,
+.unity-base-dropdown__item:focus,
+.unity-base-dropdown__item:active,
+.unity-base-dropdown__item:checked {
+    background-color: rgb(62, 48, 41);
+    color: rgb(255, 255, 255);
+}
+
+.unity-base-dropdown__item:disabled {
+    background-color: rgb(35, 35, 37);
+    color: rgb(102, 102, 106);
+}
+
+.unity-base-dropdown__separator,
+.unity-generic-dropdown-menu__separator,
+.unity-contextual-menu__separator,
+.unity-menu-item__separator {
+    height: 1px;
+    min-height: 1px;
+    margin: 5px 7px;
+    padding: 0;
+    background-image: none;
+    background-color: rgb(63, 63, 66);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+}
+
+.unity-base-dropdown__checkmark {
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    background-image: none;
+    background-color: rgb(255, 122, 69);
+    border-radius: 4px;
+}
+
+/* Compatibility aliases used by GenericDropdownMenu/ContextualMenu across supported
+   UI Toolkit revisions. DebugPanel suppresses native contextual menus, while these
+   styles keep any engine-created popup visually owned during the same event frame. */
+.unity-generic-dropdown-menu,
+.unity-contextual-menu,
+.unity-menu,
+.unity-menu-container {
+    padding: 5px;
+    background-image: none;
+    background-color: rgb(38, 38, 40);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgb(73, 73, 77);
+    border-right-color: rgb(73, 73, 77);
+    border-bottom-color: rgb(73, 73, 77);
+    border-left-color: rgb(73, 73, 77);
+    border-radius: 10px;
+}
+
+.unity-generic-dropdown-menu__item,
+.unity-contextual-menu__item,
+.unity-menu-item {
+    min-height: 30px;
+    margin: 1px 0;
+    padding: 5px 10px;
+    background-image: none;
+    background-color: rgb(38, 38, 40);
+    color: rgb(225, 225, 227);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 7px;
+}
+
+.unity-generic-dropdown-menu__item:hover,
+.unity-generic-dropdown-menu__item:focus,
+.unity-generic-dropdown-menu__item:checked,
+.unity-contextual-menu__item:hover,
+.unity-contextual-menu__item:focus,
+.unity-contextual-menu__item:checked,
+.unity-menu-item:hover,
+.unity-menu-item:focus,
+.unity-menu-item:checked {
+    background-color: rgb(62, 48, 41);
+    color: rgb(255, 255, 255);
+}
+
+.unity-generic-dropdown-menu__item:disabled,
+.unity-contextual-menu__item:disabled,
+.unity-menu-item:disabled {
+    background-color: rgb(35, 35, 37);
+    color: rgb(102, 102, 106);
+}
+
+.unity-generic-dropdown-menu__checkmark,
+.unity-contextual-menu__checkmark,
+.unity-menu-item__checkmark {
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    background-image: none;
+    background-color: rgb(255, 122, 69);
+    border-radius: 4px;
+}

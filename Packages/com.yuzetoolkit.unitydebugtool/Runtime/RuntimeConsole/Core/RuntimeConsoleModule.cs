@@ -42,6 +42,9 @@ namespace YuzeToolkit
                     }
                 }
 
+                foreach (var tab in RuntimeConsoleTabRegistry.CreateTabs(consoleContext))
+                    _tabs.Add(tab);
+
                 var duplicateId = _tabs.GroupBy(tab => tab.Id).FirstOrDefault(group => group.Count() > 1)?.Key;
                 if (!string.IsNullOrWhiteSpace(duplicateId))
                     throw new InvalidOperationException(

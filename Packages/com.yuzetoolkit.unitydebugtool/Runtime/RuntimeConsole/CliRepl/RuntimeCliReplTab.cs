@@ -58,12 +58,14 @@ namespace YuzeToolkit
             inputRow.AddToClassList(InputRowClass);
             Root.Add(inputRow);
 
-            _input = new TextField { tooltip = "Enter a UnityEvalTool command and press Enter." };
+            _input = new TextField();
             _input.tabIndex = -1;
+            RuntimeConsoleUss.ApplyOwnedControl(_input);
             _input.AddToClassList(InputFieldClass);
             _input.style.flexGrow = 1;
             _input.style.flexShrink = 1;
             _input.style.minWidth = 0;
+            RuntimeConsoleUi.AttachHelp(_input, "Enter a UnityEvalTool command and press Enter.");
             _input.RegisterCallback<KeyDownEvent>(evt =>
             {
                 if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter) return;

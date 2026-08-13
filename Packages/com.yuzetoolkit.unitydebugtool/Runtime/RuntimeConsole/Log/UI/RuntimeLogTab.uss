@@ -279,3 +279,133 @@
     font-size: 12px;
     -unity-text-align: upper-left;
 }
+
+.yuzu-runtime-console .yuzu-runtime-log-toolbar-button {
+    min-height: 30px;
+    padding: 4px 10px;
+    background-color: rgb(43, 43, 46);
+    color: rgb(165, 165, 170);
+    border-top-color: rgb(62, 62, 66);
+    border-right-color: rgb(62, 62, 66);
+    border-bottom-color: rgb(62, 62, 66);
+    border-left-color: rgb(62, 62, 66);
+    border-radius: 8px;
+}
+
+.yuzu-runtime-console .yuzu-runtime-log-toolbar-button:hover {
+    background-color: rgb(54, 54, 57);
+    color: rgb(238, 238, 240);
+    border-top-color: rgb(88, 88, 93);
+    border-right-color: rgb(88, 88, 93);
+    border-bottom-color: rgb(88, 88, 93);
+    border-left-color: rgb(88, 88, 93);
+}
+
+.yuzu-runtime-console .yuzu-runtime-log-toolbar-button:focus,
+.yuzu-runtime-console .yuzu-runtime-log-toolbar-button:active,
+.yuzu-runtime-console .yuzu-runtime-log-filter-toggle-active,
+.yuzu-runtime-console .yuzu-runtime-log-collapse-toggle.yuzu-runtime-log-filter-toggle-active {
+    background-color: rgb(63, 48, 40);
+    color: rgb(255, 237, 229);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-console .yuzu-runtime-log-filter-toggle-active:hover {
+    background-color: rgb(72, 53, 43);
+    color: rgb(255, 245, 240);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.yuzu-runtime-console .yuzu-runtime-log-toolbar-button:disabled {
+    background-color: rgb(34, 34, 36);
+    color: rgb(98, 98, 102);
+    border-top-color: rgb(47, 47, 50);
+    border-right-color: rgb(47, 47, 50);
+    border-bottom-color: rgb(47, 47, 50);
+    border-left-color: rgb(47, 47, 50);
+}
+
+.yuzu-runtime-console .yuzu-runtime-log-search {
+    min-height: 32px;
+    margin: 0 5px;
+}
+
+.yuzu-runtime-console .yuzu-runtime-log-search .unity-base-text-field__input {
+    min-height: 30px;
+    padding: 4px 10px;
+    background-color: rgb(36, 36, 38);
+    color: rgb(235, 235, 237);
+    border-top-color: rgb(62, 62, 65);
+    border-right-color: rgb(62, 62, 65);
+    border-bottom-color: rgb(62, 62, 65);
+    border-left-color: rgb(62, 62, 65);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 8px;
+    --unity-cursor-color: rgb(255, 255, 255);
+    --unity-selection-color: rgba(255, 122, 69, 0.34);
+}
+
+.yuzu-runtime-console .yuzu-runtime-log-search .unity-base-text-field__input:hover {
+    background-color: rgb(43, 43, 46);
+    border-top-color: rgb(83, 83, 87);
+    border-right-color: rgb(83, 83, 87);
+    border-bottom-color: rgb(83, 83, 87);
+    border-left-color: rgb(83, 83, 87);
+}
+
+.yuzu-runtime-console .yuzu-runtime-log-search .unity-base-text-field__input:focus {
+    background-color: rgb(40, 36, 34);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-log-list,
+.yuzu-runtime-log-detail {
+    background-color: rgb(25, 25, 27);
+}
+
+.yuzu-runtime-log-row {
+    min-height: 30px;
+    padding: 5px 9px;
+    border-left-color: rgb(93, 93, 98);
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+.yuzu-runtime-log-row:hover {
+    background-color: rgb(43, 43, 46);
+}
+
+.yuzu-runtime-log-row-log.yuzu-runtime-log-row-selected {
+    background-color: rgb(61, 49, 43);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-log-splitter {
+    background-color: rgb(30, 30, 32);
+    border-top-color: rgba(255, 255, 255, 0.06);
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.yuzu-runtime-log-splitter:hover,
+.yuzu-runtime-log-splitter-active {
+    background-color: rgb(54, 44, 39);
+    border-top-color: rgba(255, 122, 69, 0.50);
+    border-bottom-color: rgba(255, 122, 69, 0.50);
+}
+
+.yuzu-runtime-log-splitter-handle,
+.yuzu-runtime-log-splitter:hover .yuzu-runtime-log-splitter-handle,
+.yuzu-runtime-log-splitter-active .yuzu-runtime-log-splitter-handle {
+    background-color: rgb(255, 122, 69);
+}

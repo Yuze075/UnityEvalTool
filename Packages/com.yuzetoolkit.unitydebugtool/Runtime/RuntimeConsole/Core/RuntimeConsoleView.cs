@@ -52,11 +52,11 @@ namespace YuzeToolkit
                 var captured = tab;
                 var button = new Button(() => SetActiveTab(captured))
                 {
-                    text = tab.Title,
-                    tooltip = $"Show {tab.Title} tab."
+                    text = tab.Title
                 };
                 button.AddToClassList(RuntimeConsoleUss.TabButtonClass);
                 DisableKeyboardFocus(button);
+                RuntimeConsoleUi.AttachHelp(button, $"Show {tab.Title} tab.");
                 tabBar.Add(button);
                 _buttons[tab.Id] = button;
 
@@ -66,10 +66,10 @@ namespace YuzeToolkit
 
             var resizeGrip = new VisualElement
             {
-                name = "runtime-console-resize-grip",
-                tooltip = "Drag to resize the Runtime Console."
+                name = "runtime-console-resize-grip"
             };
             resizeGrip.AddToClassList(RuntimeConsoleUss.ResizeGripClass);
+            RuntimeConsoleUi.AttachHelp(resizeGrip, "Drag to resize the Runtime Console.");
             resizeGrip.AddManipulator(new RuntimeConsoleResizeManipulator(resizeGrip, _window));
             _window.Add(resizeGrip);
 

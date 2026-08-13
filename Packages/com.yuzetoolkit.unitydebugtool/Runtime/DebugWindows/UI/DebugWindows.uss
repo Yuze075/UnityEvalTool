@@ -895,3 +895,507 @@
     border-bottom-color: rgba(242, 242, 242, 0.68);
     border-left-color: rgba(242, 242, 242, 0.68);
 }
+
+/* Codex-inspired owned surface. These final rules deliberately replace the legacy
+   teal/default-control treatment above while keeping the existing layout contract. */
+.yuzu-debug-debug-layer .yuzu-debug-window {
+    margin: 12px 0 0 12px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background {
+    background-color: rgba(28, 28, 30, 0.97);
+    border-top-color: rgba(255, 255, 255, 0.10);
+    border-right-color: rgba(255, 255, 255, 0.10);
+    border-bottom-color: rgba(255, 255, 255, 0.10);
+    border-left-color: rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle {
+    min-height: 34px;
+    padding: 3px 10px;
+    background-color: rgb(39, 39, 41);
+    border-left-color: rgba(255, 122, 69, 0.68);
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:hover {
+    background-color: rgb(48, 48, 51);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:focus,
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:active {
+    background-color: rgb(57, 45, 39);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:hover .unity-toggle__checkmark {
+    background-color: rgb(43, 43, 46);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:focus .unity-toggle__checkmark,
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:active .unity-toggle__checkmark {
+    background-color: rgb(54, 43, 38);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:checked:hover .unity-toggle__checkmark,
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:checked:focus .unity-toggle__checkmark,
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:checked:active .unity-toggle__checkmark {
+    background-image: none;
+    background-color: rgb(255, 143, 94);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:disabled .unity-toggle__checkmark {
+    background-image: none;
+    background-color: rgb(31, 31, 33);
+    border-top-color: rgb(46, 46, 49);
+    border-right-color: rgb(46, 46, 49);
+    border-bottom-color: rgb(46, 46, 49);
+    border-left-color: rgb(46, 46, 49);
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header {
+    min-height: 42px;
+    padding: 6px 14px;
+    background-color: rgb(34, 34, 36);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header:hover {
+    background-color: rgb(43, 43, 46);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header:focus,
+.yuzu-debug-debug-layer .yuzu-debug-window-background > .yuzu-debug-foldout > .yuzu-debug-header:active {
+    background-color: rgb(55, 44, 38);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle .unity-foldout__checkmark {
+    width: 12px;
+    min-width: 12px;
+    height: 12px;
+    min-height: 12px;
+    background-image: none;
+    background-color: rgb(69, 69, 73);
+    border-radius: 4px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:checked .unity-foldout__checkmark,
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle .unity-toggle:checked .unity-foldout__checkmark {
+    background-image: none;
+    background-color: rgb(255, 122, 69);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:hover .unity-foldout__checkmark,
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__toggle:focus .unity-foldout__checkmark {
+    -unity-background-image-tint-color: rgb(255, 151, 105);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-foldout > .unity-foldout__content {
+    border-left-color: rgba(255, 122, 69, 0.24);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-content {
+    padding: 10px 12px 14px 12px;
+    background-color: rgba(24, 24, 26, 0.98);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-content > .unity-scroll-view__vertical-scroller {
+    width: 10px;
+    margin: 3px;
+    background-color: rgb(30, 30, 32);
+    border-radius: 5px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-content .unity-scroller .unity-base-slider__dragger {
+    background-color: rgb(84, 84, 89);
+    border-radius: 4px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-window-content .unity-scroller .unity-base-slider__dragger:hover,
+.yuzu-debug-debug-layer .yuzu-debug-window-content .unity-scroller .unity-base-slider__dragger:active {
+    background-color: rgb(255, 122, 69);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field {
+    min-height: 36px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-field__input,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-text-field__input,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-enum-field__input {
+    min-height: 30px;
+    padding: 4px 9px;
+    background-color: rgb(35, 35, 37);
+    border-top-color: rgb(61, 61, 64);
+    border-right-color: rgb(61, 61, 64);
+    border-bottom-color: rgb(61, 61, 64);
+    border-left-color: rgb(61, 61, 64);
+    border-radius: 8px;
+    --unity-selection-color: rgba(255, 122, 69, 0.34);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-field__input:hover,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-text-field__input:hover,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-enum-field__input:hover {
+    background-color: rgb(43, 43, 46);
+    border-top-color: rgb(83, 83, 87);
+    border-right-color: rgb(83, 83, 87);
+    border-bottom-color: rgb(83, 83, 87);
+    border-left-color: rgb(83, 83, 87);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-field__input:focus,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-base-text-field__input:focus,
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-enum-field__input:focus {
+    background-color: rgb(40, 36, 34);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-base-field--invalid .unity-base-field__input,
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-base-field--invalid .unity-base-text-field__input,
+.yuzu-debug-debug-layer .yuzu-debug-field.yuzu-debug-invalid .unity-base-field__input,
+.yuzu-debug-debug-layer .yuzu-debug-field.yuzu-debug-invalid .unity-base-text-field__input {
+    background-color: rgb(53, 34, 35);
+    border-top-color: rgb(239, 91, 91);
+    border-right-color: rgb(239, 91, 91);
+    border-bottom-color: rgb(239, 91, 91);
+    border-left-color: rgb(239, 91, 91);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field .unity-toggle__checkmark {
+    background-image: none;
+    background-color: rgb(35, 35, 37);
+    border-top-color: rgb(75, 75, 79);
+    border-right-color: rgb(75, 75, 79);
+    border-bottom-color: rgb(75, 75, 79);
+    border-left-color: rgb(75, 75, 79);
+    border-radius: 5px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-field.unity-toggle:checked .unity-toggle__checkmark {
+    background-image: none;
+    background-color: rgb(255, 122, 69);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button {
+    min-height: 31px;
+    padding: 4px 12px;
+    background-color: rgb(45, 45, 48);
+    border-top-color: rgb(68, 68, 72);
+    border-right-color: rgb(68, 68, 72);
+    border-bottom-color: rgb(68, 68, 72);
+    border-left-color: rgb(68, 68, 72);
+    border-radius: 8px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button:hover {
+    background-color: rgb(55, 55, 58);
+    border-top-color: rgb(96, 96, 101);
+    border-right-color: rgb(96, 96, 101);
+    border-bottom-color: rgb(96, 96, 101);
+    border-left-color: rgb(96, 96, 101);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button:focus,
+.yuzu-debug-debug-layer .yuzu-debug-button:active,
+.yuzu-debug-debug-layer .yuzu-debug-button.yuzu-debug-active {
+    background-color: rgb(65, 48, 40);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-button:disabled {
+    background-color: rgb(34, 34, 36);
+    color: rgb(103, 103, 107);
+    border-top-color: rgb(48, 48, 51);
+    border-right-color: rgb(48, 48, 51);
+    border-bottom-color: rgb(48, 48, 51);
+    border-left-color: rgb(48, 48, 51);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider .unity-base-slider__tracker {
+    height: 8px;
+    margin-top: -4px;
+    background-color: rgb(45, 45, 48);
+    border-radius: 4px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider .unity-base-slider__dragger {
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    background-color: rgb(238, 238, 240);
+    border-top-width: 3px;
+    border-right-width: 3px;
+    border-bottom-width: 3px;
+    border-left-width: 3px;
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+    border-radius: 8px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider-filler,
+.yuzu-debug-debug-layer .yuzu-debug-progress .unity-progress-bar__progress {
+    background-color: rgb(255, 122, 69);
+    border-radius: 6px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:hover .unity-base-slider__tracker {
+    background-color: rgb(57, 51, 48);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:focus .unity-base-slider__tracker,
+.yuzu-debug-debug-layer .yuzu-debug-slider:active .unity-base-slider__tracker {
+    background-color: rgb(65, 49, 42);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:hover .unity-base-slider__dragger {
+    background-color: rgb(255, 255, 255);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:focus .unity-base-slider__dragger,
+.yuzu-debug-debug-layer .yuzu-debug-slider:active .unity-base-slider__dragger {
+    background-color: rgb(255, 122, 69);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:disabled .unity-base-slider__dragger {
+    background-color: rgb(86, 86, 90);
+    border-top-color: rgb(86, 86, 90);
+    border-right-color: rgb(86, 86, 90);
+    border-bottom-color: rgb(86, 86, 90);
+    border-left-color: rgb(86, 86, 90);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:disabled .unity-base-slider__tracker {
+    background-color: rgb(36, 36, 38);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-slider:disabled .yuzu-debug-slider-filler {
+    background-color: rgb(92, 62, 49);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-progress .unity-progress-bar__background {
+    background-color: rgb(36, 36, 38);
+    border-top-color: rgb(61, 61, 64);
+    border-right-color: rgb(61, 61, 64);
+    border-bottom-color: rgb(61, 61, 64);
+    border-left-color: rgb(61, 61, 64);
+    border-radius: 7px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-section {
+    color: rgb(184, 164, 154);
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+/* Native EnumField is deliberately replaced by DebugEnumDropdown so its popup remains
+   inside the themed runtime hierarchy instead of opening Unity's GenericDropdownMenu. */
+.yuzu-debug-debug-layer .yuzu-debug-enum-field {
+    position: relative;
+    min-width: 0;
+    min-height: 36px;
+    margin: 1px 0;
+    padding: 0;
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-label {
+    width: 156px;
+    min-width: 156px;
+    margin-right: 8px;
+    color: rgb(151, 151, 156);
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-button {
+    min-width: 0;
+    min-height: 30px;
+    margin: 0;
+    padding: 4px 10px;
+    background-image: none;
+    background-color: rgb(35, 35, 37);
+    color: rgb(235, 235, 237);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgb(61, 61, 64);
+    border-right-color: rgb(61, 61, 64);
+    border-bottom-color: rgb(61, 61, 64);
+    border-left-color: rgb(61, 61, 64);
+    border-radius: 8px;
+    -unity-text-align: middle-left;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-button:hover {
+    background-color: rgb(43, 43, 46);
+    border-top-color: rgb(83, 83, 87);
+    border-right-color: rgb(83, 83, 87);
+    border-bottom-color: rgb(83, 83, 87);
+    border-left-color: rgb(83, 83, 87);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-button:focus,
+.yuzu-debug-debug-layer .yuzu-debug-enum-button:active,
+.yuzu-debug-debug-layer .yuzu-debug-enum-button-open {
+    background-color: rgb(63, 48, 40);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-field:disabled .yuzu-debug-enum-label {
+    color: rgb(91, 91, 95);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-field:disabled .yuzu-debug-enum-button {
+    background-color: rgb(31, 31, 33);
+    color: rgb(101, 101, 105);
+    border-top-color: rgb(46, 46, 49);
+    border-right-color: rgb(46, 46, 49);
+    border-bottom-color: rgb(46, 46, 49);
+    border-left-color: rgb(46, 46, 49);
+}
+
+.yuzu-debug-debug-layer > .yuzu-debug-enum-popup {
+    position: absolute;
+    min-width: 180px;
+    min-height: 42px;
+    max-height: 280px;
+    padding: 5px;
+    background-color: rgb(37, 37, 39);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgb(72, 72, 76);
+    border-right-color: rgb(72, 72, 76);
+    border-bottom-color: rgb(72, 72, 76);
+    border-left-color: rgb(72, 72, 76);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll {
+    min-width: 0;
+    min-height: 0;
+    background-color: rgb(37, 37, 39);
+    flex-grow: 1;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll > .unity-scroll-view__content-viewport,
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll > .unity-scroll-view__content-viewport > .unity-scroll-view__content-container {
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    background-color: rgb(37, 37, 39);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-item {
+    min-width: 0;
+    min-height: 32px;
+    margin: 1px 0;
+    padding: 5px 10px;
+    background-image: none;
+    background-color: rgb(37, 37, 39);
+    color: rgb(222, 222, 224);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 7px;
+    -unity-text-align: middle-left;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-item:hover,
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-item:focus,
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-item:active {
+    background-color: rgb(50, 50, 53);
+    color: rgb(255, 255, 255);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-item-selected {
+    background-color: rgb(63, 48, 40);
+    color: rgb(255, 226, 213);
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll .unity-scroll-view__vertical-scroller {
+    width: 10px;
+    margin: 2px;
+    padding: 0;
+    background-color: rgb(31, 31, 33);
+    border-radius: 5px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll .unity-scroller__low-button,
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll .unity-scroller__high-button {
+    display: none;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll .unity-scroller .unity-base-slider__tracker {
+    width: 8px;
+    margin: 0;
+    background-color: rgb(31, 31, 33);
+    border-radius: 4px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll .unity-scroller .unity-base-slider__dragger,
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll .unity-scroller .unity-base-slider__dragger-border {
+    width: 8px;
+    min-height: 30px;
+    margin: 0;
+    background-image: none;
+    background-color: rgb(82, 82, 86);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 4px;
+}
+
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll .unity-scroller .unity-base-slider__dragger:hover,
+.yuzu-debug-debug-layer .yuzu-debug-enum-popup-scroll .unity-scroller .unity-base-slider__dragger:active {
+    background-color: rgb(255, 122, 69);
+}

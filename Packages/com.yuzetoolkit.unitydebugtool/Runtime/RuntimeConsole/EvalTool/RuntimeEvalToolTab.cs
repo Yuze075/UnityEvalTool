@@ -129,13 +129,9 @@ namespace YuzeToolkit
         private static void SetSwitchStyle(Button button, bool enabled)
         {
             button.text = enabled ? "●  Enabled" : "○  Disabled";
-            button.style.backgroundColor = enabled ? RuntimeConsoleUi.RunningColor : DisabledColor;
-            button.style.color = Color.white;
-            button.style.unityFontStyleAndWeight = FontStyle.Bold;
-            button.style.borderTopLeftRadius = 13;
-            button.style.borderTopRightRadius = 13;
-            button.style.borderBottomLeftRadius = 13;
-            button.style.borderBottomRightRadius = 13;
+            button.AddToClassList(RuntimeConsoleUss.SwitchClass);
+            button.EnableInClassList(RuntimeConsoleUss.SwitchOnClass, enabled);
+            button.EnableInClassList(RuntimeConsoleUss.SwitchOffClass, !enabled);
         }
     }
 }

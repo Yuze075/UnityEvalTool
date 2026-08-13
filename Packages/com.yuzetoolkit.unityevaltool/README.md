@@ -41,6 +41,10 @@ control registration for the current process. The window reports the installed B
 connection state, Unity phase, eval availability, compilation counters, and registered
 tool catalog.
 
+The window uses a package-owned dark UI Toolkit theme. Buttons, tabs, switches, notices,
+text input, tooltip, focus state, and scrollbars are explicitly styled; it does not expose
+Unity's default control skin or native tooltip/context-menu visuals.
+
 The Editor reports importing, compilation, compilation failure, assembly reload, play-mode
 transition, and main-thread responsiveness independently of eval. During Domain Reload,
 the Broker retains the Unity instance and valid selection handles; the same process

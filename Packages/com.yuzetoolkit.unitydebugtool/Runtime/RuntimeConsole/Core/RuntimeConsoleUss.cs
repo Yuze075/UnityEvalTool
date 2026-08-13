@@ -19,6 +19,11 @@ namespace YuzeToolkit
         public const string PanViewScrollbarThumbActiveClass = "yuzu-runtime-console-pan-scrollbar-thumb-active";
         public const string ToolbarClass = "yuzu-runtime-console-toolbar";
         public const string ButtonClass = "yuzu-runtime-console-button";
+        public const string ControlClass = "yuzu-runtime-console-control";
+        public const string SwitchClass = "yuzu-runtime-console-switch";
+        public const string SwitchOnClass = "yuzu-runtime-console-switch-on";
+        public const string SwitchOffClass = "yuzu-runtime-console-switch-off";
+        public const string SwitchBlockedClass = "yuzu-runtime-console-switch-blocked";
         public const string CardClass = "yuzu-runtime-console-card";
         public const string CardTitleClass = "yuzu-runtime-console-card-title";
         public const string FieldRowClass = "yuzu-runtime-console-field-row";
@@ -26,8 +31,15 @@ namespace YuzeToolkit
         public const string FieldValueClass = "yuzu-runtime-console-field-value";
         public const string MessageClass = "yuzu-runtime-console-message";
         public const string ResizeGripClass = "yuzu-runtime-console-resize-grip";
+        public const string HelpPopupClass = "yuzu-runtime-console-help-popup";
+        public const string HelpTextClass = "yuzu-runtime-console-help-text";
         public const string LabelClass = "yuzu-debug-label";
         public const string MutedLabelClass = "yuzu-debug-label-muted";
+
+        public static void ApplyOwnedControl(UnityEngine.UIElements.VisualElement control)
+        {
+            control.AddToClassList(ControlClass);
+        }
 
         public static void ApplyLayer(UnityEngine.UIElements.VisualElement layer)
         {

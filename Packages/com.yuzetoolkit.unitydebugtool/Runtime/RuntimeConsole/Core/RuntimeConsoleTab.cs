@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -26,6 +27,93 @@ namespace YuzeToolkit
     public interface IRuntimeConsoleTabProvider
     {
         IEnumerable<IRuntimeConsoleTab> CreateTabs(RuntimeConsoleContext context);
+    }
+
+    public static class RuntimeConsoleTabRegistry
+    {
+        private static readonly object SyncRoot = new();
+        private static readonly Dictionary<string, Registration>
+            Factories = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Registers a process-wide tab factory. Register before the active <see cref="RuntimeConsoleModule"/>
+        /// initializes; the factory is evaluated once for each console host initialization.
+        /// </summary>
+        public static IDisposable Register(
+            string id,
+            Func<RuntimeConsoleContext, IEnumerable<IRuntimeConsoleTab>> factory)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException("Runtime Console factory id is required.", nameof(id));
+            if (factory == null) throw new ArgumentNullException(nameof(factory));
+            lock (SyncRoot)
+            {
+                if (Factories.ContainsKey(id))
+                    throw new InvalidOperationException($"Runtime Console factory '{id}' is already registered.");
+                var registration = new Registration(id, factory);
+                Factories.Add(id, registration);
+                return new RegistrationHandle(registration);
+            }
+        }
+
+        internal static IReadOnlyList<IRuntimeConsoleTab> CreateTabs(RuntimeConsoleContext context)
+        {
+            if (context == null) throw new ArgumentNullException(nameof(context));
+            List<Registration> registrations;
+            lock (SyncRoot)
+                registrations = Factories.Values.OrderBy(value => value.Id, StringComparer.Ordinal).ToList();
+            return registrations
+                .SelectMany(registration => registration.Factory(context) ?? Array.Empty<IRuntimeConsoleTab>())
+                .Where(tab => tab != null).ToList();
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Reset()
+        {
+            lock (SyncRoot) Factories.Clear();
+        }
+
+        private static void Unregister(Registration registration)
+        {
+            lock (SyncRoot)
+            {
+                if (Factories.TryGetValue(registration.Id, out var current) &&
+                    ReferenceEquals(current, registration))
+                    Factories.Remove(registration.Id);
+            }
+        }
+
+        private sealed class Registration
+        {
+            public Registration(
+                string id,
+                Func<RuntimeConsoleContext, IEnumerable<IRuntimeConsoleTab>> factory)
+            {
+                Id = id;
+                Factory = factory;
+            }
+
+            public string Id { get; }
+
+            public Func<RuntimeConsoleContext, IEnumerable<IRuntimeConsoleTab>> Factory { get; }
+        }
+
+        private sealed class RegistrationHandle : IDisposable
+        {
+            private Registration? _registration;
+
+            public RegistrationHandle(Registration registration)
+            {
+                _registration = registration;
+            }
+
+            public void Dispose()
+            {
+                if (_registration == null) return;
+                Unregister(_registration);
+                _registration = null;
+            }
+        }
     }
 
     public sealed class RuntimeConsoleContext

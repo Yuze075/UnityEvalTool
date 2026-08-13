@@ -56,3 +56,87 @@
     flex-shrink: 0;
     margin-right: 0;
 }
+
+.yuzu-runtime-cli-history {
+    background-color: rgb(25, 25, 27);
+    border-radius: 10px;
+}
+
+.yuzu-runtime-cli-history-row {
+    margin: 0 2px 7px 0;
+    padding: 7px 9px;
+    background-color: rgb(37, 37, 39);
+    border-left-color: rgb(255, 122, 69);
+    border-radius: 8px;
+}
+
+.yuzu-runtime-cli-input-row {
+    min-height: 50px;
+    padding: 8px 9px;
+    background-color: rgb(31, 31, 33);
+    border-top-color: rgba(255, 255, 255, 0.07);
+}
+
+.yuzu-runtime-console .yuzu-runtime-cli-input-field .unity-base-text-field__input {
+    min-height: 34px;
+    padding: 6px 11px;
+    background-color: rgb(38, 38, 40);
+    color: rgb(239, 239, 241);
+    border-top-color: rgb(65, 65, 68);
+    border-right-color: rgb(65, 65, 68);
+    border-bottom-color: rgb(65, 65, 68);
+    border-left-color: rgb(65, 65, 68);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 10px;
+    --unity-cursor-color: rgb(255, 255, 255);
+    --unity-selection-color: rgba(255, 122, 69, 0.34);
+}
+
+.yuzu-runtime-console .yuzu-runtime-cli-input-field .unity-base-text-field__input:hover {
+    background-color: rgb(44, 44, 47);
+    border-top-color: rgb(85, 85, 90);
+    border-right-color: rgb(85, 85, 90);
+    border-bottom-color: rgb(85, 85, 90);
+    border-left-color: rgb(85, 85, 90);
+}
+
+.yuzu-runtime-console .yuzu-runtime-cli-input-field .unity-base-text-field__input:focus {
+    background-color: rgb(41, 37, 35);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-console .yuzu-runtime-cli-run-button {
+    min-height: 34px;
+    background-color: rgb(255, 122, 69);
+    color: rgb(28, 28, 30);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+    border-radius: 10px;
+    -unity-font-style: bold;
+}
+
+.yuzu-runtime-console .yuzu-runtime-cli-run-button:hover {
+    background-color: rgb(255, 143, 94);
+}
+
+.yuzu-runtime-console .yuzu-runtime-cli-run-button:active,
+.yuzu-runtime-console .yuzu-runtime-cli-run-button:focus {
+    background-color: rgb(224, 96, 48);
+}
+
+.yuzu-runtime-console .yuzu-runtime-cli-run-button:disabled {
+    background-color: rgb(72, 58, 52);
+    color: rgb(130, 117, 111);
+    border-top-color: rgb(82, 68, 61);
+    border-right-color: rgb(82, 68, 61);
+    border-bottom-color: rgb(82, 68, 61);
+    border-left-color: rgb(82, 68, 61);
+}

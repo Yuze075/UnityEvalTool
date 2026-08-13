@@ -87,14 +87,14 @@ namespace YuzeToolkit
                 MarkDirty();
             })
             {
-                text = "Collapse",
-                tooltip = "Collapse identical log messages."
+                text = "Collapse"
             };
             _collapse.focusable = false;
             _collapse.tabIndex = -1;
             _collapse.AddToClassList(ToolbarButtonClass);
             _collapse.AddToClassList(FilterButtonClass);
             _collapse.AddToClassList(CollapseButtonClass);
+            RuntimeConsoleUi.AttachHelp(_collapse, "Collapse identical log messages.");
             toolbar.Add(_collapse);
             SyncFilterButton(_collapse, _collapseEnabled);
 
@@ -102,14 +102,16 @@ namespace YuzeToolkit
             spacer.AddToClassList(ToolbarSpacerClass);
             toolbar.Add(spacer);
 
-            _search = new TextField { tooltip = "Filter logs by message or stack trace." };
+            _search = new TextField();
             _search.tabIndex = -1;
+            RuntimeConsoleUss.ApplyOwnedControl(_search);
             _search.AddToClassList(SearchClass);
             _search.style.width = 180;
             _search.style.maxWidth = 260;
             _search.style.minWidth = 88;
             _search.style.flexGrow = 1;
             _search.style.flexShrink = 1;
+            RuntimeConsoleUi.AttachHelp(_search, "Filter logs by message or stack trace.");
             _search.RegisterValueChangedCallback(_ => MarkDirty());
             toolbar.Add(_search);
 
@@ -121,8 +123,9 @@ namespace YuzeToolkit
             _list.Root.AddToClassList(ListClass);
             Root.Add(_list.Root);
 
-            var splitter = new VisualElement { tooltip = "Drag to resize the log list and stack trace panes." };
+            var splitter = new VisualElement();
             splitter.AddToClassList(SplitterClass);
+            RuntimeConsoleUi.AttachHelp(splitter, "Drag to resize the log list and stack trace panes.");
             var splitterHandle = new VisualElement { name = "runtime-log-splitter-handle" };
             splitterHandle.AddToClassList(SplitterHandleClass);
             splitter.Add(splitterHandle);
@@ -145,15 +148,13 @@ namespace YuzeToolkit
                 _typeEnabled[type] = !_typeEnabled[type];
                 SyncFilterButton(_typeButtons[type], _typeEnabled[type]);
                 MarkDirty();
-            })
-            {
-                tooltip = $"Show {label} entries."
-            };
+            });
             button.focusable = false;
             button.tabIndex = -1;
             button.AddToClassList(ToolbarButtonClass);
             button.AddToClassList(FilterButtonClass);
             button.AddToClassList(GetFilterClass(type));
+            RuntimeConsoleUi.AttachHelp(button, $"Show {label} entries.");
             SetFilterLabel(button, type, 0);
             _typeButtons[type] = button;
             parent.Add(button);

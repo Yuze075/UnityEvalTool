@@ -1,0 +1,16 @@
+{
+  "name": "com.yuzetoolkit.unityagenttool",
+  "version": "0.1.0",
+  "displayName": "UnityAgentTool",
+  "description": "A Broker-independent in-process Unity Agent with multi-session chat, native tools, Skills and multiple model protocols.",
+  "unity": "2022.3",
+  "author": {
+    "name": "Yuze",
+    "email": "925581968@qq.com",
+    "url": "https://github.com/Yuze075"
+  },
+  "dependencies": {
+    "com.yuzetoolkit.unityevaltool": "2.0.2",
+    "com.yuzetoolkit.unitydebugtool": "1.0.1"
+  }
+}

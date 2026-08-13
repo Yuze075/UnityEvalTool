@@ -1,0 +1,16 @@
+{
+  "name": "UnityAgentTool",
+  "rootNamespace": "YuzeToolkit.UnityAgent",
+  "references": [
+    "UnityEvalTool"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

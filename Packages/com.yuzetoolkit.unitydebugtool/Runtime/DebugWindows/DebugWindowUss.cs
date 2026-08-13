@@ -45,6 +45,14 @@ namespace YuzeToolkit
         public const string SliderFillerClass = "yuzu-debug-slider-filler";
         public const string PreviewClass = "yuzu-debug-preview";
         public const string ImageClass = "yuzu-debug-image";
+        public const string EnumFieldClass = "yuzu-debug-enum-field";
+        public const string EnumLabelClass = "yuzu-debug-enum-label";
+        public const string EnumButtonClass = "yuzu-debug-enum-button";
+        public const string EnumButtonOpenClass = "yuzu-debug-enum-button-open";
+        public const string EnumPopupClass = "yuzu-debug-enum-popup";
+        public const string EnumPopupScrollClass = "yuzu-debug-enum-popup-scroll";
+        public const string EnumPopupItemClass = "yuzu-debug-enum-popup-item";
+        public const string EnumPopupItemSelectedClass = "yuzu-debug-enum-popup-item-selected";
 
         public static void ApplyLayer(VisualElement layer)
         {

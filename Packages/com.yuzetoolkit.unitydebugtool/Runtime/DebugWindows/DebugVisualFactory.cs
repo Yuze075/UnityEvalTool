@@ -479,11 +479,19 @@ namespace YuzeToolkit
             ICollection<IDebugValueBinding> bindings)
         {
             var current = node.GetObjectValue() as Enum;
-            var field = current == null ? new EnumField(label) : new EnumField(label, current);
+            if (current == null)
+            {
+                var enumType = Nullable.GetUnderlyingType(node.ValueType) ?? node.ValueType;
+                var values = Enum.GetValues(enumType);
+                current = values.Length > 0 ? values.GetValue(0) as Enum : null;
+                if (current == null)
+                    return CreateReadOnlyLabel(node, label, bindings);
+            }
+
+            var field = new DebugEnumDropdown(label, current.GetType(), current);
             field.SetEnabled(!node.IsReadOnly);
-            DebugWindowUss.ApplyField(field);
             if (string.IsNullOrEmpty(label))
-                DebugWindowUss.ApplyFieldWithoutLabel(field);
+                field.AddToClassList(DebugWindowUss.FieldWithoutLabelClass);
 
             var binding = new EnumFieldBinding(node, field);
             bindings.Add(binding);
@@ -491,12 +499,12 @@ namespace YuzeToolkit
 
             if (!node.IsReadOnly)
             {
-                field.RegisterValueChangedCallback(evt =>
+                field.ValueChanged += value =>
                 {
                     if (binding.IsRefreshing) return;
-                    node.SetObjectValue(evt.newValue);
+                    node.SetObjectValue(value);
                     binding.Refresh();
-                });
+                };
             }
 
             return field;
@@ -684,9 +692,9 @@ namespace YuzeToolkit
         private sealed class EnumFieldBinding : IDebugValueBinding
         {
             private readonly IDebugFieldNode _node;
-            private readonly EnumField _field;
+            private readonly DebugEnumDropdown _field;
 
-            public EnumFieldBinding(IDebugFieldNode node, EnumField field)
+            public EnumFieldBinding(IDebugFieldNode node, DebugEnumDropdown field)
             {
                 _node = node;
                 _field = field;

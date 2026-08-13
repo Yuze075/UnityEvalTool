@@ -1,0 +1,17 @@
+{
+  "name": "UnityAgentTool.RuntimeConsole",
+  "rootNamespace": "YuzeToolkit.UnityAgent",
+  "references": [
+    "UnityAgentTool",
+    "UnityDebugTool.RuntimeConsole"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

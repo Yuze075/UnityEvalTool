@@ -61,3 +61,32 @@
     white-space: normal;
     flex-shrink: 1;
 }
+
+.yuzu-debug-system-info-hud {
+    right: 12px;
+    bottom: 12px;
+    padding: 10px 12px;
+    background-color: rgba(28, 28, 30, 0.96);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.09);
+    border-right-color: rgba(255, 255, 255, 0.09);
+    border-bottom-color: rgba(255, 255, 255, 0.09);
+    border-left-color: rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+}
+
+.yuzu-debug-system-info-layer .yuzu-debug-system-info-label {
+    color: rgb(224, 224, 226);
+}
+
+.yuzu-debug-system-info-layer .yuzu-debug-system-info-label-muted {
+    color: rgb(142, 142, 147);
+}
+
+.yuzu-debug-system-info-row {
+    min-height: 21px;
+    padding: 1px 0;
+}

@@ -168,3 +168,52 @@
     border-top-width: 1px;
     border-top-color: rgba(255, 255, 255, 0.22);
 }
+
+.yuzu-debug-performance-graph-hud {
+    right: 12px;
+    top: 12px;
+    width: 218px;
+    max-width: 218px;
+}
+
+.yuzu-debug-hud-panel,
+.yuzu-debug-performance-panel {
+    min-width: 218px;
+    max-width: 218px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    background-color: rgba(28, 28, 30, 0.96);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.09);
+    border-right-color: rgba(255, 255, 255, 0.09);
+    border-bottom-color: rgba(255, 255, 255, 0.09);
+    border-left-color: rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+}
+
+.yuzu-debug-performance-layer .yuzu-debug-label {
+    color: rgb(224, 224, 226);
+}
+
+.yuzu-debug-hud-label {
+    color: rgb(142, 142, 147);
+}
+
+.yuzu-debug-hud-value {
+    color: rgb(235, 235, 237);
+}
+
+.yuzu-debug-metric-good {
+    color: rgb(255, 122, 69);
+}
+
+.yuzu-debug-hud-graph {
+    border-bottom-color: rgba(255, 122, 69, 0.34);
+}
+
+.yuzu-debug-panel-footer {
+    border-top-color: rgba(255, 255, 255, 0.08);
+}

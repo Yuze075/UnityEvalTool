@@ -16,12 +16,13 @@ namespace YuzeToolkit
         {
             var button = new Button(clicked)
             {
-                text = text,
-                tooltip = tooltip
+                text = text
             };
             button.focusable = false;
             button.tabIndex = -1;
+            RuntimeConsoleUss.ApplyOwnedControl(button);
             button.AddToClassList(RuntimeConsoleUss.ButtonClass);
+            AttachHelp(button, tooltip);
             button.style.width = width;
             return button;
         }
@@ -31,10 +32,11 @@ namespace YuzeToolkit
             var field = new TextField(label)
             {
                 value = value,
-                tooltip = tooltip,
                 isPasswordField = isPassword
             };
             field.tabIndex = -1;
+            RuntimeConsoleUss.ApplyOwnedControl(field);
+            AttachHelp(field, tooltip);
             return field;
         }
 
@@ -42,11 +44,12 @@ namespace YuzeToolkit
         {
             var field = new IntegerField(label)
             {
-                value = Mathf.Max(0, value),
-                tooltip = tooltip
+                value = Mathf.Max(0, value)
             };
             field.focusable = false;
             field.tabIndex = -1;
+            RuntimeConsoleUss.ApplyOwnedControl(field);
+            AttachHelp(field, tooltip);
             return field;
         }
 
@@ -54,11 +57,12 @@ namespace YuzeToolkit
         {
             var toggle = new Toggle(label)
             {
-                value = value,
-                tooltip = tooltip
+                value = value
             };
             toggle.focusable = false;
             toggle.tabIndex = -1;
+            RuntimeConsoleUss.ApplyOwnedControl(toggle);
+            AttachHelp(toggle, tooltip);
             return toggle;
         }
 
@@ -126,6 +130,78 @@ namespace YuzeToolkit
             return box;
         }
 
+        public static void AttachHelp(VisualElement target, string helpText)
+        {
+            AttachHelp(target, () => helpText);
+        }
+
+        public static void AttachHelp(VisualElement target, Func<string> helpTextProvider)
+        {
+            if (target == null) throw new ArgumentNullException(nameof(target));
+            if (helpTextProvider == null) throw new ArgumentNullException(nameof(helpTextProvider));
+
+            target.RegisterCallback<TooltipEvent>(evt =>
+            {
+                evt.tooltip = string.Empty;
+                evt.StopImmediatePropagation();
+            }, TrickleDown.TrickleDown);
+            target.RegisterCallback<PointerEnterEvent>(evt =>
+            {
+                var text = helpTextProvider();
+                if (!string.IsNullOrWhiteSpace(text))
+                    ShowHelp(target, text, evt.position);
+            });
+            target.RegisterCallback<PointerMoveEvent>(evt => PositionHelp(target, evt.position));
+            target.RegisterCallback<PointerLeaveEvent>(_ => HideHelp(target));
+            target.RegisterCallback<DetachFromPanelEvent>(_ => HideHelp(target));
+        }
+
+        private const string HelpPopupName = "yuzu-runtime-console-owned-help-popup";
+        private const string HelpTextName = "yuzu-runtime-console-owned-help-text";
+
+        private static void ShowHelp(VisualElement target, string text, Vector2 worldPosition)
+        {
+            var root = target.panel?.visualTree;
+            if (root == null) return;
+            var popup = root.Q<VisualElement>(HelpPopupName);
+            if (popup == null)
+            {
+                popup = new VisualElement { name = HelpPopupName, pickingMode = PickingMode.Ignore };
+                popup.AddToClassList(RuntimeConsoleUss.HelpPopupClass);
+                var label = new Label { name = HelpTextName, pickingMode = PickingMode.Ignore };
+                label.AddToClassList(RuntimeConsoleUss.HelpTextClass);
+                popup.Add(label);
+                root.Add(popup);
+            }
+
+            var textLabel = popup.Q<Label>(HelpTextName);
+            if (textLabel != null) textLabel.text = text;
+            popup.style.display = DisplayStyle.Flex;
+            popup.BringToFront();
+            PositionHelp(target, worldPosition);
+        }
+
+        private static void PositionHelp(VisualElement target, Vector2 worldPosition)
+        {
+            var root = target.panel?.visualTree;
+            var popup = root?.Q<VisualElement>(HelpPopupName);
+            if (root == null || popup == null || popup.style.display == DisplayStyle.None) return;
+
+            var local = root.WorldToLocal(worldPosition);
+            var width = float.IsNaN(popup.resolvedStyle.width) ? 300f : popup.resolvedStyle.width;
+            var height = float.IsNaN(popup.resolvedStyle.height) ? 56f : popup.resolvedStyle.height;
+            popup.style.left = Mathf.Clamp(local.x + 12f, 8f,
+                Mathf.Max(8f, root.resolvedStyle.width - width - 8f));
+            popup.style.top = Mathf.Clamp(local.y + 17f, 8f,
+                Mathf.Max(8f, root.resolvedStyle.height - height - 8f));
+        }
+
+        private static void HideHelp(VisualElement target)
+        {
+            var popup = target.panel?.visualTree.Q<VisualElement>(HelpPopupName);
+            if (popup != null) popup.style.display = DisplayStyle.None;
+        }
+
         public static string FormatDateTime(DateTime utc)
         {
             return utc == default ? "-" : utc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
@@ -180,11 +256,11 @@ namespace YuzeToolkit
             _content.RegisterCallback<GeometryChangedEvent>(_ => ClampOffset());
             _root.Add(_content);
 
-            _scrollbar = new VisualElement { tooltip = "Scroll vertically." };
+            _scrollbar = new VisualElement();
             _scrollbar.AddToClassList(RuntimeConsoleUss.PanViewScrollbarClass);
             _scrollbar.RegisterCallback<PointerDownEvent>(OnScrollbarPointerDown);
 
-            _scrollbarThumb = new VisualElement { tooltip = "Drag to scroll." };
+            _scrollbarThumb = new VisualElement();
             _scrollbarThumb.AddToClassList(RuntimeConsoleUss.PanViewScrollbarThumbClass);
             _scrollbarThumb.RegisterCallback<PointerDownEvent>(OnThumbPointerDown);
             _scrollbarThumb.RegisterCallback<PointerMoveEvent>(OnThumbPointerMove);

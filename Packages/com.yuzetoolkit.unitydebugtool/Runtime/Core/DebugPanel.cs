@@ -128,6 +128,8 @@ namespace YuzeToolkit
 
                 _root.Clear();
                 PrepareRoot(_root);
+                _root.RegisterCallback<ContextualMenuPopulateEvent>(SuppressNativeContextMenu,
+                    TrickleDown.TrickleDown);
                 InstallInteractionPolicy(_root);
                 _context = new DebugPanelContext(_root);
             }
@@ -154,6 +156,13 @@ namespace YuzeToolkit
             root.style.top = 0;
             root.style.bottom = 0;
             root.style.flexGrow = 1;
+        }
+
+        private static void SuppressNativeContextMenu(ContextualMenuPopulateEvent evt)
+        {
+            evt.menu.ClearItems();
+            evt.PreventDefault();
+            evt.StopImmediatePropagation();
         }
 
         private void InstallInteractionPolicy(VisualElement root)

@@ -13,14 +13,15 @@ namespace YuzeToolkit
     internal sealed class UnityEvalToolWindow : EditorWindow
     {
         private const string Endpoint = "http://127.0.0.1:2347/mcp";
+        private const string StyleSheetPath = "Packages/com.yuzetoolkit.unityevaltool/Editor/Window/UnityEvalToolWindow.uss";
         private const string ToolPrefPrefix = nameof(YuzeToolkit) + ".McpTool.Enabled.";
         private const string ToolExpandedPrefPrefix = nameof(YuzeToolkit) + ".UnityEvalToolWindow.ToolExpanded.";
         private const int RefreshIntervalMilliseconds = 500;
 
-        private static readonly Color AccentColor = new(0.18f, 0.55f, 0.9f);
-        private static readonly Color RunningColor = new(0.18f, 0.68f, 0.4f);
-        private static readonly Color WarningColor = new(0.93f, 0.62f, 0.18f);
-        private static readonly Color StoppedColor = new(0.62f, 0.64f, 0.68f);
+        private static readonly Color AccentColor = new(0.32f, 0.67f, 0.98f);
+        private static readonly Color RunningColor = new(0.28f, 0.76f, 0.5f);
+        private static readonly Color WarningColor = new(0.98f, 0.48f, 0.2f);
+        private static readonly Color StoppedColor = new(0.39f, 0.42f, 0.47f);
 
         private readonly HashSet<string> _expandedTools = new(StringComparer.Ordinal);
         private VisualElement _overviewRoot = null!;
@@ -46,23 +47,15 @@ namespace YuzeToolkit
         private Label _mainThread = null!;
         private Label _installation = null!;
         private TextField _toolSearch = null!;
+        private Label _toolSearchPlaceholder = null!;
+        private VisualElement _tooltipPopup = null!;
+        private Label _tooltipText = null!;
         private bool _toolsViewDirty = true;
 
-        private Color WindowBackground => EditorGUIUtility.isProSkin
-            ? new Color(0.055f, 0.07f, 0.09f)
-            : new Color(0.91f, 0.93f, 0.95f);
-
-        private Color CardBackground => EditorGUIUtility.isProSkin
-            ? new Color(0.085f, 0.105f, 0.135f)
-            : new Color(0.98f, 0.985f, 0.99f);
-
-        private Color BorderColor => EditorGUIUtility.isProSkin
-            ? new Color(0.2f, 0.25f, 0.31f)
-            : new Color(0.65f, 0.7f, 0.75f);
-
-        private Color MutedTextColor => EditorGUIUtility.isProSkin
-            ? new Color(0.66f, 0.71f, 0.78f)
-            : new Color(0.3f, 0.35f, 0.4f);
+        private static readonly Color WindowBackground = new(0.055f, 0.059f, 0.067f);
+        private static readonly Color CardBackground = new(0.086f, 0.09f, 0.102f);
+        private static readonly Color BorderColor = new(0.18f, 0.19f, 0.22f);
+        private static readonly Color MutedTextColor = new(0.59f, 0.61f, 0.66f);
 
         [MenuItem(nameof(YuzeToolkit) + "/UnityEvalTool")]
         public static void Open()
@@ -87,8 +80,13 @@ namespace YuzeToolkit
         {
             var root = rootVisualElement;
             root.Clear();
+            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(StyleSheetPath);
+            if (styleSheet != null)
+                root.styleSheets.Add(styleSheet);
+            root.AddToClassList("uet-root");
             root.style.backgroundColor = WindowBackground;
             root.style.flexDirection = FlexDirection.Column;
+            root.RegisterCallback<PointerLeaveEvent>(_ => HideTooltip());
 
             BuildHeader(root);
             BuildTabBar(root);
@@ -103,6 +101,7 @@ namespace YuzeToolkit
             scroll.style.paddingRight = 14;
             scroll.style.paddingTop = 12;
             scroll.style.paddingBottom = 16;
+            scroll.AddToClassList("uet-scroll");
             root.Add(scroll);
 
             _overviewRoot = new VisualElement();
@@ -112,6 +111,7 @@ namespace YuzeToolkit
             BuildOverview();
             BuildToolsPage();
             SetActiveTab(false);
+            BuildTooltipLayer(root);
 
             root.schedule.Execute(Refresh).Every(RefreshIntervalMilliseconds);
             Refresh();
@@ -149,10 +149,7 @@ namespace YuzeToolkit
             _phaseBadge.style.marginRight = 12;
             header.Add(_phaseBadge);
 
-            _featureSwitch = new Button(ToggleFeature)
-            {
-                tooltip = "Enable or disable this Unity process registration with the UnityEvalTool Broker."
-            };
+            _featureSwitch = new Button(ToggleFeature);
             _featureSwitch.style.width = 112;
             _featureSwitch.style.height = 30;
             _featureSwitch.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -160,6 +157,9 @@ namespace YuzeToolkit
             _featureSwitch.style.borderTopRightRadius = 15;
             _featureSwitch.style.borderBottomLeftRadius = 15;
             _featureSwitch.style.borderBottomRightRadius = 15;
+            _featureSwitch.AddToClassList("uet-button");
+            _featureSwitch.AddToClassList("uet-switch");
+            AttachTooltip(_featureSwitch, "Enable or disable this Unity process registration with the UnityEvalTool Broker.");
             header.Add(_featureSwitch);
         }
 
@@ -182,9 +182,9 @@ namespace YuzeToolkit
 
         private void BuildOverview()
         {
-            var intro = new HelpBox(
+            var intro = CreateNotice(
                 "Unity connects outward to the computer-level Broker. MCP and CLI share this registration and do not open separate Unity ports.",
-                HelpBoxMessageType.Info);
+                "Connection model", false);
             intro.style.marginBottom = 10;
             _overviewRoot.Add(intro);
 
@@ -222,9 +222,9 @@ namespace YuzeToolkit
             _installation = AddField(environmentCard, "CLI installation");
             _overviewRoot.Add(environmentCard);
 
-            var workflow = new HelpBox(
+            var workflow = CreateNotice(
                 "Agent workflow: unity_status → unity_connect → reuse handle → eval. Wait for compilation through unity_status; CompilationFailed remains executable for repair.",
-                HelpBoxMessageType.None);
+                "Agent workflow", false);
             workflow.style.marginTop = 4;
             _overviewRoot.Add(workflow);
         }
@@ -236,10 +236,25 @@ namespace YuzeToolkit
             toolbar.style.marginBottom = 10;
             _toolsRoot.Add(toolbar);
 
-            _toolSearch = new TextField { tooltip = "Filter tools by name, path, source or description." };
+            _toolSearch = new TextField();
+            _toolSearch.AddToClassList("uet-text-field");
+            _toolSearch.RegisterCallback<FocusInEvent>(_ => _toolSearch.AddToClassList("uet-text-field--focus"));
+            _toolSearch.RegisterCallback<FocusOutEvent>(_ => _toolSearch.RemoveFromClassList("uet-text-field--focus"));
+            _toolSearch.RegisterCallback<ContextualMenuPopulateEvent>(evt => evt.StopImmediatePropagation(),
+                TrickleDown.TrickleDown);
+            AttachTooltip(_toolSearch, "Filter tools by name, path, source or description.");
             _toolSearch.style.flexGrow = 1;
             _toolSearch.style.minWidth = 180;
-            _toolSearch.RegisterValueChangedCallback(_ => RefreshToolsView(false));
+            _toolSearchPlaceholder = new Label("Filter tools…") { pickingMode = PickingMode.Ignore };
+            _toolSearchPlaceholder.AddToClassList("uet-text-field__placeholder");
+            _toolSearch.Add(_toolSearchPlaceholder);
+            _toolSearch.RegisterValueChangedCallback(evt =>
+            {
+                _toolSearchPlaceholder.style.display = string.IsNullOrEmpty(evt.newValue)
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+                RefreshToolsView(false);
+            });
             toolbar.Add(_toolSearch);
             toolbar.Add(CreateButton("Refresh registry", "Refresh C# metadata and explicitly loaded JavaScript tools.",
                 () => RefreshToolsView(true), 120));
@@ -317,7 +332,7 @@ namespace YuzeToolkit
 
             if (tools.Count == 0)
             {
-                _toolsList.Add(new HelpBox("No tools match the current filter.", HelpBoxMessageType.Warning));
+                _toolsList.Add(CreateNotice("No tools match the current filter.", "No results", true));
                 return;
             }
 
@@ -357,18 +372,15 @@ namespace YuzeToolkit
                 RefreshToolsView(false);
             })
             {
-                text = (expanded ? "▼  " : "▶  ") + tool.Name,
-                tooltip = expanded ? "Collapse tool details." : "Expand tool details."
+                text = (expanded ? "▼  " : "▶  ") + tool.Name
             };
             expand.style.flexGrow = 1;
             expand.style.unityTextAlign = TextAnchor.MiddleLeft;
             expand.style.unityFontStyleAndWeight = FontStyle.Bold;
             expand.style.fontSize = 14;
-            expand.style.backgroundColor = Color.clear;
-            expand.style.borderTopWidth = 0;
-            expand.style.borderRightWidth = 0;
-            expand.style.borderBottomWidth = 0;
-            expand.style.borderLeftWidth = 0;
+            expand.AddToClassList("uet-button");
+            expand.AddToClassList("uet-tool-expand");
+            AttachTooltip(expand, expanded ? "Collapse tool details." : "Expand tool details.");
             header.Add(expand);
 
             header.Add(CreatePill(tool.Source.ToUpperInvariant(), MutedTextColor));
@@ -377,13 +389,13 @@ namespace YuzeToolkit
             {
                 SetToolEnabled(tool.Path, !tool.Enabled);
                 RefreshToolsView(false);
-            })
-            {
-                tooltip = "Enable or disable importing and invoking this tool."
-            };
+            });
             state.style.width = 96;
             state.style.height = 25;
             state.style.marginLeft = 8;
+            state.AddToClassList("uet-button");
+            state.AddToClassList("uet-switch");
+            AttachTooltip(state, "Enable or disable importing and invoking this tool.");
             SetSwitchStyle(state, tool.Enabled, "Enabled", "Disabled");
             header.Add(state);
 
@@ -430,9 +442,7 @@ namespace YuzeToolkit
                 row.style.paddingRight = 8;
                 row.style.paddingTop = 6;
                 row.style.paddingBottom = 6;
-                row.style.backgroundColor = EditorGUIUtility.isProSkin
-                    ? new Color(0.06f, 0.075f, 0.095f)
-                    : new Color(0.93f, 0.95f, 0.97f);
+                row.style.backgroundColor = new Color(0.065f, 0.068f, 0.077f);
                 row.style.borderTopLeftRadius = 5;
                 row.style.borderTopRightRadius = 5;
                 row.style.borderBottomLeftRadius = 5;
@@ -490,6 +500,8 @@ namespace YuzeToolkit
                 });
                 state.style.width = 90;
                 state.style.height = 24;
+                state.AddToClassList("uet-button");
+                state.AddToClassList("uet-switch");
                 SetSwitchStyle(state, subTool.Enabled, "Enabled", "Disabled");
                 row.Add(state);
                 parent.Add(row);
@@ -565,16 +577,69 @@ namespace YuzeToolkit
 
         private Button CreateButton(string text, string tooltip, Action action, int width)
         {
-            var button = new Button(action) { text = text, tooltip = tooltip };
+            var button = new Button(action) { text = text };
+            button.AddToClassList("uet-button");
+            AttachTooltip(button, tooltip);
             button.style.width = width;
             button.style.height = 26;
             button.style.marginRight = 6;
             return button;
         }
 
+        private void BuildTooltipLayer(VisualElement root)
+        {
+            _tooltipPopup = new VisualElement { pickingMode = PickingMode.Ignore };
+            _tooltipPopup.AddToClassList("uet-tooltip");
+            _tooltipPopup.style.display = DisplayStyle.None;
+            _tooltipText = new Label { pickingMode = PickingMode.Ignore };
+            _tooltipText.AddToClassList("uet-tooltip__text");
+            _tooltipPopup.Add(_tooltipText);
+            root.Add(_tooltipPopup);
+        }
+
+        private void AttachTooltip(VisualElement target, string text)
+        {
+            target.tooltip = string.Empty;
+            if (string.IsNullOrWhiteSpace(text)) return;
+            target.RegisterCallback<TooltipEvent>(evt =>
+            {
+                evt.tooltip = string.Empty;
+                evt.StopImmediatePropagation();
+            }, TrickleDown.TrickleDown);
+            target.RegisterCallback<PointerEnterEvent>(evt => ShowTooltip(text, evt.position));
+            target.RegisterCallback<PointerMoveEvent>(evt => PositionTooltip(evt.position));
+            target.RegisterCallback<PointerLeaveEvent>(_ => HideTooltip());
+            target.RegisterCallback<DetachFromPanelEvent>(_ => HideTooltip());
+        }
+
+        private void ShowTooltip(string text, Vector2 position)
+        {
+            if (_tooltipPopup == null || _tooltipText == null) return;
+            _tooltipText.text = text;
+            _tooltipPopup.style.display = DisplayStyle.Flex;
+            PositionTooltip(position);
+        }
+
+        private void PositionTooltip(Vector2 position)
+        {
+            if (_tooltipPopup == null || _tooltipPopup.style.display == DisplayStyle.None) return;
+            var maxLeft = Mathf.Max(8f, rootVisualElement.resolvedStyle.width - 328f);
+            var maxTop = Mathf.Max(8f, rootVisualElement.resolvedStyle.height - 74f);
+            _tooltipPopup.style.left = Mathf.Clamp(position.x + 12f, 8f, maxLeft);
+            _tooltipPopup.style.top = Mathf.Clamp(position.y + 16f, 8f, maxTop);
+        }
+
+        private void HideTooltip()
+        {
+            if (_tooltipPopup != null)
+                _tooltipPopup.style.display = DisplayStyle.None;
+        }
+
         private Button CreateTabButton(string text, Action action)
         {
             var button = new Button(action) { text = text };
+            button.AddToClassList("uet-button");
+            button.AddToClassList("uet-tab");
             button.style.width = 112;
             button.style.height = 28;
             button.style.marginRight = 6;
@@ -588,11 +653,8 @@ namespace YuzeToolkit
         private void SetTabStyle(Button button, bool active)
         {
             if (button == null) return;
-            button.style.backgroundColor = active ? AccentColor : Color.clear;
-            button.style.color = active ? Color.white : MutedTextColor;
+            button.EnableInClassList("uet-tab--active", active);
             button.style.unityFontStyleAndWeight = active ? FontStyle.Bold : FontStyle.Normal;
-            button.style.borderBottomWidth = active ? 2 : 0;
-            button.style.borderBottomColor = active ? new Color(0.55f, 0.83f, 1f) : Color.clear;
         }
 
         private static Label CreateBadge(string text, Color color)
@@ -658,13 +720,29 @@ namespace YuzeToolkit
         private static void SetSwitchStyle(Button button, bool enabled, string enabledText, string disabledText)
         {
             button.text = enabled ? "●  " + enabledText : "○  " + disabledText;
-            button.style.backgroundColor = enabled ? RunningColor : StoppedColor;
-            button.style.color = Color.white;
+            button.EnableInClassList("uet-switch--on", enabled);
+            button.EnableInClassList("uet-switch--off", !enabled);
             button.style.unityFontStyleAndWeight = FontStyle.Bold;
             button.style.borderTopLeftRadius = 13;
             button.style.borderTopRightRadius = 13;
             button.style.borderBottomLeftRadius = 13;
             button.style.borderBottomRightRadius = 13;
+        }
+
+        private VisualElement CreateNotice(string message, string title, bool warning)
+        {
+            var notice = new VisualElement();
+            notice.AddToClassList("uet-notice");
+            notice.EnableInClassList("uet-notice--warning", warning);
+
+            var heading = new Label(title);
+            heading.AddToClassList("uet-notice__title");
+            notice.Add(heading);
+
+            var body = new Label(message);
+            body.AddToClassList("uet-notice__body");
+            notice.Add(body);
+            return notice;
         }
 
         private void ToggleFeature()

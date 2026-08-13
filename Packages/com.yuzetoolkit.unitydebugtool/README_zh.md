@@ -49,7 +49,26 @@ Debug Window 以指针交互为主。Button、Foldout、Slider、数值字段和
 - `DebugWindowModule` 只负责挂载 Debug 窗口，静态注册列表交给 `DebugWindowRegistry`。
 - `PerformanceMonitorModule` 只协调 `PerformanceSampler` 和基于 UXML 的 `PerformanceMonitorView`。
 - `SystemInfoModule` 只负责渲染 `SystemInfoRegistry` 中的信息项，并使用独立 UXML/USS。
-- `RuntimeConsoleModule` 只承载挂在 prefab 上的 `IRuntimeConsoleTabProvider` 返回的页签。没有 provider 时不创建 RuntimeConsole 界面。
+- `RuntimeConsoleModule` 同时承载启用中的 prefab `IRuntimeConsoleTabProvider` 与进程级 `RuntimeConsoleTabRegistry` factory 返回的页签；两种来源都没有页签时不创建 RuntimeConsole 界面。
+
+无法修改消费项目 DebugPanel prefab 的包，可以在 `RuntimeConsoleModule` 初始化前注册页签：
+
+```csharp
+private static IDisposable? registration;
+
+[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+private static void RegisterTabs()
+{
+    registration = RuntimeConsoleTabRegistry.Register(
+        "com.example.runtime-tabs",
+        context => new IRuntimeConsoleTab[] { new ExampleTab(context) });
+}
+```
+
+Factory id 在整个进程内必须唯一。Console Host 每次初始化时，factory 都必须创建全新的页签实例。释放返回的句柄只会从后续 Host 初始化中移除对应注册，不会修改已经创建的 Console 视图。静态注册会在 `SubsystemRegistration` 阶段清空，因此需要兼容关闭 Domain Reload 的包应像示例一样在 `BeforeSceneLoad` 阶段重新注册。
+
+每个 factory 自己决定页签粒度。例如 UnityAgentTool 只注册一个 **Unity Agent** 页签，并在内部工作台切换 Chat 与
+Settings；消费方不需要把一个工具的内部页面拆成多个 Runtime Console 页签。
 
 当前运行时代码结构：
 
@@ -112,10 +131,13 @@ link.xml            IL2CPP 下反射调用 Debug Eval Tool 适配器的保留规
 
 - `Runtime/Performance/UI/PerformanceMonitor.uxml`：FPS/RAM/Audio HUD 结构。
 - `Runtime/SystemInfo/UI/SystemInfo.uxml`：System Info HUD 结构。
-- Runtime Console 不再使用单个 UXML 模板。Core 创建页签外壳，挂在 prefab 上的 provider 创建各自页签。
+- Runtime Console 不再使用单个 UXML 模板。Core 创建页签外壳，prefab provider 与进程级 registry factory 创建各自页签。
 - Runtime Console 页签刻意不使用 UI Toolkit `ScrollView`。运行时数据内容溢出时使用 `RuntimeConsoleUi.CreatePanView()` 创建带自定义滚动条的滚轮平移内容区。
 
-USS 由使用它的模块自己持有。Core 不再提供共享 root USS。`Runtime/Core/Settings/DebugPanelDefaultTheme.tss` 只导入 Unity 内置默认主题，保证 UI Toolkit 控件能正常绘制。
+USS 由使用它的模块自己持有。`Runtime/Core/Settings/DebugPanelDefaultTheme.tss` 是包自有基础主题，
+不会导入 `unity-theme://default`。原生 UI Toolkit 控件只保留输入和无障碍语义；包会完整重置并重画控件根、输入层、
+checkmark、Foldout 标记、Slider、滚动条、Popup，以及 focus、disabled、selected、invalid 等状态，再由各模块 USS
+添加布局和语义颜色。Runtime Console 同样遵守这套视觉契约，并替换原生 Tooltip 与右键菜单。
 
 - `Runtime/DebugWindows/UI/DebugWindows.uss`：注册式 Debug 窗口 UI。
 - `Runtime/Performance/UI/PerformanceMonitor.uss`：FPS/RAM/Audio HUD。
@@ -126,7 +148,7 @@ USS 由使用它的模块自己持有。Core 不再提供共享 root USS。`Runt
 - `Runtime/RuntimeConsole/EvalTool/UI/RuntimeEvalToolTab.uss`：EvalTool 状态与控制页签。
 - `Runtime/RuntimeConsole/Tools/UI/RuntimeToolsTab.uss`：Tools 目录页签。
 
-内置模块和 Runtime Console 页签 provider 通过 prefab 序列化字段显式引用自己的 USS，不使用 `Resources` 运行时加载。`DebugPanel` 只清空并暴露 `UIDocument` 根节点，然后驱动模块生命周期。
+内置模块与挂在 prefab 上的 Runtime Console 页签 provider 通过序列化字段显式引用自己的 USS；进程级 registry factory 负责持有自身页签需要的额外资源，也可以通过 `RuntimeConsoleContext` 添加样式表。内置运行时 UI 不使用 `Resources` 加载。`DebugPanel` 会清空并暴露 `UIDocument` 根节点、拦截原生右键菜单视觉，然后驱动模块生命周期。
 
 内置模块或页签 provider 只有在自身 `MonoBehaviour` 启用时才会初始化；缺失必需 UXML/USS 会显式失败。任一模块初始化抛异常时，`DebugPanel` 会按逆序关闭已经启动的模块，并且不会逐帧反复重试。
 

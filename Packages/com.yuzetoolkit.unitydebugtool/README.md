@@ -49,7 +49,27 @@ The panel root is intentionally thin:
 - `DebugWindowModule` owns debug-window hosting and delegates static registration to `DebugWindowRegistry`.
 - `PerformanceMonitorModule` only coordinates `PerformanceSampler` and a UXML-backed `PerformanceMonitorView`.
 - `SystemInfoModule` only renders `SystemInfoRegistry` entries through its own UXML/USS.
-- `RuntimeConsoleModule` only hosts tabs returned by prefab-mounted `IRuntimeConsoleTabProvider` components. If no providers are present, it creates no console UI.
+- `RuntimeConsoleModule` hosts tabs returned by enabled prefab-mounted `IRuntimeConsoleTabProvider` components and process-wide `RuntimeConsoleTabRegistry` factories. If neither source returns tabs, it creates no console UI.
+
+Packages that cannot modify the consumer's DebugPanel prefab may register tabs before `RuntimeConsoleModule` initializes:
+
+```csharp
+private static IDisposable? registration;
+
+[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+private static void RegisterTabs()
+{
+    registration = RuntimeConsoleTabRegistry.Register(
+        "com.example.runtime-tabs",
+        context => new IRuntimeConsoleTab[] { new ExampleTab(context) });
+}
+```
+
+Factory ids are process-wide and unique. Factories must create fresh tab instances each time the console host initializes. Disposing the returned handle removes that exact registration from future host initializations; it does not mutate an already-created console view. Static registrations are cleared at `SubsystemRegistration`, so packages that support Enter Play Mode without Domain Reload should register at `BeforeSceneLoad` as shown above.
+
+A factory controls its own tab granularity. For example, UnityAgentTool registers one **Unity Agent**
+tab whose internal workbench switches between Chat and Settings; consumers do not need to expose
+each internal page as a separate Runtime Console tab.
 
 Current runtime layout:
 
@@ -112,10 +132,15 @@ Current templates:
 
 - `Runtime/Performance/UI/PerformanceMonitor.uxml`: FPS/RAM/audio HUD structure.
 - `Runtime/SystemInfo/UI/SystemInfo.uxml`: system information HUD structure.
-- Runtime Console no longer uses a single UXML template. Its Core creates the tab container, and prefab-mounted tab providers create each tab.
+- Runtime Console no longer uses a single UXML template. Its Core creates the tab container; prefab-mounted providers and process-wide registry factories create the tabs.
 - Runtime Console tabs intentionally avoid UI Toolkit `ScrollView`. Use `RuntimeConsoleUi.CreatePanView()` for wheel-panned overflowing runtime content with the built-in custom scrollbar.
 
-Styles are owned by the module that uses them. Core does not provide a shared root USS. `Runtime/Core/Settings/DebugPanelDefaultTheme.tss` imports only Unity's built-in default theme so UI Toolkit controls can render.
+Styles are owned by the module that uses them. `Runtime/Core/Settings/DebugPanelDefaultTheme.tss`
+is a package-owned base theme and deliberately does not import `unity-theme://default`.
+Native UI Toolkit controls retain their input and accessibility behavior, but the package resets
+and redraws every visible root, input, checkmark, foldout marker, slider, scrollbar, popup, focus,
+disabled, selected, and invalid state. Module USS files then add layout and semantic tone.
+Runtime Console tabs use the same visual contract and replace native tooltips and contextual menus.
 
 - `Runtime/DebugWindows/UI/DebugWindows.uss`: registered debug-window UI.
 - `Runtime/Performance/UI/PerformanceMonitor.uss`: FPS/RAM/audio HUD.
@@ -126,7 +151,7 @@ Styles are owned by the module that uses them. Core does not provide a shared ro
 - `Runtime/RuntimeConsole/EvalTool/UI/RuntimeEvalToolTab.uss`: EvalTool state and control tab.
 - `Runtime/RuntimeConsole/Tools/UI/RuntimeToolsTab.uss`: Tools catalog tab.
 
-Built-in modules and Runtime Console tab providers receive their USS through serialized prefab references. No runtime UI asset is loaded through `Resources`. `DebugPanel` only clears and exposes the `UIDocument` root, then drives module lifecycle.
+Built-in modules and prefab-mounted Runtime Console tab providers receive their USS through serialized prefab references. A process-wide registry factory owns any additional assets required by its tabs and may add a stylesheet through `RuntimeConsoleContext`. No built-in runtime UI asset is loaded through `Resources`. `DebugPanel` clears and exposes the `UIDocument` root, suppresses native contextual-menu styling, then drives module lifecycle.
 
 A built-in module or tab provider is active only when its `MonoBehaviour` is enabled. Missing required UXML/USS references fail that initialization explicitly. If any module throws while initializing, `DebugPanel` shuts down already-started modules in reverse order and does not retry every frame.
 

@@ -369,3 +369,398 @@
     border-radius: 2px;
     -unity-background-image-tint-color: rgba(255, 255, 255, 0.9);
 }
+
+/* Codex-inspired owned console surface. The console never falls back to the panel
+   theme for a visible control sub-element. */
+.yuzu-runtime-console {
+    left: 14px;
+    bottom: 14px;
+    background-color: rgba(27, 27, 29, 0.98);
+    border-top-color: rgba(255, 255, 255, 0.10);
+    border-right-color: rgba(255, 255, 255, 0.10);
+    border-bottom-color: rgba(255, 255, 255, 0.10);
+    border-left-color: rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+}
+
+.yuzu-runtime-console-tab-bar {
+    min-height: 44px;
+    padding: 7px 36px 7px 10px;
+    background-color: rgb(33, 33, 35);
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+.yuzu-runtime-console-tab-button {
+    min-height: 30px;
+    margin-right: 4px;
+    padding: 4px 11px;
+    background-color: rgba(0, 0, 0, 0);
+    color: rgb(158, 158, 163);
+    border-top-color: rgba(255, 255, 255, 0);
+    border-right-color: rgba(255, 255, 255, 0);
+    border-bottom-color: rgba(255, 255, 255, 0);
+    border-left-color: rgba(255, 255, 255, 0);
+    border-radius: 8px;
+}
+
+.yuzu-runtime-console-tab-button:hover {
+    background-color: rgb(47, 47, 50);
+    color: rgb(232, 232, 234);
+    border-top-color: rgb(60, 60, 64);
+    border-right-color: rgb(60, 60, 64);
+    border-bottom-color: rgb(60, 60, 64);
+    border-left-color: rgb(60, 60, 64);
+}
+
+.yuzu-runtime-console-tab-button:focus,
+.yuzu-runtime-console-tab-button:active,
+.yuzu-runtime-console-tab-button-active {
+    background-color: rgb(62, 47, 40);
+    color: rgb(255, 237, 229);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-console-content,
+.yuzu-runtime-console-tab-root,
+.yuzu-runtime-console-page {
+    background-color: rgb(27, 27, 29);
+}
+
+.yuzu-runtime-console-page {
+    padding: 10px;
+}
+
+.yuzu-runtime-console-toolbar {
+    min-height: 44px;
+    padding: 7px 9px;
+    background-color: rgb(31, 31, 33);
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+.yuzu-runtime-console-button {
+    min-height: 30px;
+    margin-right: 7px;
+    padding: 4px 11px;
+    background-color: rgb(45, 45, 48);
+    color: rgb(235, 235, 237);
+    border-top-color: rgb(67, 67, 71);
+    border-right-color: rgb(67, 67, 71);
+    border-bottom-color: rgb(67, 67, 71);
+    border-left-color: rgb(67, 67, 71);
+    border-radius: 8px;
+}
+
+.yuzu-runtime-console-button:hover {
+    background-color: rgb(56, 56, 59);
+    border-top-color: rgb(94, 94, 99);
+    border-right-color: rgb(94, 94, 99);
+    border-bottom-color: rgb(94, 94, 99);
+    border-left-color: rgb(94, 94, 99);
+}
+
+.yuzu-runtime-console-button:focus,
+.yuzu-runtime-console-button:active,
+.yuzu-runtime-console-button:checked {
+    background-color: rgb(64, 48, 40);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-console-button:disabled {
+    background-color: rgb(35, 35, 37);
+    color: rgb(101, 101, 105);
+    border-top-color: rgb(48, 48, 51);
+    border-right-color: rgb(48, 48, 51);
+    border-bottom-color: rgb(48, 48, 51);
+    border-left-color: rgb(48, 48, 51);
+}
+
+.yuzu-runtime-console-card {
+    margin-bottom: 10px;
+    padding: 10px 12px 12px 12px;
+    background-color: rgb(34, 34, 36);
+    border-top-color: rgb(53, 53, 56);
+    border-right-color: rgb(53, 53, 56);
+    border-bottom-color: rgb(53, 53, 56);
+    border-left-color: rgb(53, 53, 56);
+    border-radius: 10px;
+}
+
+.yuzu-runtime-console-card-title {
+    min-height: 24px;
+    margin-bottom: 8px;
+    color: rgb(239, 239, 241);
+    font-size: 13px;
+}
+
+.yuzu-runtime-console-field-row {
+    min-height: 26px;
+    margin-bottom: 3px;
+}
+
+.yuzu-runtime-console-field-label {
+    color: rgb(142, 142, 147);
+}
+
+.yuzu-runtime-console-field-value {
+    color: rgb(222, 222, 224);
+}
+
+.yuzu-runtime-console-message {
+    margin: 5px 0;
+    padding: 7px 9px;
+    border-radius: 8px;
+}
+
+.yuzu-runtime-console-resize-grip {
+    width: 22px;
+    height: 22px;
+    background-color: rgb(64, 48, 40);
+    border-bottom-left-radius: 10px;
+    border-bottom-color: rgba(255, 122, 69, 0.48);
+    border-left-color: rgba(255, 122, 69, 0.48);
+}
+
+.yuzu-runtime-console-resize-grip:hover,
+.yuzu-runtime-console-resize-grip:active {
+    background-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control.unity-base-field {
+    min-height: 36px;
+    margin: 2px 0;
+    padding: 0;
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-base-field__label {
+    min-width: 148px;
+    margin: 0 10px 0 0;
+    padding: 0;
+    color: rgb(142, 142, 147);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-base-field__input,
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-base-text-field__input,
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-integer-field__input,
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-float-field__input,
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-enum-field__input {
+    min-height: 30px;
+    padding: 4px 9px;
+    background-color: rgb(36, 36, 38);
+    color: rgb(235, 235, 237);
+    border-top-color: rgb(62, 62, 65);
+    border-right-color: rgb(62, 62, 65);
+    border-bottom-color: rgb(62, 62, 65);
+    border-left-color: rgb(62, 62, 65);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-radius: 8px;
+    --unity-cursor-color: rgb(255, 255, 255);
+    --unity-selection-color: rgba(255, 122, 69, 0.34);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-base-field__input:hover,
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-base-text-field__input:hover,
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-enum-field__input:hover {
+    background-color: rgb(43, 43, 46);
+    border-top-color: rgb(82, 82, 86);
+    border-right-color: rgb(82, 82, 86);
+    border-bottom-color: rgb(82, 82, 86);
+    border-left-color: rgb(82, 82, 86);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-base-field__input:focus,
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-base-text-field__input:focus,
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-integer-field__input:focus,
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-enum-field__input:focus {
+    background-color: rgb(40, 36, 34);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control.unity-base-field--invalid .unity-base-field__input,
+.yuzu-runtime-console .yuzu-runtime-console-control.unity-base-field--invalid .unity-base-text-field__input,
+.yuzu-runtime-console .yuzu-runtime-console-control.yuzu-debug-invalid .unity-base-field__input,
+.yuzu-runtime-console .yuzu-runtime-console-control.yuzu-debug-invalid .unity-base-text-field__input {
+    background-color: rgb(53, 34, 35);
+    border-top-color: rgb(239, 91, 91);
+    border-right-color: rgb(239, 91, 91);
+    border-bottom-color: rgb(239, 91, 91);
+    border-left-color: rgb(239, 91, 91);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control:disabled .unity-base-field__input,
+.yuzu-runtime-console .yuzu-runtime-console-control:disabled .unity-base-text-field__input {
+    background-color: rgb(31, 31, 33);
+    color: rgb(100, 100, 104);
+    border-top-color: rgb(45, 45, 48);
+    border-right-color: rgb(45, 45, 48);
+    border-bottom-color: rgb(45, 45, 48);
+    border-left-color: rgb(45, 45, 48);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control.unity-toggle {
+    min-height: 32px;
+    margin: 2px 8px 2px 0;
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control .unity-toggle__checkmark {
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    min-height: 18px;
+    margin: 0 8px 0 0;
+    background-image: none;
+    background-color: rgb(35, 35, 37);
+    border-top-color: rgb(76, 76, 80);
+    border-right-color: rgb(76, 76, 80);
+    border-bottom-color: rgb(76, 76, 80);
+    border-left-color: rgb(76, 76, 80);
+    border-radius: 5px;
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-control.unity-toggle:checked .unity-toggle__checkmark {
+    background-image: none;
+    background-color: rgb(255, 122, 69);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.yuzu-runtime-console-pan-scrollbar {
+    width: 10px;
+    background-color: rgb(31, 31, 33);
+    border-radius: 5px;
+}
+
+.yuzu-runtime-console-pan-scrollbar-thumb {
+    left: 2px;
+    right: 2px;
+    min-height: 30px;
+    background-color: rgb(82, 82, 86);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-radius: 3px;
+}
+
+.yuzu-runtime-console-pan-scrollbar:hover {
+    background-color: rgb(36, 36, 38);
+}
+
+.yuzu-runtime-console-pan-scrollbar-thumb:hover,
+.yuzu-runtime-console-pan-scrollbar-thumb-active {
+    background-color: rgb(255, 122, 69);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-switch {
+    min-height: 30px;
+    border-radius: 15px;
+    -unity-font-style: bold;
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-switch-on {
+    background-color: rgb(64, 48, 40);
+    color: rgb(255, 199, 168);
+    border-top-color: rgba(255, 122, 69, 0.75);
+    border-right-color: rgba(255, 122, 69, 0.75);
+    border-bottom-color: rgba(255, 122, 69, 0.75);
+    border-left-color: rgba(255, 122, 69, 0.75);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-switch-on:hover {
+    background-color: rgb(75, 54, 43);
+    color: rgb(255, 231, 218);
+    border-top-color: rgb(255, 151, 105);
+    border-right-color: rgb(255, 151, 105);
+    border-bottom-color: rgb(255, 151, 105);
+    border-left-color: rgb(255, 151, 105);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-switch-on:focus,
+.yuzu-runtime-console .yuzu-runtime-console-switch-on:active {
+    background-color: rgb(98, 58, 39);
+    color: rgb(255, 255, 255);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-switch-off {
+    background-color: rgb(43, 43, 46);
+    color: rgb(160, 160, 165);
+    border-top-color: rgb(65, 65, 69);
+    border-right-color: rgb(65, 65, 69);
+    border-bottom-color: rgb(65, 65, 69);
+    border-left-color: rgb(65, 65, 69);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-switch-off:hover {
+    background-color: rgb(53, 53, 56);
+    color: rgb(220, 220, 223);
+    border-top-color: rgb(91, 91, 96);
+    border-right-color: rgb(91, 91, 96);
+    border-bottom-color: rgb(91, 91, 96);
+    border-left-color: rgb(91, 91, 96);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-switch-off:focus,
+.yuzu-runtime-console .yuzu-runtime-console-switch-off:active {
+    background-color: rgb(55, 46, 42);
+    color: rgb(235, 235, 237);
+    border-top-color: rgb(255, 122, 69);
+    border-right-color: rgb(255, 122, 69);
+    border-bottom-color: rgb(255, 122, 69);
+    border-left-color: rgb(255, 122, 69);
+}
+
+.yuzu-runtime-console .yuzu-runtime-console-switch-blocked,
+.yuzu-runtime-console .yuzu-runtime-console-switch-blocked:disabled {
+    background-color: rgb(33, 33, 35);
+    color: rgb(93, 93, 97);
+    border-top-color: rgb(47, 47, 50);
+    border-right-color: rgb(47, 47, 50);
+    border-bottom-color: rgb(47, 47, 50);
+    border-left-color: rgb(47, 47, 50);
+}
+
+.yuzu-runtime-console-help-popup {
+    position: absolute;
+    max-width: 340px;
+    padding: 7px 9px;
+    background-color: rgb(42, 42, 45);
+    background-image: none;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: rgb(75, 75, 79);
+    border-right-color: rgb(75, 75, 79);
+    border-bottom-color: rgb(75, 75, 79);
+    border-left-color: rgb(75, 75, 79);
+    border-radius: 8px;
+}
+
+.yuzu-runtime-console-help-text {
+    margin: 0;
+    padding: 0;
+    color: rgb(226, 226, 229);
+    font-size: 11px;
+    white-space: normal;
+}

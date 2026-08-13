@@ -37,6 +37,9 @@ https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unit
 打开 **YuzeToolkit > UnityEvalTool** 可检查和控制当前进程的注册。该窗口会显示
 已安装 Broker、连接状态、Unity phase、eval 可用性、编译计数和已注册 Tool 目录。
 
+该窗口使用包自有的深色 UI Toolkit 主题；按钮、页签、开关、Notice、文本输入、Tooltip、
+焦点状态和滚动条均显式定制，不会呈现 Unity 默认控件皮肤或原生 Tooltip/右键菜单视觉。
+
 Editor 会在 eval 之外独立报告导入、编译、编译失败、程序集重载、Play Mode 过渡
 和主线程响应状态。Domain Reload 期间，Broker 会保留 Unity 实例与有效选择 handle；
 同一进程会以新的 connection epoch 和 VM generation 重连。编译失败时，上一次成功
