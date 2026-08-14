@@ -9,6 +9,7 @@ namespace YuzeToolkit.UnityAgent
 {
     public sealed class HttpAgentModelProvider : IAgentModelProvider, IDisposable
     {
+        private const int MaximumTurnAttempts = 3;
         private readonly IAgentSecretStore _secretStore;
         private readonly AgentProviderTransport _transport;
 
@@ -35,12 +36,33 @@ namespace YuzeToolkit.UnityAgent
             var profileSnapshot = Snapshot(profile);
             var protocol = AgentWireProtocolFactory.Create(profileSnapshot.Protocol);
             var secret = _secretStore.Resolve(profileSnapshot);
-            var decoder = protocol.CreateDecoder(SanitizeFailureEvents(onEvent, secret));
             var uri = ResolveUri(profileSnapshot.BaseUrl, protocol.TurnPath);
             var json = AgentJson.Stringify(protocol.CreateRequest(profileSnapshot, request));
-            await _transport.SendSseAsync(uri, json, protocol.CreateHeaders(secret), decoder.Accept,
-                cancellationToken).ConfigureAwait(false);
-            return decoder.Complete();
+            var headers = protocol.CreateHeaders(secret);
+            for (var attempt = 0; attempt < MaximumTurnAttempts; attempt++)
+            {
+                var receivedSseEvent = false;
+                var decoder = protocol.CreateDecoder(SanitizeFailureEvents(onEvent, secret));
+                try
+                {
+                    await _transport.SendSseAsync(uri, json, headers, value =>
+                    {
+                        receivedSseEvent = true;
+                        decoder.Accept(value);
+                    }, cancellationToken).ConfigureAwait(false);
+                    return decoder.Complete();
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception) when (attempt + 1 < MaximumTurnAttempts &&
+                                                  !receivedSseEvent && IsTransientTurnFailure(exception))
+                {
+                    await Task.Delay(RetryDelay(exception, attempt), cancellationToken).ConfigureAwait(false);
+                }
+            }
+            throw new InvalidOperationException("HTTP Agent retry loop ended without a result.");
         }
 
         public async Task<IReadOnlyList<string>> ListModelsAsync(
@@ -131,6 +153,7 @@ namespace YuzeToolkit.UnityAgent
                 ReasoningEffort = profile.ReasoningEffort,
                 SecretEnvironmentVariable = profile.SecretEnvironmentVariable,
                 MaxOutputTokens = profile.MaxOutputTokens,
+                ContextWindowTokens = profile.ContextWindowTokens,
                 StrictTools = profile.StrictTools
             };
         }
@@ -140,6 +163,18 @@ namespace YuzeToolkit.UnityAgent
             if (preset == null || preset.Models.Count == 0) return false;
             return exception is AgentProviderException or HttpRequestException or FormatException or
                    LitJson.JsonException;
+        }
+
+        private static bool IsTransientTurnFailure(Exception exception) =>
+            exception is HttpRequestException ||
+            exception is TaskCanceledException ||
+            exception is AgentProviderTransportException { IsTransient: true };
+
+        private static TimeSpan RetryDelay(Exception exception, int completedAttempt)
+        {
+            var fallback = completedAttempt == 0 ? TimeSpan.FromMilliseconds(500) : TimeSpan.FromSeconds(1.5);
+            if (exception is not AgentProviderTransportException { RetryAfter: { } retryAfter }) return fallback;
+            return retryAfter > TimeSpan.FromSeconds(10) ? TimeSpan.FromSeconds(10) : retryAfter;
         }
 
         private static Action<AgentStreamEvent>? SanitizeFailureEvents(

@@ -51,6 +51,8 @@ namespace YuzeToolkit.UnityAgent
                 throw new FormatException("Editor and Runtime system prompts are required.");
             if (settings.DefaultToolTimeoutSeconds < 1)
                 throw new FormatException("Default Tool timeout must be positive.");
+            if (settings.MaximumAgentSteps < 1)
+                throw new FormatException("Maximum Agent steps must be positive.");
             ValidateRoots(settings.AgentsRoots, "AGENTS.md");
             ValidateRoots(settings.SkillRoots, "Skill");
         }

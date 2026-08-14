@@ -160,8 +160,10 @@ namespace YuzeToolkit.UnityAgent
                     foreach (var document in sessions)
                     {
                         var repaired = false;
-                        if (document.State is AgentSessionState.Running or AgentSessionState.AwaitingApproval or
-                            AgentSessionState.StepLimitReached)
+                        var closedCalls = AgentConversationIntegrity.CloseIncompleteToolCalls(document,
+                            "Tool call was not completed because the previous Unity domain or process ended.");
+                        if (document.State is AgentSessionState.Running or AgentSessionState.AwaitingApproval ||
+                            closedCalls > 0)
                         {
                             document.State = AgentSessionState.Interrupted;
                             document.PendingApproval = null;
@@ -421,9 +423,14 @@ namespace YuzeToolkit.UnityAgent
                     deleting = runtime.IsDeleting;
                     if (!deleting)
                     {
+                        var interruption = string.IsNullOrWhiteSpace(runtime.InterruptionMessage)
+                            ? "Agent turn was stopped."
+                            : runtime.InterruptionMessage;
+                        AgentConversationIntegrity.CloseIncompleteToolCalls(runtime.Document,
+                            "Tool call was not completed because " + interruption.TrimEnd('.') + ".");
                         runtime.Document.State = AgentSessionState.Interrupted;
                         runtime.Document.PendingApproval = null;
-                        runtime.Document.LastError = "Agent turn was stopped.";
+                        runtime.Document.LastError = interruption;
                         runtime.Document.UpdatedAtUtc = DateTime.UtcNow;
                     }
                 }
@@ -441,6 +448,8 @@ namespace YuzeToolkit.UnityAgent
                     deleting = runtime.IsDeleting;
                     if (!deleting)
                     {
+                        AgentConversationIntegrity.CloseIncompleteToolCalls(runtime.Document,
+                            "Tool call was not completed because the Agent turn failed: " + exception.Message);
                         runtime.Document.State = AgentSessionState.Failed;
                         runtime.Document.PendingApproval = null;
                         runtime.Document.LastError = exception.Message;
@@ -459,6 +468,7 @@ namespace YuzeToolkit.UnityAgent
                 {
                     if (ReferenceEquals(runtime.ActiveCancellation, turnCancellation))
                         runtime.ActiveCancellation = null;
+                    runtime.InterruptionMessage = string.Empty;
                 }
                 turnCancellation?.Dispose();
                 if (turnAdmitted) ExitTurnAdmission();
@@ -472,6 +482,79 @@ namespace YuzeToolkit.UnityAgent
             var runtime = GetRuntime(sessionId);
             lock (runtime.SyncRoot) runtime.ActiveCancellation?.Cancel();
             _approvals.CancelSession(sessionId);
+        }
+
+        /// <summary>
+        /// Captures active Editor conversations before a compilation marker is written. The caller
+        /// must persist that marker before requesting interruption so Domain Reload cannot lose intent.
+        /// </summary>
+        public IReadOnlyList<string> GetActiveSessionIdsForEditorCompilation()
+        {
+            using var operation = EnterOperation();
+            if (!AgentPaths.IsEditor) return Array.Empty<string>();
+            lock (_syncRoot)
+            {
+                if (!_initialized) return Array.Empty<string>();
+                var result = new List<string>();
+                foreach (var runtime in _sessions.Values)
+                {
+                    lock (runtime.SyncRoot)
+                    {
+                        if (runtime.ActiveCancellation != null &&
+                            runtime.Document.State is AgentSessionState.Running or AgentSessionState.AwaitingApproval)
+                            result.Add(runtime.Document.Id);
+                    }
+                }
+                return result;
+            }
+        }
+
+        /// <summary>Interrupts only the previously captured conversations that are still active.</summary>
+        public IReadOnlyList<string> InterruptSessionsForEditorCompilation(
+            IReadOnlyList<string> sessionIds,
+            string interruptionMessage)
+        {
+            if (sessionIds == null) throw new ArgumentNullException(nameof(sessionIds));
+            if (string.IsNullOrWhiteSpace(interruptionMessage))
+                throw new ArgumentException("Compilation interruption message is required.",
+                    nameof(interruptionMessage));
+            using var operation = EnterOperation();
+            if (!AgentPaths.IsEditor)
+                throw new InvalidOperationException("Editor compilation recovery is unavailable in a Player.");
+            var cancellations = new List<(string Id, CancellationTokenSource Cancellation)>();
+            lock (_syncRoot)
+            {
+                foreach (var id in sessionIds.Distinct(StringComparer.Ordinal))
+                {
+                    if (!_sessions.TryGetValue(id, out var runtime)) continue;
+                    lock (runtime.SyncRoot)
+                    {
+                        if (runtime.ActiveCancellation == null ||
+                            runtime.Document.State is not (AgentSessionState.Running or
+                                AgentSessionState.AwaitingApproval)) continue;
+                        runtime.InterruptionMessage = interruptionMessage;
+                        cancellations.Add((id, runtime.ActiveCancellation));
+                    }
+                }
+            }
+            foreach (var value in cancellations)
+            {
+                value.Cancellation.Cancel();
+                _approvals.CancelSession(value.Id);
+            }
+            return cancellations.Select(value => value.Id).ToList();
+        }
+
+        public async Task WaitForSessionIdleAsync(
+            string sessionId,
+            CancellationToken cancellationToken = default)
+        {
+            using var operation = EnterOperation();
+            using var linkedCancellation = CreateOperationCancellation(cancellationToken);
+            await EnsureInitializedCoreAsync(linkedCancellation.Token).ConfigureAwait(false);
+            var runtime = GetRuntime(sessionId);
+            await runtime.TurnGate.WaitAsync(linkedCancellation.Token).ConfigureAwait(false);
+            runtime.TurnGate.Release();
         }
 
         public async Task DeleteSessionAsync(string sessionId, CancellationToken cancellationToken = default)
@@ -716,8 +799,12 @@ namespace YuzeToolkit.UnityAgent
             ValidateSettings(settings);
             var normalized = AgentDocumentCodec.Clone(settings);
             normalized.DefaultToolTimeoutSeconds = Math.Max(1, normalized.DefaultToolTimeoutSeconds);
+            normalized.MaximumAgentSteps = Math.Max(1, normalized.MaximumAgentSteps);
             foreach (var profile in normalized.ProviderProfiles)
+            {
                 profile.MaxOutputTokens = Math.Max(1, profile.MaxOutputTokens);
+                profile.ContextWindowTokens = Math.Max(8_192, profile.ContextWindowTokens);
+            }
             ValidateSettings(normalized);
             await _settingsMutationGate.WaitAsync(token).ConfigureAwait(false);
             var admissionClosed = false;
@@ -803,8 +890,12 @@ namespace YuzeToolkit.UnityAgent
                 ValidateSettings(reloaded);
                 var normalized = AgentDocumentCodec.Clone(reloaded);
                 normalized.DefaultToolTimeoutSeconds = Math.Max(1, normalized.DefaultToolTimeoutSeconds);
+                normalized.MaximumAgentSteps = Math.Max(1, normalized.MaximumAgentSteps);
                 foreach (var profile in normalized.ProviderProfiles)
+                {
                     profile.MaxOutputTokens = Math.Max(1, profile.MaxOutputTokens);
+                    profile.ContextWindowTokens = Math.Max(8_192, profile.ContextWindowTokens);
+                }
                 ValidateSettings(normalized);
 
                 AgentSettingsDocument previous;
@@ -893,8 +984,10 @@ namespace YuzeToolkit.UnityAgent
                     }
 
                     var repaired = false;
-                    if (document.State is AgentSessionState.Running or AgentSessionState.AwaitingApproval or
-                        AgentSessionState.StepLimitReached)
+                    var closedCalls = AgentConversationIntegrity.CloseIncompleteToolCalls(document,
+                        "Tool call was not completed because the previous Unity domain or process ended.");
+                    if (document.State is AgentSessionState.Running or AgentSessionState.AwaitingApproval ||
+                        closedCalls > 0)
                     {
                         document.State = AgentSessionState.Interrupted;
                         document.PendingApproval = null;
@@ -1291,6 +1384,10 @@ namespace YuzeToolkit.UnityAgent
                     throw new ArgumentException($"Provider profile '{profile.Id}' uses unknown protocol '{profile.Protocol}'.", nameof(settings));
                 if (string.IsNullOrWhiteSpace(profile.BaseUrl))
                     throw new ArgumentException($"Provider profile '{profile.Id}' requires a base URL or Codex executable.", nameof(settings));
+                if (profile.ContextWindowTokens < 8_192)
+                    throw new ArgumentException(
+                        $"Provider profile '{profile.Id}' requires a context window of at least 8,192 tokens.",
+                        nameof(settings));
 
                 if (string.Equals(profile.Protocol, AgentProtocolIds.CodexAppServer, StringComparison.Ordinal))
                 {
@@ -1317,6 +1414,8 @@ namespace YuzeToolkit.UnityAgent
                 throw new ArgumentException("Editor system prompt is required.", nameof(settings));
             if (string.IsNullOrWhiteSpace(settings.RuntimeSystemPrompt))
                 throw new ArgumentException("Runtime system prompt is required.", nameof(settings));
+            if (settings.MaximumAgentSteps < 1)
+                throw new ArgumentException("Maximum Agent steps must be positive.", nameof(settings));
         }
 
         private static void ValidatePathLocations(

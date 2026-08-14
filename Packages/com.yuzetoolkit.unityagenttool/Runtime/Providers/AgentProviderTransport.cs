@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
@@ -9,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace YuzeToolkit.UnityAgent
 {
-    public sealed class AgentProviderException : Exception
+    public class AgentProviderException : Exception
     {
         public AgentProviderException(string message) : base(message)
         {
@@ -18,6 +19,22 @@ namespace YuzeToolkit.UnityAgent
         public AgentProviderException(string message, Exception innerException) : base(message, innerException)
         {
         }
+    }
+
+    internal sealed class AgentProviderTransportException : AgentProviderException
+    {
+        public AgentProviderTransportException(string message, HttpStatusCode statusCode,
+            TimeSpan? retryAfter) : base(message)
+        {
+            StatusCode = statusCode;
+            RetryAfter = retryAfter;
+        }
+
+        public HttpStatusCode StatusCode { get; }
+        public TimeSpan? RetryAfter { get; }
+        public bool IsTransient => StatusCode == HttpStatusCode.RequestTimeout ||
+                                   (int)StatusCode == 425 || StatusCode == (HttpStatusCode)429 ||
+                                   (int)StatusCode >= 500;
     }
 
     internal sealed class AgentProviderTransport : IDisposable
@@ -132,9 +149,13 @@ namespace YuzeToolkit.UnityAgent
         {
             var body = await ReadBodyAsync(response.Content, MaxErrorBodyBytes, cancellationToken)
                 .ConfigureAwait(false);
-            return new AgentProviderException(
+            TimeSpan? retryAfter = response.Headers.RetryAfter?.Delta;
+            if (retryAfter == null && response.Headers.RetryAfter?.Date is { } date)
+                retryAfter = date - DateTimeOffset.UtcNow;
+            if (retryAfter is { } delay && delay < TimeSpan.Zero) retryAfter = TimeSpan.Zero;
+            return new AgentProviderTransportException(
                 $"Provider returned HTTP {(int)response.StatusCode} {response.ReasonPhrase}.\n" +
-                RedactSecrets(FormatBody(body), requestHeaders));
+                RedactSecrets(FormatBody(body), requestHeaders), response.StatusCode, retryAfter);
         }
 
         private static async Task<BoundedBody> ReadBodyAsync(

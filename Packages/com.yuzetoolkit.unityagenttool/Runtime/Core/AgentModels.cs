@@ -34,7 +34,6 @@ namespace YuzeToolkit.UnityAgent
         Completed,
         Interrupted,
         Failed,
-        // Kept only so schema V1/V2 histories can be repaired to Interrupted on load.
         StepLimitReached
     }
 
@@ -69,6 +68,12 @@ namespace YuzeToolkit.UnityAgent
         public string SecretEnvironmentVariable { get; set; } = "OPENAI_API_KEY";
 
         public int MaxOutputTokens { get; set; } = 4096;
+
+        /// <summary>
+        /// Complete model context window. Curated presets populate their published value; custom
+        /// providers use this explicit profile value so context compaction never relies on a model-name guess.
+        /// </summary>
+        public int ContextWindowTokens { get; set; } = 128_000;
 
         public bool StrictTools { get; set; } = true;
     }
@@ -160,7 +165,7 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class AgentSettingsDocument
     {
-        public const int CurrentSchemaVersion = 3;
+        public const int CurrentSchemaVersion = 4;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -173,6 +178,8 @@ namespace YuzeToolkit.UnityAgent
         public string RuntimeSystemPrompt { get; set; } = AgentPromptDefaults.RuntimeSystemPrompt;
 
         public int DefaultToolTimeoutSeconds { get; set; } = 120;
+
+        public int MaximumAgentSteps { get; set; } = 64;
 
         public List<AgentProviderProfile> ProviderProfiles { get; set; } = new();
 
@@ -211,13 +218,14 @@ namespace YuzeToolkit.UnityAgent
     /// </summary>
     public sealed class AgentProjectSettingsDocument
     {
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
         public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.FullAccess;
         public string EditorSystemPrompt { get; set; } = AgentPromptDefaults.EditorSystemPrompt;
         public string RuntimeSystemPrompt { get; set; } = AgentPromptDefaults.RuntimeSystemPrompt;
         public int DefaultToolTimeoutSeconds { get; set; } = 120;
+        public int MaximumAgentSteps { get; set; } = 64;
         public List<AgentPathLocation> AgentsRoots { get; set; } = new()
         {
             AgentPathLocation.ProjectAgentsRoot(), AgentPathLocation.PersistentAgentsRoot()
@@ -233,6 +241,7 @@ namespace YuzeToolkit.UnityAgent
             EditorSystemPrompt = settings.EditorSystemPrompt,
             RuntimeSystemPrompt = settings.RuntimeSystemPrompt,
             DefaultToolTimeoutSeconds = settings.DefaultToolTimeoutSeconds,
+            MaximumAgentSteps = settings.MaximumAgentSteps,
             AgentsRoots = settings.AgentsRoots.Select(ClonePath).ToList(),
             SkillRoots = settings.SkillRoots.Select(ClonePath).ToList()
         };
@@ -243,6 +252,7 @@ namespace YuzeToolkit.UnityAgent
             settings.EditorSystemPrompt = EditorSystemPrompt;
             settings.RuntimeSystemPrompt = RuntimeSystemPrompt;
             settings.DefaultToolTimeoutSeconds = Math.Max(1, DefaultToolTimeoutSeconds);
+            settings.MaximumAgentSteps = Math.Max(1, MaximumAgentSteps);
             settings.AgentsRoots = AgentsRoots.Select(ClonePath).ToList();
             settings.SkillRoots = SkillRoots.Select(ClonePath).ToList();
         }
@@ -258,18 +268,34 @@ namespace YuzeToolkit.UnityAgent
 
     public static class AgentPromptDefaults
     {
-        public const string EditorSystemPrompt =
+        internal const string PreviousEditorSystemPrompt =
             "You are a Unity Editor development agent running inside the current Unity Editor process. " +
             "Work autonomously through multiple tool calls until the user's task is complete. " +
             "Inspect relevant files and Unity state before changing them, preserve unrelated work, " +
             "report tool failures honestly, and never claim an action succeeded without its tool result. " +
             "Use unity_eval_js for native Unity and IEvalTool operations. Use file and process tools for host operations.";
 
-        public const string RuntimeSystemPrompt =
+        internal const string PreviousRuntimeSystemPrompt =
             "You are a runtime Unity game agent embedded in the currently running Player. " +
             "Operate only through tools available in this build, prioritize observing and controlling live game state, " +
             "do not assume UnityEditor APIs or project source files exist, and report unavailable operations explicitly. " +
             "Continue through multiple safe tool calls until the user's runtime task is complete.";
+
+        public const string EditorSystemPrompt =
+            "You are an AI Agent developer working inside the current Unity Editor project. " +
+            "Use the available Unity, file, process, and project-instruction tools according to their own descriptions. " +
+            "Inspect the relevant source, assets, and live Editor state before acting; implement the requested Unity work, " +
+            "preserve unrelated changes, and validate the actual result. Continue through tool calls until the task is complete " +
+            "or a concrete blocker remains. Before the first tool call, state the immediate direction in one short sentence; " +
+            "update only for important findings or changes of direction, and lead the final response with the outcome.";
+
+        public const string RuntimeSystemPrompt =
+            "You are a Unity runtime debugging Agent embedded in the currently running Player. " +
+            "Use the available runtime tools according to their own descriptions to reproduce or observe the symptom, " +
+            "locate the relevant GameObjects and systems, inspect components, logs, and live state, then trace the evidence " +
+            "to the most likely root cause. Runtime cannot modify project source or Editor assets: do not assume UnityEditor APIs " +
+            "or project files exist, and do not present temporary live-state changes as a fix. Continue until the diagnosis is " +
+            "complete or a concrete limitation remains, then report the evidence, conclusion, and recommended Editor-side change.";
     }
 
     public sealed class AgentToolCall
@@ -319,7 +345,7 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class AgentSessionDocument
     {
-        public const int CurrentSchemaVersion = 4;
+        public const int CurrentSchemaVersion = 5;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -360,6 +386,12 @@ namespace YuzeToolkit.UnityAgent
         /// Schema V3 never keeps the summarized prefix in Messages.
         /// </summary>
         public int SummarizedMessageCount { get; set; }
+
+        /// <summary>
+        /// Number of messages at the start of Messages represented by Summary for model requests.
+        /// Unlike legacy SummarizedMessageCount, these messages remain in durable history.
+        /// </summary>
+        public int ContextSummaryMessageCount { get; set; }
 
         public int CompletedSteps { get; set; }
 

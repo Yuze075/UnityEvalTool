@@ -27,6 +27,22 @@ Agent 与 Command Line 会话在侧栏中分组显示，各自保存独立输入
 Provider 页面内联显示，不再反复弹窗；所有自有下拉菜单都会限制在工作区视口内，供应商、Profile 或模型列表
 较长时可纵向滚动。
 
+## Agent 循环
+
+内建 HTTP Agent 使用刻意保持简单的顺序循环：先持久化一次模型响应，再为每个 ToolCall 按顺序写入且仅写入
+一个 ToolResult，最后继续请求模型，直到模型不再调用工具。单轮模型步骤可配置，默认上限为 64。用户停止、
+意外失败或 Unity Domain Reload 都会先为未完成工具补充明确的错误结果，再保存终态，后续轮次不会收到孤立的
+工具协议。
+
+Provider Profile 保存模型 Context Window。HTTP 对话接近窗口时，对话文档继续保留完整消息；发给模型的内容
+改用一份语义摘要检查点和最近的完整消息边界。网络瞬时错误、429 与可恢复的 5xx 最多重试两次，并且只能发生
+在收到第一条 SSE 事件之前；任何部分模型输出都不会重试。
+
+Editor 中若活动对话触发脚本编译，本包会先在 `Application.persistentDataPath` 写入同时绑定当前项目与 Editor
+进程的恢复 marker，再中断并持久化该轮。成功编译与 Domain Reload 后，或失败编译结束后，系统会追加一次包含
+编译错误/警告数量的续跑消息，并要求 Agent 重新检查 Unity 状态；Domain Reload 不会保留缓存 Unity 对象和
+JavaScript VM。其它 Editor 进程留下的 marker 会被删除，不会在下次启动时自动执行旧任务。
+
 ## 持久化
 
 所有机器级非密钥设置固定存放在 `Application.persistentDataPath/settings.json`：
@@ -34,6 +50,7 @@ Provider 页面内联显示，不再反复弹窗；所有自有下拉菜单都�
 ```text
 AgentConversations/       Agent 对话文档
 CommandLineHistory/       命令行文档与当前选择状态
+UnityAgentEditorCompilationRecovery.json  仅 Editor 使用的活动轮次恢复 marker
 ```
 
 命令行输入、输出和草稿会跨 Unity 重启保存；JavaScript `EvalSession` 不恢复。Provider 密钥只写入

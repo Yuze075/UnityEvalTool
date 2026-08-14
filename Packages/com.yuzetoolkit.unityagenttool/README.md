@@ -29,6 +29,27 @@ Eval connection, Eval Tools, archived conversations and archived command lines. 
 stay inline in the provider page instead of opening repeated dialogs, and all owned choice menus clamp to
 the workspace viewport and scroll when their provider, profile or model catalog is long.
 
+## Agent loop
+
+The built-in HTTP Agent uses a deliberately small sequential loop: one model response is persisted, each
+tool call receives exactly one ordered result, and the model continues until it returns no tool calls. A
+turn has a configurable model-step limit (64 by default). Cancellation, an unexpected failure, or a Unity
+Domain Reload closes every uncompleted tool call with an explicit error result before the terminal state is
+saved, so a later turn never receives an orphaned tool protocol.
+
+Provider profiles store the model context window. When an HTTP conversation approaches that limit, the
+complete transcript remains in its conversation document while a semantic summary checkpoint plus the
+latest complete message boundary is projected to the model. Transient HTTP network errors, 429 responses,
+and recoverable 5xx responses are retried at most twice and only before the first SSE event; partial model
+output is never retried.
+
+In Editor, active conversations are paused when script compilation starts. The package writes a
+process- and project-bound recovery marker to `Application.persistentDataPath`, interrupts and persists the
+turn, then appends one continuation message after a successful Domain Reload or a failed compilation. The
+continuation includes compiler counts and tells the Agent to re-inspect Unity state because cached Unity
+objects and the JavaScript VM do not survive a reload. A marker from another Editor process is discarded
+instead of automatically running work after a restart.
+
 ## Persistence
 
 All non-secret machine settings live at `Application.persistentDataPath/settings.json` with fixed folders:
@@ -36,6 +57,7 @@ All non-secret machine settings live at `Application.persistentDataPath/settings
 ```text
 AgentConversations/       Agent conversation documents
 CommandLineHistory/       Command Line documents and selected-session state
+UnityAgentEditorCompilationRecovery.json  Editor-only active-turn recovery marker
 ```
 
 Command Line input, output and drafts survive Unity restarts. JavaScript `EvalSession` instances do not.

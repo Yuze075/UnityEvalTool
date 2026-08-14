@@ -334,6 +334,7 @@ namespace YuzeToolkit.UnityAgent
             target.Model = model?.Id ?? string.Empty;
             target.ReasoningEffort = model?.DefaultReasoningEffort ?? string.Empty;
             target.MaxOutputTokens = Math.Max(1, model?.RecommendedOutputTokens ?? 4096);
+            target.ContextWindowTokens = Math.Max(8_192, model?.ContextTokens ?? 128_000);
             return true;
         }
 

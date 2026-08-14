@@ -33,8 +33,19 @@ namespace YuzeToolkit.UnityAgent
                     sourceSchemaVersion < 3
                         ? AgentJson.GetString(root, "systemPrompt", AgentPromptDefaults.RuntimeSystemPrompt)
                         : AgentPromptDefaults.RuntimeSystemPrompt),
-                DefaultToolTimeoutSeconds = Math.Max(1, EvalData.GetInt(root, "defaultToolTimeoutSeconds", 120))
+                DefaultToolTimeoutSeconds = Math.Max(1, EvalData.GetInt(root, "defaultToolTimeoutSeconds", 120)),
+                MaximumAgentSteps = Math.Max(1, EvalData.GetInt(root, "maximumAgentSteps", 64))
             };
+
+            if (sourceSchemaVersion < 4)
+            {
+                if (string.Equals(settings.EditorSystemPrompt, AgentPromptDefaults.PreviousEditorSystemPrompt,
+                        StringComparison.Ordinal))
+                    settings.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
+                if (string.Equals(settings.RuntimeSystemPrompt, AgentPromptDefaults.PreviousRuntimeSystemPrompt,
+                        StringComparison.Ordinal))
+                    settings.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
+            }
 
             foreach (var value in AgentJson.GetObjectArray(root, "providerProfiles"))
                 settings.ProviderProfiles.Add(ReadProviderProfile(value));
@@ -117,6 +128,8 @@ namespace YuzeToolkit.UnityAgent
                 State = AgentJson.GetEnum(root, "state", AgentSessionState.Idle),
                 Summary = AgentJson.GetString(root, "summary"),
                 SummarizedMessageCount = Math.Max(0, EvalData.GetInt(root, "summarizedMessageCount")),
+                ContextSummaryMessageCount = Math.Max(0,
+                    EvalData.GetInt(root, "contextSummaryMessageCount")),
                 CompletedSteps = Math.Max(0, EvalData.GetInt(root, "completedSteps")),
                 LastError = AgentJson.GetString(root, "lastError"),
                 IsPinned = EvalData.GetBool(root, "isPinned"),
@@ -127,6 +140,8 @@ namespace YuzeToolkit.UnityAgent
 
             foreach (var value in AgentJson.GetObjectArray(root, "messages"))
                 session.Messages.Add(ReadMessage(value));
+            session.ContextSummaryMessageCount = Math.Min(session.ContextSummaryMessageCount,
+                session.Messages.Count);
 
             // Schema V1/V2 retained both the summarized prefix and the summary. V3 makes the
             // summary authoritative and physically removes that prefix so histories remain bounded.
@@ -163,6 +178,7 @@ namespace YuzeToolkit.UnityAgent
                 ("editorSystemPrompt", settings.EditorSystemPrompt),
                 ("runtimeSystemPrompt", settings.RuntimeSystemPrompt),
                 ("defaultToolTimeoutSeconds", settings.DefaultToolTimeoutSeconds),
+                ("maximumAgentSteps", settings.MaximumAgentSteps),
                 ("agentsRoots", settings.AgentsRoots.Select(ToJson).Cast<object?>().ToList()),
                 ("skillRoots", settings.SkillRoots.Select(ToJson).Cast<object?>().ToList())));
 
@@ -186,9 +202,19 @@ namespace YuzeToolkit.UnityAgent
                     AgentPromptDefaults.RuntimeSystemPrompt),
                 DefaultToolTimeoutSeconds = Math.Max(1,
                     EvalData.GetInt(root, "defaultToolTimeoutSeconds", 120)),
+                MaximumAgentSteps = Math.Max(1, EvalData.GetInt(root, "maximumAgentSteps", 64)),
                 AgentsRoots = AgentJson.GetObjectArray(root, "agentsRoots").Select(ReadPathLocation).ToList(),
                 SkillRoots = AgentJson.GetObjectArray(root, "skillRoots").Select(ReadPathLocation).ToList()
             };
+            if (version < 2)
+            {
+                if (string.Equals(result.EditorSystemPrompt, AgentPromptDefaults.PreviousEditorSystemPrompt,
+                        StringComparison.Ordinal))
+                    result.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
+                if (string.Equals(result.RuntimeSystemPrompt, AgentPromptDefaults.PreviousRuntimeSystemPrompt,
+                        StringComparison.Ordinal))
+                    result.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
+            }
             return result;
         }
 
@@ -201,6 +227,7 @@ namespace YuzeToolkit.UnityAgent
                 ("editorSystemPrompt", settings.EditorSystemPrompt),
                 ("runtimeSystemPrompt", settings.RuntimeSystemPrompt),
                 ("defaultToolTimeoutSeconds", settings.DefaultToolTimeoutSeconds),
+                ("maximumAgentSteps", settings.MaximumAgentSteps),
                 ("providerProfiles", settings.ProviderProfiles.Select(ToJson).Cast<object?>().ToList()),
                 ("agentsRoots", settings.AgentsRoots.Select(ToJson).Cast<object?>().ToList()),
                 ("skillRoots", settings.SkillRoots.Select(ToJson).Cast<object?>().ToList()));
@@ -218,6 +245,7 @@ namespace YuzeToolkit.UnityAgent
                 ("reasoningEffort", profile.ReasoningEffort),
                 ("secretEnvironmentVariable", profile.SecretEnvironmentVariable),
                 ("maxOutputTokens", profile.MaxOutputTokens),
+                ("contextWindowTokens", profile.ContextWindowTokens),
                 ("strictTools", profile.StrictTools));
         }
 
@@ -240,6 +268,8 @@ namespace YuzeToolkit.UnityAgent
                 ReasoningEffort = AgentJson.GetString(value, "reasoningEffort"),
                 SecretEnvironmentVariable = AgentJson.GetString(value, "secretEnvironmentVariable"),
                 MaxOutputTokens = Math.Max(1, EvalData.GetInt(value, "maxOutputTokens", 4096)),
+                ContextWindowTokens = Math.Max(8_192,
+                    EvalData.GetInt(value, "contextWindowTokens", 128_000)),
                 StrictTools = EvalData.GetBool(value, "strictTools", true)
             };
             // V1 profiles had no preset id and were commonly materialized with an empty model.
@@ -307,6 +337,7 @@ namespace YuzeToolkit.UnityAgent
                 ("messages", session.Messages.Select(ToJson).Cast<object?>().ToList()),
                 ("summary", session.Summary),
                 ("summarizedMessageCount", session.SummarizedMessageCount),
+                ("contextSummaryMessageCount", session.ContextSummaryMessageCount),
                 ("completedSteps", session.CompletedSteps),
                 ("usage", AgentJson.Object(
                     ("inputTokens", session.Usage.InputTokens),

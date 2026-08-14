@@ -82,7 +82,7 @@ namespace YuzeToolkit.UnityAgent
 
         public void ShowPage(UnityAgentWorkbenchPage page)
         {
-            if (_disposed) return;
+            if (_disposed || _page != null && _pageKind == page) return;
             _page?.Dispose();
             _pageHost.Clear();
             _pageKind = page;
@@ -1349,6 +1349,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly Label _modelCatalogMessage;
         private readonly AgentChoiceField _effort;
         private readonly AgentIntegerField _maxTokens;
+        private readonly AgentIntegerField _contextWindow;
         private readonly AgentTextField _secretEnvironment;
         private readonly AgentTextField _localSecret;
         private readonly VisualElement _localSecretActions;
@@ -1357,6 +1358,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly Label _codexAccount;
         private readonly AgentChoiceField _permission;
         private readonly AgentIntegerField _toolTimeout;
+        private readonly AgentIntegerField _maximumAgentSteps;
         private readonly AgentTextField _editorSystemPrompt;
         private readonly AgentTextField _runtimeSystemPrompt;
         private readonly AgentPathListEditor _agentsRoots;
@@ -1556,6 +1558,10 @@ namespace YuzeToolkit.UnityAgent
             providerCard.Add(_effort);
             _maxTokens = new AgentIntegerField("Max output tokens") { value = 4096 };
             providerCard.Add(_maxTokens);
+            _contextWindow = new AgentIntegerField("Context window tokens") { value = 128_000 };
+            AgentTooltip.Attach(_contextWindow,
+                "Used to reserve output space and compact HTTP conversation context before the provider limit.");
+            providerCard.Add(_contextWindow);
             providerCard.Add(CreateSettingsGroupLabel("Credentials"));
             _secretEnvironment = AgentUi.Field("API key environment variable", string.Empty,
                 "Portable environment variable name used to resolve the API key.");
@@ -1607,6 +1613,10 @@ namespace YuzeToolkit.UnityAgent
             AgentTooltip.Attach(_toolTimeout,
                 "Used when a process, shell, or Unity eval tool call does not specify its own timeout.");
             defaults.Add(_toolTimeout);
+            _maximumAgentSteps = new AgentIntegerField("Maximum model steps per turn") { value = 64 };
+            AgentTooltip.Attach(_maximumAgentSteps,
+                "Stops a looping Agent turn with an explicit StepLimitReached result.");
+            defaults.Add(_maximumAgentSteps);
             defaults.Add(CreateSettingsGroupLabel("System prompts"));
             _editorSystemPrompt = AgentUi.Field("Editor system prompt", string.Empty,
                 "Instructions used while the Agent runs inside Unity Editor.");
@@ -1803,6 +1813,7 @@ namespace YuzeToolkit.UnityAgent
             LoadSelectedProfile();
             _permission.SetValueWithoutNotify(_editing.PermissionMode.ToString());
             _toolTimeout.SetValueWithoutNotify(_editing.DefaultToolTimeoutSeconds);
+            _maximumAgentSteps.SetValueWithoutNotify(_editing.MaximumAgentSteps);
             _editorSystemPrompt.SetValueWithoutNotify(_editing.EditorSystemPrompt);
             _runtimeSystemPrompt.SetValueWithoutNotify(_editing.RuntimeSystemPrompt);
             _agentsRoots.SetItems(_editing.AgentsRoots);
@@ -1824,6 +1835,7 @@ namespace YuzeToolkit.UnityAgent
                 ? permission
                 : AgentPermissionMode.FullAccess;
             _editing.DefaultToolTimeoutSeconds = Math.Max(1, _toolTimeout.value);
+            _editing.MaximumAgentSteps = Math.Max(1, _maximumAgentSteps.value);
             _editing.EditorSystemPrompt = string.IsNullOrWhiteSpace(_editorSystemPrompt.value)
                 ? AgentPromptDefaults.EditorSystemPrompt
                 : _editorSystemPrompt.value;
@@ -1896,6 +1908,7 @@ namespace YuzeToolkit.UnityAgent
             LoadSelectedProfile();
             _permission.SetValueWithoutNotify(_editing.PermissionMode.ToString());
             _toolTimeout.SetValueWithoutNotify(_editing.DefaultToolTimeoutSeconds);
+            _maximumAgentSteps.SetValueWithoutNotify(_editing.MaximumAgentSteps);
             _editorSystemPrompt.SetValueWithoutNotify(_editing.EditorSystemPrompt);
             _runtimeSystemPrompt.SetValueWithoutNotify(_editing.RuntimeSystemPrompt);
             _agentsRoots.SetItems(_editing.AgentsRoots);
@@ -1957,6 +1970,7 @@ namespace YuzeToolkit.UnityAgent
             profile.Model = _model.value;
             profile.ReasoningEffort = _effort.value == "default" ? string.Empty : _effort.value;
             profile.MaxOutputTokens = Math.Max(1, _maxTokens.value);
+            profile.ContextWindowTokens = Math.Max(8_192, _contextWindow.value);
             profile.SecretEnvironmentVariable = profile.Protocol == AgentProtocolIds.CodexAppServer
                 ? string.Empty
                 : _secretEnvironment.value.Trim();
@@ -1978,6 +1992,7 @@ namespace YuzeToolkit.UnityAgent
                 : profile.ReasoningEffort);
             EnsureChoice(_effort, _effort.value);
             _maxTokens.SetValueWithoutNotify(profile.MaxOutputTokens);
+            _contextWindow.SetValueWithoutNotify(profile.ContextWindowTokens);
             _secretEnvironment.SetValueWithoutNotify(profile.SecretEnvironmentVariable);
             _localSecret.SetValueWithoutNotify(string.Empty);
             RefreshLocalSecretStatus();
@@ -2132,6 +2147,7 @@ namespace YuzeToolkit.UnityAgent
                 ? "default"
                 : option.DefaultReasoningEffort);
             if (option.RecommendedOutputTokens > 0) _maxTokens.value = option.RecommendedOutputTokens;
+            if (option.ContextTokens > 0) _contextWindow.value = option.ContextTokens;
         }
 
         private void ApplyModelPreset(AgentModelPreset? model)
@@ -2145,6 +2161,7 @@ namespace YuzeToolkit.UnityAgent
                 ? "default"
                 : model.DefaultReasoningEffort);
             if (model.RecommendedOutputTokens > 0) _maxTokens.value = model.RecommendedOutputTokens;
+            if (model.ContextTokens > 0) _contextWindow.value = model.ContextTokens;
         }
 
         private void ApplyProtocolDefaults()
