@@ -2,7 +2,7 @@
   "name": "com.yuzetoolkit.unityagenttool",
   "version": "0.1.0",
   "displayName": "UnityAgentTool",
-  "description": "A Broker-independent in-process Unity Agent with multi-session chat, native tools, Skills and multiple model protocols.",
+  "description": "A unified Editor and Runtime workbench for Agent chat, persistent command lines, Debug Panels, Unity logs, System Info and shared settings.",
   "unity": "2022.3",
   "author": {
     "name": "Yuze",
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "com.yuzetoolkit.unityevaltool": "2.0.2",
-    "com.yuzetoolkit.unitydebugtool": "1.0.1"
+    "com.unity.inputsystem": "1.0.0",
+    "com.unity.ugui": "1.0.0"
   }
 }

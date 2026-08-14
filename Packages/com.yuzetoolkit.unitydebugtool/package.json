@@ -2,7 +2,7 @@
   "name": "com.yuzetoolkit.unitydebugtool",
   "version": "1.0.1",
   "displayName": "UnityDebugTool",
-  "description": "一个Unity运行时日志、性能信息、调试工具",
+  "description": "Unity Agent 工作台的 System Info 与 Performance 扩展包，并保留独立的运行时系统信息界面。",
   "unity": "2022.3",
   "author": {
     "name": "Yuze",
@@ -10,7 +10,7 @@
     "url": "https://github.com/Yuze075"
   },
   "dependencies": {
-    "com.yuzetoolkit.unityevaltool": "2.0.2",
+    "com.yuzetoolkit.unityagenttool": "0.1.0",
     "com.unity.inputsystem": "1.0.0",
     "com.unity.ugui": "1.0.0"
   }

@@ -130,6 +130,9 @@ namespace YuzeToolkit.UnityAgent
         private readonly Action<string, string> _showError;
         private readonly Action<string, string, Action> _showConfirmation;
         private VisualElement _sessionList = new();
+        private VisualElement _commandSessionList = new();
+        private readonly VisualElement _workspaceHost;
+        private readonly VisualElement _conversationPage;
         private readonly VisualElement _messageList;
         private readonly AgentScrollContainer _messageScroll;
         private readonly AgentChoiceField _provider;
@@ -152,6 +155,11 @@ namespace YuzeToolkit.UnityAgent
         private string _shownSessionError = string.Empty;
         private string _modelCatalogDetail = string.Empty;
         private bool _archiveCollapsed = true;
+        private AgentWorkspacePage _workspacePage;
+        private AgentCommandLineWorkspaceView? _commandLineView;
+        private AgentDebugWorkspaceView? _debugPanelView;
+        private AgentLogWorkspaceView? _logView;
+        private AgentSystemInfoWorkspaceView? _systemInfoView;
         private bool _initialized;
         private bool _disposed;
 
@@ -175,12 +183,19 @@ namespace YuzeToolkit.UnityAgent
             var sidebar = CreateSidebar();
             Add(sidebar);
 
-            var main = new VisualElement { name = "unity-agent-chat-main" };
+            _workspaceHost = new VisualElement { name = "unity-agent-workspace-host" };
+            _workspaceHost.style.flexGrow = 1;
+            _workspaceHost.style.minWidth = 0;
+            _workspaceHost.style.minHeight = 0;
+            Add(_workspaceHost);
+
+            _conversationPage = new VisualElement { name = "unity-agent-chat-main" };
+            var main = _conversationPage;
             main.style.flexGrow = 1;
             main.style.minWidth = 0;
             main.style.minHeight = 0;
             main.style.alignItems = Align.Stretch;
-            Add(main);
+            _workspaceHost.Add(main);
 
             var header = new VisualElement();
             header.style.height = 54;
@@ -338,6 +353,7 @@ namespace YuzeToolkit.UnityAgent
 
             RegisterCallback<GeometryChangedEvent>(evt => ApplyResponsiveLayout(sidebar, evt.newRect.width));
 
+            ShowWorkspace(AgentWorkspacePage.Conversation);
             RunUiTask(InitializeAsync);
         }
 
@@ -356,16 +372,11 @@ namespace YuzeToolkit.UnityAgent
             sidebar.style.borderRightColor = AgentUi.Border;
             sidebar.style.backgroundColor = AgentUi.Sidebar;
 
-            var brandRow = new VisualElement();
+            var brandRow = new VisualElement { name = "unity-agent-sidebar-logo" };
             brandRow.style.flexDirection = FlexDirection.Row;
             brandRow.style.alignItems = Align.Center;
-            brandRow.style.marginLeft = 3;
-            brandRow.name = "unity-agent-sidebar-logo";
             brandRow.style.height = 60;
-            brandRow.style.paddingLeft = 4;
-            brandRow.style.paddingTop = 8;
-            brandRow.style.paddingBottom = 8;
-            brandRow.style.marginBottom = 8;
+            brandRow.style.paddingLeft = 7;
             var mark = AgentUi.RoundedPanel(10);
             mark.style.width = 34;
             mark.style.height = 34;
@@ -378,44 +389,76 @@ namespace YuzeToolkit.UnityAgent
             var brand = new Label("Unity Agent");
             AgentUi.ApplyTypography(brand, AgentTypography.PageTitle);
             brandCopy.Add(brand);
-            var brandMeta = new Label("Agent workspace");
+            var brandMeta = new Label("Unified workspace");
             AgentUi.ApplyTypography(brandMeta, AgentTypography.Caption);
             brandMeta.style.color = AgentUi.Muted;
             brandCopy.Add(brandMeta);
             brandRow.Add(brandCopy);
             sidebar.Add(brandRow);
-            var newConversation = AgentUi.Button("New conversation", "Create an independent conversation.",
-                () => RunUiTask(CreateSessionAsync), 0, AgentUi.PanelRaised, icon: AgentIconKind.Add);
-            newConversation.name = "unity-agent-sidebar-new";
-            newConversation.style.height = 38;
-            newConversation.style.borderTopLeftRadius = 12;
-            newConversation.style.borderTopRightRadius = 12;
-            newConversation.style.borderBottomLeftRadius = 12;
-            newConversation.style.borderBottomRightRadius = 12;
-            newConversation.style.flexGrow = 0;
-            sidebar.Add(newConversation);
+
+            sidebar.Add(CreateWorkspaceNavigation("New conversation", AgentIconKind.Add,
+                () => { ShowWorkspace(AgentWorkspacePage.Conversation); RunUiTask(CreateSessionAsync); }));
+            sidebar.Add(CreateWorkspaceNavigation("New command line", AgentIconKind.Sliders,
+                () => RunUiTask(CreateCommandLineSessionAsync)));
+            sidebar.Add(CreateWorkspaceNavigation("Debug Panel", AgentIconKind.Provider,
+                () => ShowWorkspace(AgentWorkspacePage.DebugPanel)));
+            sidebar.Add(CreateWorkspaceNavigation("Log", AgentIconKind.History,
+                () => ShowWorkspace(AgentWorkspacePage.Log)));
+            sidebar.Add(CreateWorkspaceNavigation("System Info", AgentIconKind.Folder,
+                () => ShowWorkspace(AgentWorkspacePage.SystemInfo)));
 
             var listScroll = AgentUi.Scroll(ScrollViewMode.Vertical);
             listScroll.name = "unity-agent-sidebar-list";
             listScroll.style.flexGrow = 1;
             listScroll.style.minHeight = 0;
             listScroll.style.marginTop = 8;
-            _sessionList = listScroll.contentContainer;
+            _sessionList = new VisualElement();
+            listScroll.Add(_sessionList);
+            var commandHeading = CreateSidebarGroupHeading("COMMAND LINE SESSIONS");
+            commandHeading.style.marginTop = 12;
+            listScroll.Add(commandHeading);
+            _commandSessionList = new VisualElement();
+            listScroll.Add(_commandSessionList);
             sidebar.Add(listScroll);
 
-            var settings = AgentUi.Button("Settings", "Open provider and Agent settings.", _openSettings, 0,
+            var settings = AgentUi.Button("Settings", "Open provider, Agent, history and Eval settings.", _openSettings, 0,
                 AgentUi.Transparent, icon: AgentIconKind.Settings);
             settings.name = "unity-agent-sidebar-settings";
             settings.style.flexGrow = 0;
-            settings.style.unityTextAlign = TextAnchor.MiddleLeft;
+            settings.style.justifyContent = Justify.FlexStart;
             settings.style.marginTop = 8;
             sidebar.Add(settings);
             return sidebar;
         }
 
+        private static AgentButton CreateWorkspaceNavigation(string text, AgentIconKind icon, Action clicked)
+        {
+            var button = AgentUi.Button(text, text, clicked, 0, AgentUi.Transparent,
+                AgentUi.TextSecondary, icon);
+            button.style.height = 36;
+            button.style.flexGrow = 0;
+            button.style.justifyContent = Justify.FlexStart;
+            button.style.marginBottom = 2;
+            return button;
+        }
+
+        private static Label CreateSidebarGroupHeading(string text)
+        {
+            var label = new Label(text);
+            AgentUi.ApplyTypography(label, AgentTypography.Caption);
+            label.style.color = AgentUi.Muted;
+            label.style.marginLeft = 8;
+            label.style.marginBottom = 5;
+            return label;
+        }
+
         public void Tick()
         {
             if (_disposed) return;
+            _commandLineView?.Tick();
+            _debugPanelView?.Tick();
+            _logView?.Tick();
+            _systemInfoView?.Tick();
             var revision = _host.Revision;
             if (!_initialized || revision == _lastRevision) return;
             _lastRevision = revision;
@@ -428,11 +471,68 @@ namespace YuzeToolkit.UnityAgent
             _disposed = true;
             _lifetime.Cancel();
             _lifetime.Dispose();
+            _commandLineView?.Dispose();
+            _debugPanelView?.Dispose();
+            _logView?.Dispose();
+            _systemInfoView?.Dispose();
+        }
+
+        private async Task CreateCommandLineSessionAsync()
+        {
+            await _host.EnsureInitializedAsync(_lifetime.Token);
+            ShowWorkspace(AgentWorkspacePage.CommandLine);
+            _commandLineView?.CreateSession();
+        }
+
+        private void ShowWorkspace(AgentWorkspacePage page)
+        {
+            if (_disposed) return;
+            _workspacePage = page;
+            _conversationPage.style.display = page == AgentWorkspacePage.Conversation
+                ? DisplayStyle.Flex : DisplayStyle.None;
+            if (page == AgentWorkspacePage.CommandLine) EnsureCommandLineView();
+            if (page == AgentWorkspacePage.DebugPanel && _debugPanelView == null)
+            {
+                _debugPanelView = new AgentDebugWorkspaceView();
+                _workspaceHost.Add(_debugPanelView);
+            }
+            if (page == AgentWorkspacePage.Log && _logView == null)
+            {
+                _logView = new AgentLogWorkspaceView();
+                _workspaceHost.Add(_logView);
+            }
+            if (page == AgentWorkspacePage.SystemInfo && _systemInfoView == null)
+            {
+                _systemInfoView = new AgentSystemInfoWorkspaceView();
+                _workspaceHost.Add(_systemInfoView);
+            }
+            if (_commandLineView != null)
+                _commandLineView.style.display = page == AgentWorkspacePage.CommandLine
+                    ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_debugPanelView != null)
+                _debugPanelView.style.display = page == AgentWorkspacePage.DebugPanel
+                    ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_logView != null)
+                _logView.style.display = page == AgentWorkspacePage.Log
+                    ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_systemInfoView != null)
+                _systemInfoView.style.display = page == AgentWorkspacePage.SystemInfo
+                    ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private void EnsureCommandLineView()
+        {
+            if (_commandLineView != null) return;
+            _commandLineView = new AgentCommandLineWorkspaceView(_host, _commandSessionList,
+                () => ShowWorkspace(AgentWorkspacePage.CommandLine));
+            _workspaceHost.Add(_commandLineView);
+            _commandLineView.style.display = DisplayStyle.None;
         }
 
         private async Task InitializeAsync()
         {
             await _host.EnsureInitializedAsync(_lifetime.Token);
+            EnsureCommandLineView();
             var sessions = _host.GetSessions();
             _selectedSessionId = sessions.Count == 0
                 ? (await _host.CreateSessionAsync(_lifetime.Token)).Id
@@ -806,6 +906,7 @@ namespace YuzeToolkit.UnityAgent
             item.RegisterCallback<ClickEvent>(evt =>
             {
                 if (evt.button != 0) return;
+                ShowWorkspace(AgentWorkspacePage.Conversation);
                 _selectedSessionId = session.Id;
                 _shownSessionError = string.Empty;
                 _lastRevision = -1;
@@ -1346,20 +1447,9 @@ namespace YuzeToolkit.UnityAgent
             workspace.style.minHeight = 0;
             workspace.style.flexDirection = FlexDirection.Row;
             workspace.style.width = new Length(100, LengthUnit.Percent);
-            workspace.style.maxWidth = 800;
-            workspace.style.maxHeight = 800;
-            workspace.style.marginTop = 24;
-            workspace.style.marginRight = 24;
-            workspace.style.marginBottom = 24;
-            workspace.style.marginLeft = 24;
-            workspace.style.alignSelf = Align.Center;
+            workspace.style.height = new Length(100, LengthUnit.Percent);
             workspace.style.backgroundColor = AgentUi.Surface1;
-            workspace.style.borderTopLeftRadius = 24;
-            workspace.style.borderTopRightRadius = 24;
-            workspace.style.borderBottomLeftRadius = 24;
-            workspace.style.borderBottomRightRadius = 24;
             workspace.style.overflow = Overflow.Hidden;
-            AgentUi.SetBorder(workspace, AgentUi.Border1, 1);
             Add(workspace);
 
             var navigation = new VisualElement { name = "unity-agent-settings-navigation" };
@@ -1376,27 +1466,24 @@ namespace YuzeToolkit.UnityAgent
             RegisterCallback<GeometryChangedEvent>(evt =>
             {
                 var compact = evt.newRect.width < 1024f;
-                workspace.style.width = Mathf.Min(960f, Mathf.Max(0, evt.newRect.width - 48f));
-                workspace.style.maxHeight = Mathf.Max(0, evt.newRect.height - 54f - 48f);
-                workspace.style.flexDirection = compact ? FlexDirection.Column : FlexDirection.Row;
-                navigation.style.width = compact ? new Length(100, LengthUnit.Percent) : 188;
-                navigation.style.minWidth = compact ? 0 : 188;
-                navigation.style.height = compact ? 52 : StyleKeyword.Auto;
-                navigation.style.minHeight = compact ? 52 : StyleKeyword.Auto;
-                navigation.style.flexDirection = compact ? FlexDirection.Row : FlexDirection.Column;
-                navigation.style.paddingTop = compact ? 8 : 12;
-                navigation.style.paddingRight = 8;
-                navigation.style.paddingBottom = compact ? 4 : 12;
-                navigation.style.paddingLeft = 8;
-                navigation.style.borderRightWidth = compact ? 0 : 1;
-                navigation.style.borderBottomWidth = compact ? 1 : 0;
-                navigation.style.borderBottomColor = AgentUi.Border1;
+                workspace.style.flexDirection = FlexDirection.Row;
+                navigation.style.width = compact ? 56 : 188;
+                navigation.style.minWidth = compact ? 56 : 188;
+                navigation.style.height = new Length(100, LengthUnit.Percent);
+                navigation.style.minHeight = 0;
+                navigation.style.flexDirection = FlexDirection.Column;
+                navigation.style.paddingTop = 12;
+                navigation.style.paddingRight = compact ? 6 : 8;
+                navigation.style.paddingBottom = 12;
+                navigation.style.paddingLeft = compact ? 6 : 8;
+                navigation.style.borderRightWidth = 1;
+                navigation.style.borderBottomWidth = 0;
                 foreach (var cell in navigation.Children().OfType<AgentButton>())
                 {
-                    cell.ShowLabel(true);
-                    cell.style.width = compact ? StyleKeyword.Auto : StyleKeyword.Auto;
-                    cell.style.flexGrow = compact ? 1 : 0;
-                    cell.style.marginRight = compact ? 4 : 0;
+                    cell.ShowLabel(!compact);
+                    cell.style.width = new Length(100, LengthUnit.Percent);
+                    cell.style.flexGrow = 0;
+                    cell.style.marginRight = 0;
                     cell.style.justifyContent = compact ? Justify.Center : Justify.FlexStart;
                 }
             });
@@ -1578,6 +1665,57 @@ namespace YuzeToolkit.UnityAgent
                 () => _showConfirmation("Reload settings?", "Discard unsaved changes in this page and reload settings.json?",
                     () => RunUiTask(ReloadAsync)), 128));
 
+            var evalCard = AgentUi.Card("Eval Tool", "Control the Editor Broker and every registered root Tool from the unified settings workspace.");
+            FlattenSettingsCard(evalCard);
+            if (UnityAgentEvalSettingsBridge.IsBrokerControlAvailable)
+            {
+                var broker = new AgentToggle("Editor Broker enabled");
+                broker.SetValueWithoutNotify(UnityAgentEvalSettingsBridge.BrokerEnabled);
+                broker.RegisterValueChangedCallback(evt => UnityAgentEvalSettingsBridge.SetBrokerEnabled(evt.newValue));
+                evalCard.Add(broker);
+            }
+            else
+            {
+                var runtimeBroker = new Label("Editor Broker controls are unavailable in Player builds.");
+                runtimeBroker.style.color = AgentUi.Muted;
+                evalCard.Add(runtimeBroker);
+            }
+            evalCard.Add(CreateSettingsGroupLabel("Registered root Tools"));
+            foreach (var tool in EvalToolRegistry.ListTools(true).OrderBy(value => value.Path, StringComparer.Ordinal))
+            {
+                var capturedPath = tool.Path;
+                var toggle = new AgentToggle(tool.Path);
+                toggle.SetValueWithoutNotify(tool.Enabled);
+                AgentTooltip.Attach(toggle, string.IsNullOrWhiteSpace(tool.Description)
+                    ? tool.Path
+                    : tool.Description);
+                toggle.RegisterValueChangedCallback(evt =>
+                {
+                    var result = EvalToolRegistry.SetToolEnabled(capturedPath, evt.newValue);
+                    if (!EvalData.GetBool(result, "ok"))
+                        throw new InvalidOperationException(EvalData.GetString(result, "error") ??
+                                                            $"Unable to update Tool '{capturedPath}'.");
+                });
+                evalCard.Add(toggle);
+            }
+
+            VisualElement CreatePage(params VisualElement[] cards)
+            {
+                var page = new VisualElement();
+                page.style.minWidth = 0;
+                page.style.width = new Length(100, LengthUnit.Percent);
+                foreach (var card in cards) page.Add(card);
+                return page;
+            }
+            _scroll.Content.Clear();
+            var providersPage = CreatePage(providerCard);
+            var defaultsPage = CreatePage(defaults);
+            var instructionsPage = CreatePage(agentsCard, skillsCard);
+            var historyPage = CreatePage(historyCard, groupsCard, fileCard);
+            var evalPage = CreatePage(evalCard);
+            var settingsPages = new[] { providersPage, defaultsPage, instructionsPage, historyPage, evalPage };
+            foreach (var page in settingsPages) _scroll.Content.Add(page);
+
             var navigationButtons = new List<AgentButton>();
             void AddNavigation(string label, AgentIconKind icon, VisualElement target, bool selected = false)
             {
@@ -1586,16 +1724,22 @@ namespace YuzeToolkit.UnityAgent
                 {
                     foreach (var candidate in navigationButtons)
                         SetSettingsNavigationSelected(candidate, candidate == button);
-                    _scroll.ScrollTo(target);
+                    foreach (var page in settingsPages)
+                        page.style.display = ReferenceEquals(page, target) ? DisplayStyle.Flex : DisplayStyle.None;
+                    if (_scroll.Root is ScrollView view)
+                        view.schedule.Execute(() => view.scrollOffset = Vector2.zero);
                 });
                 navigationButtons.Add(button);
                 navigation.Add(button);
                 SetSettingsNavigationSelected(button, selected);
             }
-            AddNavigation("Providers", AgentIconKind.Provider, providerCard, true);
-            AddNavigation("Agent defaults", AgentIconKind.Sliders, defaults);
-            AddNavigation("Instructions", AgentIconKind.Folder, agentsCard);
-            AddNavigation("History", AgentIconKind.History, historyCard);
+            for (var index = 1; index < settingsPages.Length; index++)
+                settingsPages[index].style.display = DisplayStyle.None;
+            AddNavigation("Providers", AgentIconKind.Provider, providersPage, true);
+            AddNavigation("Agent defaults", AgentIconKind.Sliders, defaultsPage);
+            AddNavigation("Instructions", AgentIconKind.Folder, instructionsPage);
+            AddNavigation("History", AgentIconKind.History, historyPage);
+            AddNavigation("Eval Tool", AgentIconKind.Provider, evalPage);
 
             RunUiTask(InitializeAsync);
         }

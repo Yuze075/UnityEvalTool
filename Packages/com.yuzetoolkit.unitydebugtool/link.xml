@@ -1,5 +1,5 @@
 <linker>
-    <assembly fullname="UnityDebugTool.DebugWindows">
+    <assembly fullname="UnityAgentTool">
         <type fullname="YuzeToolkit.DebugPanelEvalTool" preserve="all"/>
         <type fullname="YuzeToolkit.DebugGroupEvalTool" preserve="all"/>
         <type fullname="YuzeToolkit.DebugReadOnlyFieldTool`1" preserve="all"/>

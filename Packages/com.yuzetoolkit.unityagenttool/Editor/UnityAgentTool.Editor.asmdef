@@ -3,7 +3,8 @@
   "rootNamespace": "YuzeToolkit.UnityAgent",
   "references": [
     "UnityAgentTool",
-    "UnityEvalTool"
+    "UnityEvalTool",
+    "UnityEvalTool.Editor.Broker"
   ],
   "includePlatforms": [
     "Editor"

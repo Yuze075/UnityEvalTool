@@ -1,13 +1,14 @@
 {
-  "name": "UnityAgentTool",
-  "rootNamespace": "YuzeToolkit.UnityAgent",
+  "name": "UnityDebugTool.Editor",
+  "rootNamespace": "YuzeToolkit.UnityDebugTool.Editor",
   "references": [
-    "UnityEvalTool",
-    "UnityEvalTool.CLI",
-    "Unity.InputSystem",
-    "UnityEngine.UI"
+    "UnityAgentTool",
+    "UnityDebugTool.SystemInfo",
+    "UnityDebugTool.Performance"
   ],
-  "includePlatforms": [],
+  "includePlatforms": [
+    "Editor"
+  ],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": false,

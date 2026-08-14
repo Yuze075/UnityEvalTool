@@ -63,6 +63,17 @@ namespace YuzeToolkit
             _audioValue = null;
         }
 
+        public void SetEmbeddedLayout()
+        {
+            if (_graphHud == null) return;
+            _graphHud.style.position = Position.Relative;
+            _graphHud.style.left = StyleKeyword.Auto;
+            _graphHud.style.right = StyleKeyword.Auto;
+            _graphHud.style.top = StyleKeyword.Auto;
+            _graphHud.style.bottom = StyleKeyword.Auto;
+            _graphHud.style.alignSelf = Align.FlexStart;
+        }
+
         public void ApplyMetrics(PerformanceMetricsSnapshot snapshot)
         {
             ApplyFps(snapshot.Fps);

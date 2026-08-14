@@ -39,6 +39,22 @@ namespace YuzeToolkit
             _rows.Clear();
         }
 
+        public void SetEmbeddedLayout()
+        {
+            if (_hud == null) return;
+            _hud.style.position = Position.Relative;
+            _hud.style.left = StyleKeyword.Auto;
+            _hud.style.right = StyleKeyword.Auto;
+            _hud.style.top = StyleKeyword.Auto;
+            _hud.style.bottom = StyleKeyword.Auto;
+            _hud.style.alignSelf = Align.FlexStart;
+            _hud.style.alignItems = Align.Stretch;
+            _hud.style.width = 320;
+            _hud.style.maxWidth = new Length(100, LengthUnit.Percent);
+            _hud.style.maxHeight = StyleKeyword.None;
+            _hud.style.flexShrink = 0;
+        }
+
         public void ApplySnapshot(SystemInfoSnapshot snapshot)
         {
             if (_lines == null) return;

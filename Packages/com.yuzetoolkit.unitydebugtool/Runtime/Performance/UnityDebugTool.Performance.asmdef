@@ -2,7 +2,7 @@
   "name": "UnityDebugTool.Performance",
   "rootNamespace": "YuzeToolkit",
   "references": [
-    "UnityDebugTool",
+    "UnityAgentTool",
     "Unity.InputSystem"
   ],
   "includePlatforms": [],

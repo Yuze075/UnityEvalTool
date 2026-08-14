@@ -2,6 +2,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
+using YuzeToolkit.UnityAgent;
 
 namespace YuzeToolkit
 {
@@ -20,6 +21,7 @@ namespace YuzeToolkit
         private readonly PerformanceSampler _sampler = new();
         private PerformanceMonitorView? _view;
         private VisualElement? _layer;
+        private System.IDisposable? _workspaceRegistration;
 
         public int SortOrder => 0;
 
@@ -38,6 +40,8 @@ namespace YuzeToolkit
                 PerformanceMonitorUss.ApplyLayer(_layer);
                 _view = new PerformanceMonitorView(template);
                 _view.AttachTo(_layer);
+                _workspaceRegistration = UnityAgentWorkspaceRegistry.RegisterSystemInfoSection(
+                    "unity-debug-tool-performance", 10, () => CreateWorkspaceSection(template, styleSheet));
             }
             catch
             {
@@ -65,9 +69,62 @@ namespace YuzeToolkit
         {
             _view?.Detach();
             _view = null;
+            _workspaceRegistration?.Dispose();
+            _workspaceRegistration = null;
             _layer?.RemoveFromHierarchy();
             _layer = null;
             _sampler.Reset();
+        }
+
+        public static IUnityAgentWorkspaceSection CreateWorkspaceSection(
+            VisualTreeAsset templateAsset, StyleSheet styleSheetAsset)
+        {
+            if (templateAsset == null) throw new System.ArgumentNullException(nameof(templateAsset));
+            if (styleSheetAsset == null) throw new System.ArgumentNullException(nameof(styleSheetAsset));
+            return new PerformanceWorkspaceSection(templateAsset, styleSheetAsset);
+        }
+
+        private sealed class PerformanceWorkspaceSection : IUnityAgentWorkspaceSection
+        {
+            private readonly PerformanceSampler _sampler = new();
+            private readonly PerformanceMonitorView _view;
+
+            public PerformanceWorkspaceSection(VisualTreeAsset templateAsset, StyleSheet styleSheetAsset)
+            {
+                Root = new VisualElement();
+                PerformanceMonitorUss.ApplyLayer(Root);
+                ApplyEmbeddedRootLayout(Root);
+                Root.style.flexShrink = 0;
+                Root.styleSheets.Add(styleSheetAsset);
+                _view = new PerformanceMonitorView(templateAsset);
+                _view.AttachTo(Root);
+                _view.SetEmbeddedLayout();
+            }
+
+            private static void ApplyEmbeddedRootLayout(VisualElement root)
+            {
+                root.style.position = Position.Relative;
+                root.style.left = StyleKeyword.Auto;
+                root.style.right = StyleKeyword.Auto;
+                root.style.top = StyleKeyword.Auto;
+                root.style.bottom = StyleKeyword.Auto;
+                root.style.width = new Length(100, LengthUnit.Percent);
+            }
+
+            public VisualElement Root { get; }
+
+            public void Tick()
+            {
+                var update = _sampler.Tick(Time.unscaledDeltaTime);
+                if (update.Metrics != null) _view.ApplyMetrics(update.Metrics.Value);
+            }
+
+            public void Dispose()
+            {
+                _view.Detach();
+                _sampler.Reset();
+                Root.RemoveFromHierarchy();
+            }
         }
     }
 }

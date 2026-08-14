@@ -57,6 +57,9 @@ namespace YuzeToolkit.UnityAgent
     {
         static UnityAgentEditorLifetime()
         {
+            UnityAgentEvalSettingsBridge.ConfigureBrokerControl(
+                () => EditorBrokerBootstrap.IsEnabled,
+                EditorBrokerBootstrap.SetEnabled);
             AssemblyReloadEvents.beforeAssemblyReload -= UnityAgentHost.DisposeDefault;
             AssemblyReloadEvents.beforeAssemblyReload += UnityAgentHost.DisposeDefault;
             EditorApplication.quitting -= UnityAgentHost.DisposeDefault;
