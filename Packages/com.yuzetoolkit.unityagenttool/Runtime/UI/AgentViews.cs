@@ -261,7 +261,7 @@ namespace YuzeToolkit.UnityAgent
                 multiline = true,
                 Placeholder = "Describe a task or ask a question…"
             };
-            AgentTooltip.Attach(_composer, "Describe a task. Press Ctrl/Cmd+Enter to send.");
+            AgentTooltip.Attach(_composer, "Ctrl/Cmd+Enter to send.");
             AgentUi.ApplyTypography(_composer, AgentTypography.Composer, false);
             _composer.style.minHeight = 24;
             _composer.style.maxHeight = 336;
@@ -672,16 +672,12 @@ namespace YuzeToolkit.UnityAgent
                 _modelChoices[profile.Id] = models;
                 ApplyModelCatalog(profile, models, _model.value);
                 SetDiscoveryState(discovery);
-                if (!string.IsNullOrWhiteSpace(discovery.Warning))
-                    _showError("Using curated model defaults", discovery.Warning);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 ApplyCuratedCatalog(profile, _model.value);
                 SetModelCatalogState("MODEL CATALOG · FALLBACK — REFRESH AVAILABLE", AgentUi.Warning,
                     exception.Message);
-                _showError("Model discovery failed", exception.Message +
-                    "\n\nA curated fallback is shown when this provider has one. Use Refresh to try again.");
             }
             finally
             {
@@ -1350,6 +1346,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly AgentChoiceField _model;
         private readonly AgentButton _refreshModels;
         private readonly Label _modelSource;
+        private readonly Label _modelCatalogMessage;
         private readonly AgentChoiceField _effort;
         private readonly AgentIntegerField _maxTokens;
         private readonly AgentTextField _secretEnvironment;
@@ -1373,7 +1370,6 @@ namespace YuzeToolkit.UnityAgent
         private readonly CancellationTokenSource _lifetime = new();
         private AgentSettingsDocument _editing = AgentSettingsDocument.CreateDefault();
         private string _selectedProfileId = string.Empty;
-        private string _modelCatalogDetail = string.Empty;
         private long _lastRevision = -1;
         private readonly HashSet<string> _discoveryStartedProfiles = new(StringComparer.Ordinal);
         private bool _initialized;
@@ -1508,8 +1504,6 @@ namespace YuzeToolkit.UnityAgent
             providerCard.Add(CreateSettingsGroupLabel("Endpoint"));
             _providerPreset = AgentUi.Dropdown("Provider preset",
                 new[] { "Custom" }.Concat(AgentProviderCatalog.Providers.Select(PresetLabel)));
-            AgentTooltip.Attach(_providerPreset,
-                "Choose a built-in provider preset. Custom preserves the fields below.");
             _providerPreset.RegisterValueChangedCallback(_ => ApplyProviderPreset());
             providerCard.Add(_providerPreset);
             _name = AgentUi.Field("Display name", string.Empty, "Name shown in the chat composer.");
@@ -1538,7 +1532,6 @@ namespace YuzeToolkit.UnityAgent
             _modelSource.style.minWidth = 0;
             AgentUi.ApplyTypography(_modelSource, AgentTypography.Caption);
             _modelSource.style.color = AgentUi.TextSecondary;
-            AgentTooltip.Attach(_modelSource, () => _modelCatalogDetail);
             modelCatalogRow.Add(_modelSource);
             _refreshModels = AgentUi.Button("Refresh", "Refresh this provider's model catalog.",
                 () => RunUiTask(DiscoverModelsAsync), 96, AgentUi.Surface3, AgentUi.TextSecondary,
@@ -1546,6 +1539,18 @@ namespace YuzeToolkit.UnityAgent
             _refreshModels.style.flexShrink = 0;
             modelCatalogRow.Add(_refreshModels);
             providerCard.Add(modelCatalogRow);
+            _modelCatalogMessage = new Label();
+            _modelCatalogMessage.style.display = DisplayStyle.None;
+            _modelCatalogMessage.style.whiteSpace = WhiteSpace.Normal;
+            _modelCatalogMessage.style.marginTop = 6;
+            _modelCatalogMessage.style.marginBottom = 4;
+            _modelCatalogMessage.style.paddingLeft = 10;
+            _modelCatalogMessage.style.paddingRight = 10;
+            _modelCatalogMessage.style.paddingTop = 8;
+            _modelCatalogMessage.style.paddingBottom = 8;
+            _modelCatalogMessage.style.borderLeftWidth = 3;
+            AgentUi.ApplyTypography(_modelCatalogMessage, AgentTypography.Caption, false);
+            providerCard.Add(_modelCatalogMessage);
             _effort = AgentUi.Dropdown("Default reasoning effort",
                 new[] { "default", "none", "low", "medium", "high", "xhigh" });
             providerCard.Add(_effort);
@@ -1806,15 +1811,7 @@ namespace YuzeToolkit.UnityAgent
             _initialized = true;
             _lastRevision = _host.Revision;
             _status.text = "Ready";
-            try
-            {
-                await DiscoverSettingsModelsOnceAsync(_selectedProfileId);
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                _showError("Model discovery failed", exception.Message +
-                    "\n\nA curated fallback is shown when this provider has one. Use Refresh models to try again.");
-            }
+            await DiscoverSettingsModelsOnceAsync(_selectedProfileId);
         }
 
         private async Task SaveAsync()
@@ -1851,15 +1848,12 @@ namespace YuzeToolkit.UnityAgent
                 var result = await _host.DiscoverModelsAsync(SelectedProfile(), _lifetime.Token);
                 ApplySettingsModelCatalog(result.Models, _model.value);
                 SetSettingsDiscoveryState(result);
-                if (!string.IsNullOrWhiteSpace(result.Warning))
-                    _showError("Using curated model defaults", result.Warning);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 ApplySettingsCuratedCatalog(SelectedProfile(), _model.value);
                 SetSettingsCatalogState("MODEL CATALOG · FALLBACK — REFRESH AVAILABLE", AgentUi.Warning,
                     exception.Message);
-                throw;
             }
             finally
             {
@@ -1877,10 +1871,20 @@ namespace YuzeToolkit.UnityAgent
         {
             var profile = _editing.ProviderProfiles.FirstOrDefault(value => value.Id == profileId);
             if (profile == null) return;
-            var result = await _host.DiscoverModelsAsync(profile, _lifetime.Token);
-            if (_selectedProfileId != profileId) return;
-            ApplySettingsModelCatalog(result.Models, _model.value);
-            SetSettingsDiscoveryState(result);
+            try
+            {
+                var result = await _host.DiscoverModelsAsync(profile, _lifetime.Token);
+                if (_selectedProfileId != profileId) return;
+                ApplySettingsModelCatalog(result.Models, _model.value);
+                SetSettingsDiscoveryState(result);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                if (_selectedProfileId != profileId) return;
+                ApplySettingsCuratedCatalog(profile, _model.value);
+                SetSettingsCatalogState("MODEL CATALOG · FALLBACK — REFRESH AVAILABLE", AgentUi.Warning,
+                    exception.Message);
+            }
         }
 
         private async Task ReloadAsync()
@@ -2056,7 +2060,21 @@ namespace YuzeToolkit.UnityAgent
                 _ => "Models ready"
             };
             _modelSource.style.color = color;
-            _modelCatalogDetail = string.IsNullOrWhiteSpace(tooltip) ? text : tooltip;
+            var detail = string.IsNullOrWhiteSpace(tooltip) ? HumanCatalogMessage(state) : tooltip;
+            var showDetail = state is AgentChoiceMenuState.Error or AgentChoiceMenuState.Warning;
+            _modelCatalogMessage.text = detail;
+            _modelCatalogMessage.style.display = showDetail && !string.IsNullOrWhiteSpace(detail)
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+            _modelCatalogMessage.style.color = state == AgentChoiceMenuState.Error
+                ? AgentUi.Error
+                : AgentUi.Warning;
+            _modelCatalogMessage.style.backgroundColor = state == AgentChoiceMenuState.Error
+                ? AgentUi.ErrorPanel
+                : AgentUi.WarningPanel;
+            _modelCatalogMessage.style.borderLeftColor = state == AgentChoiceMenuState.Error
+                ? AgentUi.Error
+                : AgentUi.Warning;
             _model.SetMenuStatus(state, HumanCatalogMessage(state),
                 () => RunUiTask(DiscoverModelsAsync));
         }
@@ -2865,7 +2883,6 @@ namespace YuzeToolkit.UnityAgent
                 isPasswordField = password
             };
             ApplyTypography(field, AgentTypography.Body);
-            AgentTooltip.Attach(field, tooltip);
             field.style.marginTop = 4;
             field.style.marginBottom = 4;
             field.style.minWidth = 0;
@@ -2892,7 +2909,6 @@ namespace YuzeToolkit.UnityAgent
             var list = choices.ToList();
             var field = new AgentChoiceField(string.Empty, list, true);
             if (list.Count > 0) field.SetValueWithoutNotify(list[0]);
-            AgentTooltip.Attach(field, tooltip);
             field.style.width = 120;
             field.style.flexGrow = 0;
             field.style.flexShrink = 1;

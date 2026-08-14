@@ -203,7 +203,6 @@ namespace YuzeToolkit.UnityAgent
         {
             _clicked = clicked ?? throw new ArgumentNullException(nameof(clicked));
             _helpText = tooltip ?? string.Empty;
-            AgentTooltip.Attach(this, () => _helpText);
             focusable = true;
             pickingMode = PickingMode.Position;
             style.flexDirection = FlexDirection.Row;
@@ -261,6 +260,11 @@ namespace YuzeToolkit.UnityAgent
 
             SetPalette(surface, foreground);
             this.text = text;
+            AgentTooltip.Attach(this, () =>
+                string.IsNullOrWhiteSpace(_helpText) ||
+                _textStack.resolvedStyle.display != DisplayStyle.None && !string.IsNullOrWhiteSpace(_label.text)
+                    ? string.Empty
+                    : _helpText);
 
             RegisterCallback<PointerEnterEvent>(_ =>
             {
@@ -442,10 +446,15 @@ namespace YuzeToolkit.UnityAgent
 
             _placeholder = new Label { pickingMode = PickingMode.Ignore };
             _placeholder.style.position = Position.Absolute;
-            _placeholder.style.left = _surface ? 9 : 0;
-            _placeholder.style.top = string.IsNullOrEmpty(label) ? (_surface ? 7 : 4) : 31;
+            _placeholder.style.left = _surface ? 8 : 0;
+            _placeholder.style.right = _surface ? 8 : 0;
+            _placeholder.style.top = 0;
+            _placeholder.style.bottom = 0;
+            _placeholder.style.unityTextAlign = TextAnchor.MiddleLeft;
             _placeholder.style.color = AgentUi.Placeholder;
             _placeholder.style.whiteSpace = WhiteSpace.NoWrap;
+            _placeholder.style.overflow = Overflow.Hidden;
+            _placeholder.style.textOverflow = TextOverflow.Ellipsis;
             _placeholder.style.display = DisplayStyle.None;
             Add(_placeholder);
 
@@ -537,8 +546,6 @@ namespace YuzeToolkit.UnityAgent
             _input.style.paddingRight = _surface ? 8 : 0;
             _input.style.paddingBottom = _surface ? 5 : 4;
             _input.style.paddingLeft = _surface ? 8 : 0;
-            _placeholder.style.left = _surface ? 9 : 0;
-            _placeholder.style.top = string.IsNullOrEmpty(label) ? (_surface ? 7 : 4) : 31;
             _input.style.borderTopLeftRadius = _surface ? 8 : 0;
             _input.style.borderTopRightRadius = _surface ? 8 : 0;
             _input.style.borderBottomLeftRadius = _surface ? 8 : 0;
@@ -556,7 +563,17 @@ namespace YuzeToolkit.UnityAgent
             }
             SetInputBorder(_invalid ? AgentUi.Error : _surface ? AgentUi.Border : AgentUi.Transparent);
 
+            if (_placeholder.parent != _input)
+                _placeholder.RemoveFromHierarchy();
             ResetNativeTextVisuals(_input);
+            if (_placeholder.parent != _input)
+                _input.Add(_placeholder);
+            _placeholder.style.left = _surface ? 8 : 0;
+            _placeholder.style.right = _surface ? 8 : 0;
+            _placeholder.style.top = 0;
+            _placeholder.style.bottom = 0;
+            _placeholder.style.color = AgentUi.Placeholder;
+            _placeholder.style.unityTextAlign = TextAnchor.MiddleLeft;
             RefreshPlaceholder();
         }
 
@@ -1182,9 +1199,10 @@ namespace YuzeToolkit.UnityAgent
             menu.style.position = Position.Absolute;
             var availableWidth = Mathf.Max(0, root.resolvedStyle.width - 32f);
             menu.style.left = Mathf.Max(16, position.x);
-            var estimatedHeight = Mathf.Clamp(14f + rows.Sum(item =>
-                (string.IsNullOrWhiteSpace(item.Description) ? 40f : 58f) + (item.SeparatorBefore ? 11f : 0f)),
-                46f, openUpward ? 352f : 312f);
+            var naturalHeight = 14f + rows.Sum(item =>
+                (string.IsNullOrWhiteSpace(item.Description) ? 40f : 58f) +
+                (item.SeparatorBefore ? 11f : 0f));
+            var estimatedHeight = Mathf.Clamp(naturalHeight, 46f, openUpward ? 352f : 312f);
             menu.style.top = openUpward
                 ? Mathf.Max(16, anchorTop.y - estimatedHeight)
                 : Mathf.Max(16, position.y);
@@ -1204,15 +1222,17 @@ namespace YuzeToolkit.UnityAgent
 
             var maxListHeight = Mathf.Min(openUpward ? 352 : 312,
                 Mathf.Max(38, root.resolvedStyle.height - 104));
-            var needsScroll = estimatedHeight > maxListHeight;
+            var needsScroll = naturalHeight > maxListHeight;
             VisualElement list;
+            ScrollView? menuScroll = null;
             if (needsScroll)
             {
-                var scroll = AgentUi.Scroll(ScrollViewMode.Vertical);
-                scroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
-                scroll.style.height = maxListHeight;
-                list = scroll.contentContainer;
-                menu.Add(scroll);
+                menuScroll = AgentUi.Scroll(ScrollViewMode.Vertical);
+                menuScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+                menuScroll.style.height = maxListHeight;
+                menuScroll.style.minHeight = 0;
+                list = menuScroll.contentContainer;
+                menu.Add(menuScroll);
             }
             else
             {
@@ -1285,6 +1305,7 @@ namespace YuzeToolkit.UnityAgent
                         .FindIndex(value => value.Selected);
                     focusedIndex = selectedIndex < 0 ? 0 : selectedIndex;
                     optionButtons[focusedIndex].Focus();
+                    menuScroll?.ScrollTo(optionButtons[focusedIndex]);
                 }
                 else
                 {

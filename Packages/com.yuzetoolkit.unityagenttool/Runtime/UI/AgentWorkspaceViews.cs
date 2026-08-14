@@ -70,6 +70,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly List<DebugWindowRegistration> _registrations = new();
         private DebugWindowRegistration? _active;
         private int _revision = -1;
+        private bool _isPlaying;
 
         public AgentDebugWorkspaceView()
         {
@@ -94,7 +95,9 @@ namespace YuzeToolkit.UnityAgent
 
         public void Tick()
         {
-            if (_revision != DebugWindowRegistry.Revision) Rebuild();
+            if (_isPlaying != UnityAgentRuntimeDataBridge.IsAvailable ||
+                _revision != DebugWindowRegistry.Revision) Rebuild();
+            if (!_isPlaying) return;
             foreach (var visual in _visuals.Values) visual.Refresh();
         }
 
@@ -116,7 +119,14 @@ namespace YuzeToolkit.UnityAgent
             _tabs.Clear();
             _content.Clear();
             _active = null;
+            _isPlaying = UnityAgentRuntimeDataBridge.IsAvailable;
             _revision = DebugWindowRegistry.Revision;
+            if (!_isPlaying)
+            {
+                _content.Add(AgentWorkspaceUi.Empty(
+                    "Debug Panel is ready. Runtime pages appear here after entering Play Mode and registering their owning game systems."));
+                return;
+            }
             foreach (var registration in DebugWindowRegistry.RegisteredWindows)
             {
                 var visual = registration.CreateVisualElement(false);
@@ -220,9 +230,12 @@ namespace YuzeToolkit.UnityAgent
 
     internal sealed class AgentLogWorkspaceView : VisualElement, IDisposable
     {
-        private readonly RuntimeLogStore _store = new();
+        private readonly RuntimeLogStore _store = RuntimeLogStore.Shared;
         private readonly ScrollView _list;
-        private readonly Label _detail;
+        private readonly VisualElement _detailPane;
+        private readonly ScrollView _detailScroll;
+        private readonly Label _detailMeta;
+        private readonly VisualElement _detailBody;
         private readonly AgentTextField _search;
         private readonly Dictionary<LogType, bool> _enabled = new();
         private readonly Dictionary<LogType, AgentButton> _filterButtons = new();
@@ -271,25 +284,80 @@ namespace YuzeToolkit.UnityAgent
 
             var split = new VisualElement { style = { flexGrow = 1, minHeight = 0, minWidth = 0 } };
             _list = AgentUi.Scroll(ScrollViewMode.Vertical);
-            _list.style.flexGrow = 1;
-            _list.style.minHeight = 100;
+            _list.style.flexGrow = 0.65f;
+            _list.style.flexBasis = 0;
+            _list.style.minHeight = 96;
+            _list.contentContainer.style.width = new Length(100, LengthUnit.Percent);
+            _list.contentContainer.style.minWidth = 0;
+            _list.contentContainer.style.alignItems = Align.Stretch;
+            _list.contentViewport.style.overflow = Overflow.Hidden;
             split.Add(_list);
-            _detail = new Label("Select a log entry to inspect its full message and stack trace.");
-            _detail.enableRichText = false;
-            _detail.style.height = 156;
-            _detail.style.flexShrink = 0;
-            _detail.style.whiteSpace = WhiteSpace.Normal;
-            _detail.style.paddingLeft = 14;
-            _detail.style.paddingRight = 14;
-            _detail.style.paddingTop = 10;
-            _detail.style.paddingBottom = 10;
-            _detail.style.color = AgentUi.TextSecondary;
-            _detail.style.backgroundColor = AgentUi.PanelInset;
-            _detail.style.borderTopWidth = 1;
-            _detail.style.borderTopColor = AgentUi.Border;
-            split.Add(_detail);
+
+            var splitter = new VisualElement { name = "unity-agent-log-splitter" };
+            splitter.style.height = 9;
+            splitter.style.flexShrink = 0;
+            splitter.style.alignItems = Align.Center;
+            splitter.style.justifyContent = Justify.Center;
+            splitter.style.backgroundColor = AgentUi.PanelInset;
+            splitter.style.borderTopWidth = 1;
+            splitter.style.borderTopColor = AgentUi.Border;
+            splitter.style.borderBottomWidth = 1;
+            splitter.style.borderBottomColor = AgentUi.Border;
+            var grip = new VisualElement { pickingMode = PickingMode.Ignore };
+            grip.style.width = 42;
+            grip.style.height = 2;
+            grip.style.backgroundColor = AgentUi.BorderStrong;
+            grip.style.borderTopLeftRadius = 1;
+            grip.style.borderTopRightRadius = 1;
+            grip.style.borderBottomLeftRadius = 1;
+            grip.style.borderBottomRightRadius = 1;
+            splitter.Add(grip);
+            AgentTooltip.Attach(splitter, "Drag to resize the log list and stack trace detail panes.");
+            split.Add(splitter);
+
+            _detailPane = new VisualElement { name = "unity-agent-log-detail-pane" };
+            _detailPane.style.flexGrow = 0.35f;
+            _detailPane.style.flexBasis = 0;
+            _detailPane.style.minHeight = 80;
+            _detailPane.style.minWidth = 0;
+            _detailPane.style.backgroundColor = AgentUi.PanelInset;
+
+            var detailHeader = new VisualElement();
+            detailHeader.style.height = 42;
+            detailHeader.style.flexShrink = 0;
+            detailHeader.style.flexDirection = FlexDirection.Row;
+            detailHeader.style.alignItems = Align.Center;
+            detailHeader.style.paddingLeft = 14;
+            detailHeader.style.paddingRight = 14;
+            detailHeader.style.borderBottomWidth = 1;
+            detailHeader.style.borderBottomColor = AgentUi.Border;
+            var detailTitle = new Label("Log Details");
+            detailTitle.style.flexGrow = 1;
+            AgentUi.ApplyTypography(detailTitle, AgentTypography.BodyStrong);
+            detailHeader.Add(detailTitle);
+            _detailMeta = new Label("No selection");
+            _detailMeta.style.flexShrink = 0;
+            _detailMeta.style.color = AgentUi.TextCaption;
+            AgentUi.ApplyTypography(_detailMeta, AgentTypography.Caption);
+            detailHeader.Add(_detailMeta);
+            _detailPane.Add(detailHeader);
+
+            _detailScroll = AgentUi.Scroll(ScrollViewMode.Vertical);
+            _detailScroll.style.flexGrow = 1;
+            _detailScroll.style.minHeight = 0;
+            _detailScroll.style.minWidth = 0;
+            _detailScroll.contentContainer.style.width = new Length(100, LengthUnit.Percent);
+            _detailScroll.contentContainer.style.minWidth = 0;
+            _detailScroll.contentContainer.style.paddingLeft = 14;
+            _detailScroll.contentContainer.style.paddingRight = 14;
+            _detailScroll.contentContainer.style.paddingTop = 12;
+            _detailScroll.contentContainer.style.paddingBottom = 14;
+            _detailBody = _detailScroll.contentContainer;
+            _detailPane.Add(_detailScroll);
+            split.Add(_detailPane);
+            splitter.AddManipulator(new VerticalSplitManipulator(split, _list, _detailPane, 96, 80));
             Add(split);
-            _store.Subscribe();
+            ShowDetail(null);
         }
 
         public void Tick()
@@ -298,7 +366,9 @@ namespace YuzeToolkit.UnityAgent
             if (_dirty) Rebuild();
         }
 
-        public void Dispose() => _store.Dispose();
+        public void Dispose()
+        {
+        }
 
         private AgentButton CreateToggle(string text, string help, Func<bool> get, Action<bool> set)
         {
@@ -331,7 +401,7 @@ namespace YuzeToolkit.UnityAgent
         {
             _store.Clear();
             _selected = null;
-            _detail.text = "Select a log entry to inspect its full message and stack trace.";
+            ShowDetail(null);
             _dirty = true;
         }
 
@@ -355,31 +425,317 @@ namespace YuzeToolkit.UnityAgent
         private VisualElement CreateRow(DebugLogEntry entry, int count)
         {
             var row = new VisualElement();
-            row.style.minHeight = 34;
+            row.style.width = new Length(100, LengthUnit.Percent);
+            row.style.maxWidth = new Length(100, LengthUnit.Percent);
+            row.style.minWidth = 0;
+            row.style.height = 38;
             row.style.flexShrink = 0;
-            row.style.paddingLeft = 12;
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.overflow = Overflow.Hidden;
+            row.style.paddingLeft = 0;
             row.style.paddingRight = 12;
-            row.style.paddingTop = 7;
-            row.style.paddingBottom = 7;
             row.style.borderBottomWidth = 1;
             row.style.borderBottomColor = AgentUi.Border;
             row.style.backgroundColor = ReferenceEquals(entry, _selected) ? AgentUi.Selected : AgentUi.Transparent;
-            var label = new Label($"[{entry.Time:HH:mm:ss}] {entry.Message}{(count > 1 ? $"  ×{count}" : string.Empty)}");
-            label.enableRichText = false;
-            label.style.whiteSpace = WhiteSpace.NoWrap;
-            label.style.overflow = Overflow.Hidden;
-            label.style.textOverflow = TextOverflow.Ellipsis;
-            label.style.color = entry.Type == LogType.Warning ? AgentUi.Warning : IsError(entry) ? AgentUi.Error : AgentUi.Text;
-            row.Add(label);
+            var tone = LogTone(entry);
+            var marker = new VisualElement { pickingMode = PickingMode.Ignore };
+            marker.style.width = 3;
+            marker.style.height = new Length(100, LengthUnit.Percent);
+            marker.style.flexShrink = 0;
+            marker.style.marginRight = 10;
+            marker.style.backgroundColor = tone;
+            row.Add(marker);
+
+            var time = new Label(entry.Time.ToString("HH:mm:ss")) { pickingMode = PickingMode.Ignore };
+            time.style.width = 62;
+            time.style.flexShrink = 0;
+            time.style.color = AgentUi.TextCaption;
+            AgentUi.ApplyTypography(time, AgentTypography.Caption);
+            row.Add(time);
+
+            var summary = new Label(FirstLine(entry.Message))
+            {
+                pickingMode = PickingMode.Ignore,
+                enableRichText = false
+            };
+            summary.style.flexGrow = 1;
+            summary.style.flexShrink = 1;
+            summary.style.flexBasis = 0;
+            summary.style.minWidth = 0;
+            summary.style.maxWidth = new Length(100, LengthUnit.Percent);
+            summary.style.whiteSpace = WhiteSpace.NoWrap;
+            summary.style.overflow = Overflow.Hidden;
+            summary.style.textOverflow = TextOverflow.Ellipsis;
+            summary.style.color = tone;
+            AgentUi.ApplyTypography(summary, AgentTypography.Control);
+            AgentTooltip.Attach(summary, entry.Message);
+            row.Add(summary);
+
+            if (count > 1)
+            {
+                var repeat = new Label($"x{count}") { pickingMode = PickingMode.Ignore };
+                repeat.style.flexShrink = 0;
+                repeat.style.marginLeft = 10;
+                repeat.style.color = AgentUi.TextCaption;
+                AgentUi.ApplyTypography(repeat, AgentTypography.Caption);
+                row.Add(repeat);
+            }
             row.RegisterCallback<PointerDownEvent>(evt =>
             {
                 if (evt.button != 0) return;
                 _selected = entry;
-                _detail.text = FormatDetail(entry);
+                ShowDetail(entry);
                 _dirty = true;
                 if (evt.clickCount >= 2) OpenSource(entry);
             });
+            row.RegisterCallback<PointerEnterEvent>(_ =>
+            {
+                if (!ReferenceEquals(entry, _selected)) row.style.backgroundColor = AgentUi.Hover;
+            });
+            row.RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                row.style.backgroundColor = ReferenceEquals(entry, _selected)
+                    ? AgentUi.Selected
+                    : AgentUi.Transparent;
+            });
             return row;
+        }
+
+        private void ShowDetail(DebugLogEntry? entry)
+        {
+            _detailBody.Clear();
+            if (entry == null)
+            {
+                _detailMeta.text = "No selection";
+                _detailMeta.style.color = AgentUi.TextCaption;
+                var empty = AgentWorkspaceUi.Empty(
+                    "Select a log entry to inspect its message and individual stack frames.");
+                empty.style.paddingTop = 24;
+                _detailBody.Add(empty);
+                return;
+            }
+
+            var tone = LogTone(entry);
+            _detailMeta.text = $"{entry.Type.ToString().ToUpperInvariant()} | {entry.Time:HH:mm:ss.fff}";
+            _detailMeta.style.color = tone;
+
+            var messageCard = AgentUi.RoundedPanel(10);
+            messageCard.style.width = new Length(100, LengthUnit.Percent);
+            messageCard.style.maxWidth = new Length(100, LengthUnit.Percent);
+            messageCard.style.minWidth = 0;
+            messageCard.style.flexShrink = 0;
+            messageCard.style.overflow = Overflow.Hidden;
+            messageCard.style.paddingLeft = 14;
+            messageCard.style.paddingRight = 14;
+            messageCard.style.paddingTop = 11;
+            messageCard.style.paddingBottom = 12;
+            messageCard.style.marginBottom = 14;
+            messageCard.style.backgroundColor = AgentUi.Surface2;
+            messageCard.style.borderLeftWidth = 3;
+            messageCard.style.borderLeftColor = tone;
+            messageCard.style.borderTopWidth = 1;
+            messageCard.style.borderTopColor = AgentUi.Border;
+            messageCard.style.borderRightWidth = 1;
+            messageCard.style.borderRightColor = AgentUi.Border;
+            messageCard.style.borderBottomWidth = 1;
+            messageCard.style.borderBottomColor = AgentUi.Border;
+            var messageHeading = new Label("MESSAGE");
+            messageHeading.style.color = tone;
+            messageHeading.style.marginBottom = 5;
+            AgentUi.ApplyTypography(messageHeading, AgentTypography.Caption);
+            messageCard.Add(messageHeading);
+            var message = new Label(MakeWrapFriendly(entry.Message))
+            {
+                enableRichText = false,
+                pickingMode = PickingMode.Ignore
+            };
+            message.style.width = new Length(100, LengthUnit.Percent);
+            message.style.maxWidth = new Length(100, LengthUnit.Percent);
+            message.style.minWidth = 0;
+            message.style.flexShrink = 0;
+            message.style.whiteSpace = WhiteSpace.Normal;
+            message.style.color = AgentUi.Text;
+            AgentUi.ApplyTypography(message, AgentTypography.Body);
+            messageCard.Add(message);
+            _detailBody.Add(messageCard);
+
+            var frames = SplitStackTrace(entry.StackTrace);
+            var stackHeader = new VisualElement();
+            stackHeader.style.width = new Length(100, LengthUnit.Percent);
+            stackHeader.style.minWidth = 0;
+            stackHeader.style.height = 28;
+            stackHeader.style.flexShrink = 0;
+            stackHeader.style.flexDirection = FlexDirection.Row;
+            stackHeader.style.alignItems = Align.Center;
+            var stackTitle = new Label("STACK TRACE");
+            stackTitle.style.flexGrow = 1;
+            stackTitle.style.color = AgentUi.TextSecondary;
+            AgentUi.ApplyTypography(stackTitle, AgentTypography.Caption);
+            stackHeader.Add(stackTitle);
+            var stackCount = new Label(frames.Count == 1 ? "1 line" : $"{frames.Count} lines");
+            stackCount.style.flexShrink = 0;
+            stackCount.style.color = AgentUi.TextCaption;
+            AgentUi.ApplyTypography(stackCount, AgentTypography.Caption);
+            stackHeader.Add(stackCount);
+            _detailBody.Add(stackHeader);
+
+            if (frames.Count == 0)
+            {
+                var noStack = new Label("No stack trace was captured for this entry.");
+                noStack.style.color = AgentUi.TextCaption;
+                noStack.style.whiteSpace = WhiteSpace.Normal;
+                noStack.style.paddingTop = 6;
+                noStack.style.paddingBottom = 10;
+                AgentUi.ApplyTypography(noStack, AgentTypography.Body);
+                _detailBody.Add(noStack);
+            }
+            else
+            {
+                for (var index = 0; index < frames.Count; index++)
+                    _detailBody.Add(CreateStackFrameRow(frames[index], index));
+            }
+
+            _detailScroll.scrollOffset = Vector2.zero;
+            _detailScroll.schedule.Execute(() => _detailScroll.scrollOffset = Vector2.zero);
+        }
+
+        private static VisualElement CreateStackFrameRow(string frame, int index)
+        {
+            var row = AgentUi.RoundedPanel(8);
+            row.style.width = new Length(100, LengthUnit.Percent);
+            row.style.maxWidth = new Length(100, LengthUnit.Percent);
+            row.style.minWidth = 0;
+            row.style.flexShrink = 0;
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.FlexStart;
+            row.style.paddingLeft = 8;
+            row.style.paddingRight = 10;
+            row.style.paddingTop = 8;
+            row.style.paddingBottom = 8;
+            row.style.marginBottom = 4;
+            row.style.backgroundColor = index % 2 == 0 ? AgentUi.Surface1 : AgentUi.Surface2;
+            AgentUi.SetBorder(row, AgentUi.Border, 1);
+
+            var number = new Label((index + 1).ToString()) { pickingMode = PickingMode.Ignore };
+            number.style.width = 32;
+            number.style.flexShrink = 0;
+            number.style.marginRight = 8;
+            number.style.color = AgentUi.TextCaption;
+            AgentUi.ApplyTypography(number, AgentTypography.Caption);
+            row.Add(number);
+
+            SplitStackFrame(frame, out var call, out var source);
+            var content = new VisualElement { pickingMode = PickingMode.Ignore };
+            content.style.flexGrow = 1;
+            content.style.flexShrink = 1;
+            content.style.minWidth = 0;
+            var callLabel = new Label(MakeWrapFriendly(call))
+            {
+                enableRichText = false,
+                pickingMode = PickingMode.Ignore
+            };
+            callLabel.style.width = new Length(100, LengthUnit.Percent);
+            callLabel.style.maxWidth = new Length(100, LengthUnit.Percent);
+            callLabel.style.minWidth = 0;
+            callLabel.style.whiteSpace = WhiteSpace.Normal;
+            callLabel.style.color = AgentUi.TextSecondary;
+            AgentUi.ApplyTypography(callLabel, AgentTypography.Control);
+            content.Add(callLabel);
+            if (!string.IsNullOrWhiteSpace(source))
+            {
+                var sourceLabel = new Label(source) { pickingMode = PickingMode.Ignore };
+                sourceLabel.style.width = new Length(100, LengthUnit.Percent);
+                sourceLabel.style.maxWidth = new Length(100, LengthUnit.Percent);
+                sourceLabel.style.minWidth = 0;
+                sourceLabel.style.marginTop = 3;
+                sourceLabel.style.whiteSpace = WhiteSpace.NoWrap;
+                sourceLabel.style.overflow = Overflow.Hidden;
+                sourceLabel.style.textOverflow = TextOverflow.Ellipsis;
+                sourceLabel.style.color = AgentUi.Accent;
+                AgentUi.ApplyTypography(sourceLabel, AgentTypography.Caption);
+                AgentTooltip.Attach(sourceLabel, source);
+                content.Add(sourceLabel);
+                AgentTooltip.Attach(row, "Double-click to open this stack frame's source file.");
+            }
+            row.Add(content);
+            row.RegisterCallback<PointerEnterEvent>(_ => row.style.backgroundColor = AgentUi.Hover);
+            row.RegisterCallback<PointerLeaveEvent>(_ =>
+                row.style.backgroundColor = index % 2 == 0 ? AgentUi.Surface1 : AgentUi.Surface2);
+            row.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                if (evt.button == 0 && evt.clickCount >= 2) OpenStackFrame(frame);
+            });
+            return row;
+        }
+
+        private static Color LogTone(DebugLogEntry entry) => entry.Type == LogType.Warning
+            ? AgentUi.Warning
+            : IsError(entry) ? AgentUi.Error : AgentUi.TextSecondary;
+
+        private static string FirstLine(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "(empty log message)";
+            var lineEnd = value.IndexOfAny(new[] { '\r', '\n' });
+            return lineEnd < 0 ? value : value.Substring(0, lineEnd);
+        }
+
+        private static List<string> SplitStackTrace(string stackTrace) =>
+            string.IsNullOrWhiteSpace(stackTrace)
+                ? new List<string>()
+                : stackTrace.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(value => value.Trim()).Where(value => value.Length > 0).ToList();
+
+        private static void SplitStackFrame(string frame, out string call, out string source)
+        {
+            var marker = frame.IndexOf("(at ", StringComparison.Ordinal);
+            var end = marker < 0 ? -1 : frame.IndexOf(')', marker + 4);
+            if (marker < 0 || end < 0)
+            {
+                call = frame;
+                source = string.Empty;
+                return;
+            }
+
+            call = frame.Substring(0, marker).TrimEnd();
+            source = frame.Substring(marker + 4, end - marker - 4);
+            if (string.IsNullOrWhiteSpace(call)) call = frame;
+        }
+
+        private static string MakeWrapFriendly(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "(empty)";
+            var builder = new System.Text.StringBuilder(value.Length + value.Length / 24);
+            var runLength = 0;
+            foreach (var character in value)
+            {
+                builder.Append(character);
+                if (char.IsWhiteSpace(character))
+                {
+                    runLength = 0;
+                    continue;
+                }
+
+                runLength++;
+                if (runLength >= 56)
+                {
+                    builder.Append('\n');
+                    runLength = 0;
+                }
+            }
+            return builder.ToString();
+        }
+
+        private static void OpenStackFrame(string frame)
+        {
+#if UNITY_EDITOR
+            if (TryParseSource(frame, out var path, out var line))
+                UnityEditorInternal.InternalEditorUtility.OpenFileAtLineExternal(path, line);
+            else
+                GUIUtility.systemCopyBuffer = frame;
+#else
+            GUIUtility.systemCopyBuffer = frame;
+#endif
         }
 
         private bool Matches(DebugLogEntry entry)
@@ -453,6 +809,96 @@ namespace YuzeToolkit.UnityAgent
 #else
             Application.OpenURL(new Uri(path).AbsoluteUri);
 #endif
+        }
+
+        private sealed class VerticalSplitManipulator : PointerManipulator
+        {
+            private readonly VisualElement _container;
+            private readonly VisualElement _first;
+            private readonly VisualElement _second;
+            private readonly float _firstMinimum;
+            private readonly float _secondMinimum;
+            private bool _active;
+
+            public VerticalSplitManipulator(
+                VisualElement container,
+                VisualElement first,
+                VisualElement second,
+                float firstMinimum,
+                float secondMinimum)
+            {
+                _container = container;
+                _first = first;
+                _second = second;
+                _firstMinimum = firstMinimum;
+                _secondMinimum = secondMinimum;
+            }
+
+            protected override void RegisterCallbacksOnTarget()
+            {
+                target.RegisterCallback<PointerDownEvent>(OnPointerDown);
+                target.RegisterCallback<PointerMoveEvent>(OnPointerMove);
+                target.RegisterCallback<PointerUpEvent>(OnPointerUp);
+                target.RegisterCallback<PointerCaptureOutEvent>(OnPointerCaptureOut);
+                target.RegisterCallback<PointerEnterEvent>(OnPointerEnter);
+                target.RegisterCallback<PointerLeaveEvent>(OnPointerLeave);
+            }
+
+            protected override void UnregisterCallbacksFromTarget()
+            {
+                target.UnregisterCallback<PointerDownEvent>(OnPointerDown);
+                target.UnregisterCallback<PointerMoveEvent>(OnPointerMove);
+                target.UnregisterCallback<PointerUpEvent>(OnPointerUp);
+                target.UnregisterCallback<PointerCaptureOutEvent>(OnPointerCaptureOut);
+                target.UnregisterCallback<PointerEnterEvent>(OnPointerEnter);
+                target.UnregisterCallback<PointerLeaveEvent>(OnPointerLeave);
+            }
+
+            private void OnPointerDown(PointerDownEvent evt)
+            {
+                if (evt.button != 0) return;
+                _active = true;
+                target.CapturePointer(evt.pointerId);
+                target.style.backgroundColor = AgentUi.Active;
+                evt.StopPropagation();
+            }
+
+            private void OnPointerMove(PointerMoveEvent evt)
+            {
+                if (!_active || !target.HasPointerCapture(evt.pointerId)) return;
+                var available = _container.contentRect.height - target.resolvedStyle.height;
+                if (available <= _firstMinimum + _secondMinimum) return;
+                var pointer = _container.WorldToLocal((Vector2)evt.position);
+                var firstSize = Mathf.Clamp(pointer.y - target.resolvedStyle.height * 0.5f,
+                    _firstMinimum, available - _secondMinimum);
+                var ratio = firstSize / available;
+                _first.style.flexGrow = ratio;
+                _second.style.flexGrow = 1f - ratio;
+                evt.StopPropagation();
+            }
+
+            private void OnPointerUp(PointerUpEvent evt)
+            {
+                if (!_active) return;
+                _active = false;
+                if (target.HasPointerCapture(evt.pointerId)) target.ReleasePointer(evt.pointerId);
+                target.style.backgroundColor = AgentUi.PanelInset;
+                evt.StopPropagation();
+            }
+
+            private void OnPointerCaptureOut(PointerCaptureOutEvent _)
+            {
+                _active = false;
+                target.style.backgroundColor = AgentUi.PanelInset;
+            }
+
+            private void OnPointerEnter(PointerEnterEvent _) =>
+                target.style.backgroundColor = _active ? AgentUi.Active : AgentUi.Hover;
+
+            private void OnPointerLeave(PointerLeaveEvent _)
+            {
+                if (!_active) target.style.backgroundColor = AgentUi.PanelInset;
+            }
         }
     }
 

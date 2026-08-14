@@ -13,14 +13,19 @@ Editor 菜单 **YuzeToolkit > Unity Agent** 与运行时 `UnityAgentPanelModule`
 
 1. **New conversation**：打开未落盘的新对话草稿；首次发送时才创建对话文档。
 2. **New command line**：打开未落盘的命令行草稿；首次执行时才创建记录和当前进程的 VM。
-3. **Debug Panel**：每个 `DebugWindowModule.RegisterWindow(...)` 注册对应一个页签。
-4. **Log**：提供搜索、日志类型过滤、同类合并、清空、自动滚动、Stack Trace 级别、
-   Editor 源文件跳转和本地日志文件入口。
-5. **System Info**：以原有视觉显示本包内置的系统信息区块。
+3. **Debug Panel**：每个运行时 `DebugWindowModule.RegisterWindow(...)` 注册对应一个页签。Edit Mode
+   可以正常打开空外壳，但只有进入 Play Mode 后才实例化依赖运行时数据的页面。
+4. **Log**：从 Editor 域初始化或 Runtime 启动开始持续捕获，不依赖是否打开过 Log 页面；提供搜索、
+   日志类型过滤、同类合并、清空、自动滚动、Stack Trace 级别、Editor 源文件跳转、本地日志文件入口、
+   可滚动详情区以及可拖动的列表/详情分隔条。列表中的长日志始终限制为一行摘要且不会撑宽容器；选中后将
+   完整消息放入突出卡片，并把每一条 Stack Frame 分别渲染为可读、可跳转源码的独立行。
+5. **System Info**：在工作台内以 Unity Agent 风格的响应式卡片展示性能与系统信息；独立 Runtime 浮层仍保留原有样式。
 
 Agent 与 Command Line 会话在侧栏中分组显示，各自保存独立输入草稿，并支持 Pin、归档与删除。
 归档项不会出现在主界面，只能在 Settings 的两个独立归档页面恢复或永久删除。Settings 是独立的
-全工作区页面，固定包含模型提供、组合配置、Eval 连接、Eval Tools 和两个归档管理页面。
+全工作区页面，固定包含模型提供、组合配置、Eval 连接、Eval Tools 和两个归档管理页面。模型发现告警只在
+Provider 页面内联显示，不再反复弹窗；所有自有下拉菜单都会限制在工作区视口内，供应商、Profile 或模型列表
+较长时可纵向滚动。
 
 ## 持久化
 

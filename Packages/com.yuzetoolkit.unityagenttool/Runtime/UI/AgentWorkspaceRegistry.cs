@@ -86,6 +86,20 @@ namespace YuzeToolkit.UnityAgent
         }
     }
 
+    /// <summary>
+    /// Editor bridge for the exact interval in which runtime-owned DebugWindow bindings are safe to render.
+    /// Player builds fall back to Application.isPlaying.
+    /// </summary>
+    public static class UnityAgentRuntimeDataBridge
+    {
+        private static Func<bool>? _isAvailable;
+
+        public static bool IsAvailable => _isAvailable?.Invoke() ?? UnityEngine.Application.isPlaying;
+
+        public static void Configure(Func<bool> isAvailable) =>
+            _isAvailable = isAvailable ?? throw new ArgumentNullException(nameof(isAvailable));
+    }
+
     /// <summary>Editor-only Eval broker controls exposed without making the runtime assembly depend on Editor code.</summary>
     public static class UnityAgentEvalSettingsBridge
     {

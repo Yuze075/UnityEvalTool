@@ -6,14 +6,29 @@ using UnityEngine;
 
 namespace YuzeToolkit
 {
-    internal sealed class RuntimeLogStore : IDisposable
+    internal sealed class RuntimeLogStore
     {
+        private static readonly RuntimeLogStore SharedStore = new();
+
         private readonly Queue<DebugLogEntry> _pendingEntries = new();
         private readonly object _pendingSyncRoot = new();
         private readonly List<DebugLogEntry> _entries = new();
         private int _maxEntries = 500;
         private int _droppedCount;
         private bool _subscribed;
+
+        private RuntimeLogStore()
+        {
+        }
+
+        public static RuntimeLogStore Shared
+        {
+            get
+            {
+                EnsureSubscribed();
+                return SharedStore;
+            }
+        }
 
         public int MaxEntries
         {
@@ -23,7 +38,31 @@ namespace YuzeToolkit
 
         public IReadOnlyList<DebugLogEntry> Entries => _entries;
 
-        public void Subscribe()
+        public static void EnsureSubscribed() => SharedStore.Subscribe();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void InitializeRuntimeCapture() => EnsureSubscribed();
+
+#if UNITY_EDITOR
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void InitializeEditorCapture()
+        {
+            EnsureSubscribed();
+            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload -= ShutdownEditorCapture;
+            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ShutdownEditorCapture;
+            UnityEditor.EditorApplication.quitting -= ShutdownEditorCapture;
+            UnityEditor.EditorApplication.quitting += ShutdownEditorCapture;
+        }
+
+        private static void ShutdownEditorCapture()
+        {
+            if (!SharedStore._subscribed) return;
+            SharedStore._subscribed = false;
+            Application.logMessageReceivedThreaded -= SharedStore.OnLogMessageReceived;
+        }
+#endif
+
+        private void Subscribe()
         {
             if (_subscribed) return;
             _subscribed = true;
@@ -85,13 +124,6 @@ namespace YuzeToolkit
                 _pendingEntries.Clear();
                 _droppedCount = 0;
             }
-        }
-
-        public void Dispose()
-        {
-            if (!_subscribed) return;
-            _subscribed = false;
-            Application.logMessageReceivedThreaded -= OnLogMessageReceived;
         }
 
         private void OnLogMessageReceived(string message, string stackTrace, LogType type)

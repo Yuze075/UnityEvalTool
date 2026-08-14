@@ -32,6 +32,13 @@ namespace YuzeToolkit
             generateVisualContent += Draw;
         }
 
+        public void UseFlexibleWidth()
+        {
+            style.width = new Length(100, LengthUnit.Percent);
+            style.minWidth = 0;
+            style.maxWidth = StyleKeyword.None;
+        }
+
         public void SetSeries(
             GraphSeries[] series,
             float average = 0f,

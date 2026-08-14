@@ -58,9 +58,14 @@ namespace YuzeToolkit.UnityAgent
     internal static class UnityAgentEditorLifetime
     {
         private const string ProjectSettingsAssetPath = "Assets/Resources/UnityAgentProjectSettings.json";
+        private static bool _runtimeDataAvailable;
 
         static UnityAgentEditorLifetime()
         {
+            _runtimeDataAvailable = EditorApplication.isPlaying;
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+            UnityAgentRuntimeDataBridge.Configure(() => _runtimeDataAvailable);
             UnityAgentEvalSettingsBridge.ConfigureBrokerControl(
                 () => EditorBrokerBootstrap.IsEnabled,
                 EditorBrokerBootstrap.SetEnabled);
@@ -72,6 +77,11 @@ namespace YuzeToolkit.UnityAgent
             AssemblyReloadEvents.beforeAssemblyReload += UnityAgentHost.DisposeDefault;
             EditorApplication.quitting -= UnityAgentHost.DisposeDefault;
             EditorApplication.quitting += UnityAgentHost.DisposeDefault;
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            _runtimeDataAvailable = state == PlayModeStateChange.EnteredPlayMode;
         }
 
         private static void OpenBrokerFolder()

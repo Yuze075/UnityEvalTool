@@ -13,15 +13,21 @@ same `UnityAgentWorkbenchView`. Its main sidebar has exactly five primary action
 
 1. **New conversation** opens an unpersisted draft; its document is created only on first send.
 2. **New command line** opens an unpersisted draft; its transcript and process-local VM start on first run.
-3. **Debug Panel** displays every `DebugWindowModule.RegisterWindow(...)` registration as a tab.
-4. **Log** captures Unity logs with search, type filters, repeat grouping, clear, auto-scroll,
-   Stack Trace level, Editor source navigation and local log-file access.
-5. **System Info** displays the package-owned system information sections with their preserved styling.
+3. **Debug Panel** displays every runtime `DebugWindowModule.RegisterWindow(...)` registration as a tab.
+   Its shell remains available in Edit Mode, but runtime-owned pages are only instantiated while Play Mode is active.
+4. **Log** captures Unity logs continuously from Editor domain initialization or runtime startup, independently of
+   whether the Log page has been opened. It provides search, type filters, repeat grouping, clear, auto-scroll,
+   Stack Trace level, Editor source navigation, local log-file access, a scrollable detail pane and a draggable
+   list/detail splitter. Long list rows stay width-bounded and use a one-line summary; the selected entry renders
+   its full message in a highlighted card and each stack frame as an individually readable source-aware row.
+5. **System Info** displays responsive Agent-styled performance and system cards, while the standalone Runtime overlays preserve their original styling.
 
 Agent and Command Line sessions are listed separately, keep independent input drafts, and support
 pinning, archiving and deletion. Archived items leave the main workspace and are restored or deleted
 from two separate Settings pages. Settings has six real pages: providers, combined configuration,
-Eval connection, Eval Tools, archived conversations and archived command lines.
+Eval connection, Eval Tools, archived conversations and archived command lines. Model discovery warnings
+stay inline in the provider page instead of opening repeated dialogs, and all owned choice menus clamp to
+the workspace viewport and scroll when their provider, profile or model catalog is long.
 
 ## Persistence
 

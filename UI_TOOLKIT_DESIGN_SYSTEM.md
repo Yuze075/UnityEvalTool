@@ -2,7 +2,7 @@
 
 Status: mandatory implementation contract for UnityAgentTool, its DebugPanel/DebugWindows, and Runtime workbench.
 
-This document replaces ad-hoc visual decisions with a source-pinned contract derived from mature open-source AI interfaces. SystemInfo and PerformanceMonitor are owned by UnityAgentTool but retain their existing presentation.
+This document replaces ad-hoc visual decisions with a source-pinned contract derived from mature open-source AI interfaces. Standalone Runtime SystemInfo and PerformanceMonitor overlays retain their existing presentation; their Unity Agent workspace representations use the Agent design system without sharing stylesheets with the standalone overlays.
 
 ## 1. Source policy
 
@@ -47,7 +47,7 @@ OpenAI's public open-source component list exposes Codex CLI, SDK, and App Serve
 5. A non-empty popup must contain at least one visible text row. An empty popup shell is a P0 defect and must not be shown.
 6. Model values are selection-only. They come from remote discovery or the curated catalog; there is no editable model ID field.
 7. Dynamic rows explicitly set `min-width: 0`; fixed actions explicitly set `flex-shrink: 0`.
-8. SystemInfo and PerformanceMonitor retain their existing styles. Shared theme changes must not cascade into them.
+8. Standalone SystemInfo and PerformanceMonitor overlays retain their existing styles. Shared theme changes must not cascade into them; the embedded Unity Agent System Info page renders the same data through separate Agent-owned components.
 
 ## 3. Source-derived dark tokens
 
@@ -211,7 +211,7 @@ Mapped from `scrollbar.css`:
 - Keep the established module hierarchy and interaction behavior; apply these same tokens and typography seats rather than inventing a second style family.
 - Debug window title/body use 16/24 and 14/22. Toolbar/control rows use 13/20 and 28–32px controls. Log metadata may use 12/18 but nothing smaller.
 - Runtime Console tabs, Log, CLI, EvalTool, and Tools share the same input, selector, popup, modal, and scrollbar contracts.
-- SystemInfo and PerformanceMonitor are excluded. No global selector may alter their existing labels, bars, graphs, padding, or colors.
+- Standalone SystemInfo and PerformanceMonitor overlays are excluded. No global selector may alter their existing labels, bars, graphs, padding, or colors. Their embedded Unity Agent cards follow this section's Runtime Console tokens, typography, wrapping, and responsive layout rules.
 
 ## 6. Unity 2022.3 conversion table
 
@@ -266,7 +266,7 @@ Any missing glyph, half glyph, zero-width non-empty label, clipped ascender/desc
 
 - Existing module navigation, draggable/resizable windows, enum selection, toggle, slider, input, progress, and scroll behavior.
 - Validate the game viewport at the target runtime resolution; the panel must not cover unrelated game UI through an accidental full-screen opaque surface.
-- Confirm SystemInfo and PerformanceMonitor have byte-identical style files to the protected baseline.
+- Confirm standalone SystemInfo and PerformanceMonitor have byte-identical style files to the protected baseline, then separately capture the Agent-styled embedded System Info workspace.
 
 ### Runtime Console
 
