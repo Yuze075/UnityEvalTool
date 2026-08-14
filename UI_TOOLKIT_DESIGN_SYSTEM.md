@@ -84,11 +84,9 @@ Brand color is used for business state, selected tabs, and the active send actio
 
 ## 4. Typography and text visibility
 
-The source font stack is:
+The web references use a platform font stack, but UI Toolkit cannot express that fallback chain reliably across Editor and Player targets. UnityAgentTool therefore does not bundle a font, enumerate operating-system font families, call `Font.CreateDynamicFontFromOSFont`, or assign `unityFont` / `unityFontDefinition` on its root. The workbench inherits the active `PanelSettings` / Theme font and lets Unity perform the platform fallback. This avoids package font weight and per-process dynamic font objects while keeping Editor and Runtime aligned with their host.
 
-`-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Helvetica Neue, Helvetica, Arial, sans-serif`.
-
-UI Toolkit cannot express a browser-style fallback chain. The package font resolver must choose the first available CJK-capable system font per platform and apply it consistently to Editor and Runtime: `PingFang SC` on macOS, `Microsoft YaHei UI` on Windows, and `Noto Sans CJK SC` on Linux when available. A missing family falls back explicitly and must be reported during the visual test; it must never be replaced by unreadable icon characters.
+PanelSettings and Theme assets used by the workbench must not introduce a package-owned font reference. Missing CJK or Latin glyphs are reported as a host Theme/Unity fallback defect during visual acceptance, not hidden by creating another runtime font. Icons remain package-owned vector drawing so action visibility never depends on a text font.
 
 Unity 2022.3 does not expose CSS `line-height` as a normal USS layout property. Source line heights therefore become minimum label seats and vertical padding contracts:
 
@@ -217,6 +215,7 @@ Mapped from `scrollbar.css`:
 
 | Web source feature | Unity implementation |
 |---|---|
+| Browser font fallback stack | Inherit the active Unity PanelSettings / Theme font; do not bundle, enumerate, or dynamically create fonts in the package. |
 | CSS custom properties | One package-owned C# token class plus USS literals generated from the same documented values. Screens cannot declare independent palettes. |
 | `line-height` | Typography role applies font size, minimum text seat, alignment, and padding; verify glyph bounds in screenshots. |
 | `@container` | `GeometryChangedEvent` adds/removes explicit compact classes using the resolved composer width. |
@@ -289,6 +288,7 @@ The final implementation must make these checks pass:
 - No model text editor.
 - No popup path that can show a card without a visible row/status.
 - No package UI code assigns a native tooltip string; owned tooltip only.
+- No package UI code or asset bundles, enumerates, dynamically creates, or explicitly assigns a font for the Unity Agent workbench.
 - No global Unity selector from DebugPanel changes SystemInfo or PerformanceMonitor.
 - No screen-local palette or raw typography value outside the design-system layer.
 

@@ -45,7 +45,7 @@ namespace YuzeToolkit
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("Return captured Unity logs. Args: count?, type?.")]
+        [EvalFunction("Return the newest captured Unity logs, optionally limited by count and log type.")]
         public List<object?> getRecentLogs(int count = 50, string type = "all")
         {
             return UnityLogBuffer.GetRecent(count, type);

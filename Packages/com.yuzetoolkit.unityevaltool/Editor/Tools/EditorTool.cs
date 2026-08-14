@@ -155,7 +155,7 @@ namespace YuzeToolkit
             return EvalData.Obj(("path", projectPath), ("fullPath", fullPath), ("message", "Screenshot capture was requested. The file may be written after the current frame."));
         }
 
-        [EvalFunction("Synchronously capture a PNG from the Game View, Scene View, or a visible Editor window. Args: target=game|scene|editor_window, maxLongEdge=0|1..8192, windowQuery? matches title or C# type for editor_window. Hard limits: editor_window source 8388608 pixels, output 16777216 pixels, encoded PNG 33554432 bytes.",
+        [EvalFunction("Synchronously capture a PNG from the Game View, Scene View, or a visible Editor window. Hard limits are 8,388,608 source pixels for Editor windows, 16,777,216 output pixels, and 33,554,432 encoded PNG bytes.",
             Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> captureViewport(
             [EvalParameter("Capture source: game, scene, or editor_window.")]

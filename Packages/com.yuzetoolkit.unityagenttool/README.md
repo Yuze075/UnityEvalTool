@@ -29,6 +29,11 @@ Eval connection, Eval Tools, archived conversations and archived command lines. 
 stay inline in the provider page instead of opening repeated dialogs, and all owned choice menus clamp to
 the workspace viewport and scroll when their provider, profile or model catalog is long.
 
+Conversation rendering shows only non-empty User and Assistant text plus a pending approval card. Tool-call
+arguments and Tool results remain fully persisted and are still sent back to the model, but are not rendered in
+the transcript. The workbench inherits the active Unity PanelSettings / Theme font; it does not bundle, enumerate,
+dynamically create or explicitly assign a font.
+
 ## Agent loop
 
 The built-in HTTP Agent uses a deliberately small sequential loop: one model response is persisted, each
@@ -42,6 +47,10 @@ complete transcript remains in its conversation document while a semantic summar
 latest complete message boundary is projected to the model. Transient HTTP network errors, 429 responses,
 and recoverable 5xx responses are retried at most twice and only before the first SSE event; partial model
 output is never retried.
+
+The built-in Editor and Runtime system prompts are English and only define the Unity role, available tool
+categories, and work loop. MCP/CLI lifecycle rules, eval JavaScript rules, module discovery, and concrete
+function parameters remain in their owning tool descriptions instead of being repeated in the system prompt.
 
 In Editor, active conversations are paused when script compilation starts. The package writes a
 process- and project-bound recovery marker to `Application.persistentDataPath`, interrupts and persists the

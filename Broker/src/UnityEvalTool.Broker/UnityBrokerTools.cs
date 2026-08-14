@@ -9,7 +9,7 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 internal sealed class UnityBrokerTools(BrokerRegistry registry)
 {
     [McpServerTool(Name = "unity_status", UseStructuredContent = true)]
-    [Description("Query Unity instances and state from the computer-level Broker. Call this before unity_connect. Waiting is event-driven and survives temporary Unity disconnects. ready returns when execution is available, including CompilationFailed repair mode; compilation-complete returns after compilation succeeds or fails. Always inspect phase, canEval, and compiler counts.")]
+    [Description("Read Unity instances and lifecycle state, or wait for a state transition without polling eval. Call this before unity_connect. Event-driven waits survive temporary disconnects. ready includes normal Ready and executable CompilationFailed repair mode; compilation-complete returns after either compilation success or failure. Always inspect phase, canEval, and compiler counts in the result.")]
     public async Task<JsonElement> StatusAsync(
         [Description("Optional handle returned by unity_connect. Pass either this or instanceId when waiting.")] string connectionHandle = "",
         [Description("Optional instanceId returned by an earlier snapshot. Use this to wait before unity_connect, including while Unity is compiling or reloading.")] string instanceId = "",
@@ -41,7 +41,7 @@ internal sealed class UnityBrokerTools(BrokerRegistry registry)
     }
 
     [McpServerTool(Name = "unity_connect", UseStructuredContent = true)]
-    [Description("Select one Unity instance for subsequent eval calls. First call unity_status and pass its exact registryRevision. The opaque connectionHandle survives compilation and same-process Domain Reload even when registryRevision changes; reconnect only when the handle expires, is invalid, or the Unity process is replaced.")]
+    [Description("Bind this workflow to one Unity instance. First call unity_status, choose the exact instance, and pass that snapshot's registryRevision. Reuse the returned opaque connectionHandle across compilation, temporary disconnects, and same-process Domain Reload; reconnect only when the handle is invalid, expired, or belongs to a replaced Unity process.")]
     public JsonElement Connect(
         [Description("Exact instanceId returned by unity_status.")] string instanceId,
         [Description("Exact registryRevision returned by the preceding unity_status call.")] long registryRevision)
@@ -51,10 +51,10 @@ internal sealed class UnityBrokerTools(BrokerRegistry registry)
     }
 
     [McpServerTool(Name = "eval")]
-    [Description("Execute JavaScript inside the Unity selected by unity_connect. Eval is rejected while Unity is compiling, reloading, importing, changing PlayMode, stalled, or disconnected. CompilationFailed is an executable repair mode backed by the last successfully loaded assemblies; use it to read errors, edit code, and request another refresh. Interrupted requests are never retried automatically.")]
+    [Description("Run one JavaScript request in the Unity selected by unity_connect, using the persistent eval session and tools:// module contract described by the code parameter. Eval is unavailable while Unity is compiling, reloading, importing, changing PlayMode, stalled, or disconnected. Before a request that may compile, retain a fresh unity_status capturedAtUtc; after the request returns, wait with unity_status(waitFor: compilation-complete, observedAfterUtc: capturedAtUtc). CompilationFailed remains executable against the last successful assemblies for repair. Never automatically retry an interrupted request whose effects are uncertain.")]
     public async Task<CallToolResult> EvalAsync(
         [Description("Opaque handle returned by unity_connect.")] string connectionHandle,
-        [Description("An async function declaration named execute, using the existing UnityEvalTool PuerTS/tool-module contract.")] string code,
+        [Description("JavaScript defining async function execute(). Return concise serializable data. For unfamiliar Unity work, import tools:// for root summaries and getToolDetails(path), then import the relevant tools://Path module; generated tool methods use positional parameters. Prefer helper modules and use CS.* only for uncovered APIs.")] string code,
         [Description("Unity-side execution timeout in seconds, from 1 to 600.")] int timeout = 30,
         [Description("Dispose and recreate this handle's persistent Unity-side PuerTS VM before execution.")] bool resetSession = false,
         CancellationToken cancellationToken = default) =>

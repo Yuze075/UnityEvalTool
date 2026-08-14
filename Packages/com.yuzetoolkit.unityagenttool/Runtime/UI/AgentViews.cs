@@ -213,7 +213,6 @@ namespace YuzeToolkit.UnityAgent
             _conversationTitle.style.overflow = Overflow.Hidden;
             _conversationTitle.style.textOverflow = TextOverflow.Ellipsis;
             AgentUi.ApplyTypography(_conversationTitle, AgentTypography.PageTitle);
-            AgentTooltip.Attach(_conversationTitle, () => _conversationTitle.text);
             header.Add(_conversationTitle);
             _status = new Label("Loading…");
             AgentUi.ApplyTypography(_status, AgentTypography.Caption);
@@ -400,9 +399,9 @@ namespace YuzeToolkit.UnityAgent
             sidebar.Add(brandRow);
 
             sidebar.Add(CreateWorkspaceNavigation("New conversation", AgentIconKind.Add,
-                BeginNewConversation));
+                BeginNewConversation, showTooltipWhenCollapsed: false));
             sidebar.Add(CreateWorkspaceNavigation("New command line", AgentIconKind.Sliders,
-                () => RunUiTask(CreateCommandLineSessionAsync)));
+                () => RunUiTask(CreateCommandLineSessionAsync), showTooltipWhenCollapsed: false));
             sidebar.Add(CreateWorkspaceNavigation("Debug Panel", AgentIconKind.Provider,
                 () => ShowWorkspace(AgentWorkspacePage.DebugPanel)));
             sidebar.Add(CreateWorkspaceNavigation("Log", AgentIconKind.History,
@@ -434,9 +433,14 @@ namespace YuzeToolkit.UnityAgent
             return sidebar;
         }
 
-        private static AgentButton CreateWorkspaceNavigation(string text, AgentIconKind icon, Action clicked)
+        private static AgentButton CreateWorkspaceNavigation(
+            string text,
+            AgentIconKind icon,
+            Action clicked,
+            bool showTooltipWhenCollapsed = true)
         {
-            var button = AgentUi.Button(text, text, clicked, 0, AgentUi.Transparent,
+            var button = AgentUi.Button(text, showTooltipWhenCollapsed ? text : string.Empty, clicked, 0,
+                AgentUi.Transparent,
                 AgentUi.TextSecondary, icon);
             button.style.height = 36;
             button.style.flexGrow = 0;
@@ -804,10 +808,11 @@ namespace YuzeToolkit.UnityAgent
                 _showError("Agent turn failed", current.LastError);
             }
 
+            var visibleMessages = current.Messages.Where(IsVisibleConversationMessage).ToList();
             _messageList.Clear();
-            if (current.Messages.Count == 0)
+            if (visibleMessages.Count == 0)
                 _messageList.Add(CreateEmptyState());
-            foreach (var message in current.Messages)
+            foreach (var message in visibleMessages)
                 _messageList.Add(CreateMessage(message));
             foreach (var approval in _host.Approvals.Pending.Where(value => value.SessionId == current.Id))
                 _messageList.Add(CreateApproval(approval));
@@ -862,7 +867,6 @@ namespace YuzeToolkit.UnityAgent
             item.style.borderBottomLeftRadius = 7;
             item.style.borderBottomRightRadius = 7;
             item.style.backgroundColor = session.Id == _selectedSessionId ? AgentUi.Selected : AgentUi.Transparent;
-            AgentTooltip.Attach(item, session.Title);
             var row = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.FlexStart } };
             item.Add(row);
             var label = new Label(session.Title);
@@ -1233,44 +1237,29 @@ namespace YuzeToolkit.UnityAgent
             box.style.borderTopRightRadius = 12;
             box.style.borderBottomLeftRadius = 12;
             box.style.borderBottomRightRadius = 12;
-            box.style.backgroundColor = message.Role switch
-            {
-                AgentMessageRole.User => AgentUi.UserMessage,
-                AgentMessageRole.Tool => message.IsError ? AgentUi.ErrorPanel : AgentUi.ToolMessage,
-                _ => AgentUi.AssistantMessage
-            };
+            box.style.backgroundColor = message.Role == AgentMessageRole.User
+                ? AgentUi.UserMessage
+                : AgentUi.AssistantMessage;
             box.style.borderLeftWidth = 2;
-            box.style.borderLeftColor = message.Role switch
-            {
-                AgentMessageRole.User => AgentUi.Accent,
-                AgentMessageRole.Tool => message.IsError ? AgentUi.Error : AgentUi.Success,
-                _ => AgentUi.BorderStrong
-            };
-            var role = new Label(message.Role == AgentMessageRole.Tool
-                ? "TOOL · " + message.ToolName
-                : message.Role.ToString().ToUpperInvariant());
+            box.style.borderLeftColor = message.Role == AgentMessageRole.User
+                ? AgentUi.Accent
+                : AgentUi.BorderStrong;
+            var role = new Label(message.Role.ToString().ToUpperInvariant());
             AgentUi.ApplyTypography(role, AgentTypography.Caption);
             role.style.unityFontStyleAndWeight = FontStyle.Bold;
             role.style.letterSpacing = 0.7f;
             role.style.color = message.Role == AgentMessageRole.User ? AgentUi.Accent : AgentUi.Muted;
             box.Add(role);
-            if (!string.IsNullOrEmpty(message.Text))
-            {
-                var text = new Label(message.Text);
-                text.style.whiteSpace = WhiteSpace.Normal;
-                text.style.marginTop = 4;
-                box.Add(text);
-            }
-            foreach (var call in message.ToolCalls)
-            {
-                var tool = new Label("Tool call: " + call.Name + "\n" + call.ArgumentsJson);
-                tool.style.whiteSpace = WhiteSpace.Normal;
-                tool.style.color = AgentUi.Muted;
-                tool.style.marginTop = 6;
-                box.Add(tool);
-            }
+            var text = new Label(message.Text);
+            text.style.whiteSpace = WhiteSpace.Normal;
+            text.style.marginTop = 4;
+            box.Add(text);
             return box;
         }
+
+        private static bool IsVisibleConversationMessage(AgentMessage message) =>
+            (message.Role is AgentMessageRole.User or AgentMessageRole.Assistant) &&
+            !string.IsNullOrWhiteSpace(message.Text);
 
         private VisualElement CreateApproval(AgentApprovalRequest approval)
         {
@@ -2796,13 +2785,9 @@ namespace YuzeToolkit.UnityAgent
         public static readonly Color Mask = new(0f, 0f, 0f, 0.5f);
         public static readonly Color Selection = new(0.376f, 0.647f, 0.980f, 0.42f);
 
-        private static Font? _font;
-
         public static void ApplyRoot(VisualElement root)
         {
             root.style.color = Text;
-            var font = ResolveFont();
-            if (font != null) root.style.unityFont = font;
             ApplyTypography(root, AgentTypography.Body);
         }
 
@@ -2845,23 +2830,6 @@ namespace YuzeToolkit.UnityAgent
             element.style.unityFontStyleAndWeight = weight;
             element.style.whiteSpace = singleLine ? WhiteSpace.NoWrap : WhiteSpace.Normal;
             element.style.unityTextAlign = TextAnchor.MiddleLeft;
-        }
-
-        private static Font? ResolveFont()
-        {
-            if (_font != null) return _font;
-            var preferred = Application.platform switch
-            {
-                RuntimePlatform.OSXEditor or RuntimePlatform.OSXPlayer => new[]
-                    { "PingFang SC", "Hiragino Sans GB", "Arial Unicode MS", "Arial" },
-                RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsPlayer => new[]
-                    { "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", "Arial" },
-                _ => new[] { "Noto Sans CJK SC", "Noto Sans CJK", "DejaVu Sans", "Arial" }
-            };
-            var installed = new HashSet<string>(Font.GetOSInstalledFontNames(), StringComparer.OrdinalIgnoreCase);
-            var selected = preferred.FirstOrDefault(installed.Contains) ?? preferred[^1];
-            _font = Font.CreateDynamicFontFromOSFont(selected, 16);
-            return _font;
         }
 
         public static AgentButton Button(string text, string tooltip, Action clicked, int width,

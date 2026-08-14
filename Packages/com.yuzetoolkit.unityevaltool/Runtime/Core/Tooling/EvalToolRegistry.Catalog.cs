@@ -432,91 +432,20 @@ namespace YuzeToolkit
                 return $"- {tool.Path}: `tools://{tool.Path}` [{string.Join(", ", tags)}] - {tool.Description}";
             });
 
-            const string puertsInteropTutorial = @"Direct PuerTS C# interop tutorial:
-- Use full C# names under `CS`; alias long names locally when that makes code clearer.
-- JS/TypeScript generics are not C# runtime generics. Use `puer.$generic(openGenericType, ...typeArgs)` with arity suffixes such as `List$1` and `Dictionary$2`.
-- JS `[]` only indexes native JS objects. Use `get_Item` and `set_Item` for C# arrays, `List<T>`, `Dictionary<TKey,TValue>`, and custom indexers.
-- Use `puer.$typeof(Type)` for `System.Type` parameters, CLR `op_*` names for overloaded operators, `puer.$ref`/`puer.$unref` for ref/out, and `await puer.$promise(task)` for C# Task.
-
-One compact teaching example:
-```javascript
-async function execute() {
-  // 1) Basic C# access through CS: alias long names, create C# objects, read/write properties, call methods.
-  const Vector3 = CS.UnityEngine.Vector3;
-  const go = new CS.UnityEngine.GameObject('Temp');
-  go.name = 'TempFromPuerTS';
-
-  // 2) typeof: Unity APIs that expect System.Type need puer.$typeof(...), not C# typeof(...).
-  go.AddComponent(puer.$typeof(CS.UnityEngine.ParticleSystem));
-
-  // 3) Runtime generics: close C# generic types with puer.$generic(Type$N, ...typeArgs).
-  const ListInt = puer.$generic(CS.System.Collections.Generic.List$1, CS.System.Int32);
-  const list = new ListInt();
-  list.Add(10);
-
-  // 4) C# indexers: do not use list[0] or dict['hp']; use get_Item/set_Item.
-  list.set_Item(0, 20);
-  const first = list.get_Item(0);
-
-  const DictStringInt = puer.$generic(
-    CS.System.Collections.Generic.Dictionary$2,
-    CS.System.String,
-    CS.System.Int32
-  );
-  const dict = new DictStringInt();
-  dict.set_Item('hp', 100);
-
-  // 5) Operator overloads: call CLR op_* methods because JS operators do not dispatch C# overloads.
-  const doubledUp = Vector3.op_Multiply(Vector3.up, 2);
-
-  // 6) ref/out pattern: replace ExampleApi.TryGetValue with the real C# method you are calling.
-  // const outValue = puer.$ref();
-  // const ok = CS.ExampleApi.TryGetValue('key', outValue);
-  // const value = puer.$unref(outValue);
-
-  // 7) Async C# Task pattern: wrap the returned Task before await.
-  // const task = CS.ExampleApi.LoadCountAsync();
-  // const count = await puer.$promise(task);
-
-  return {
-    name: go.name,
-    first,
-    hp: dict.get_Item('hp'),
-    hasParticleSystem: go.GetComponent(puer.$typeof(CS.UnityEngine.ParticleSystem)) !== null,
-    doubledUp: doubledUp.ToString()
-  };
-}
-```";
-
-            return @$"Within the Broker's `eval` tool, UnityEvalTool exposes loader-backed Unity helper modules.
-
-Inside `eval`, import Unity helper tools with the `tools://` protocol:
-
-```javascript
-async function execute() {{
-  const index = await import('tools://');
-  const runtime = await import('tools://Runtime');
-  return {{ tools: index.listTools(), state: runtime.getState() }};
-}}
-```
+            return @$"UnityEvalTool module index.
 
 Discovery:
-- `tools://` returns the concise root tool index module.
-- `index.listTools()` returns concise root tool summaries only.
-- Call `index.getToolDetails('Tool/Path')` when you need that tool's method descriptions, direct sub tools, parameter order, defaults, and safety flags.
-- Import a concrete tool such as `tools://Editor/Assets`; its exported `functions` array contains method metadata.
-- Tool details include `subTools` only when direct child tools exist. If `subTools` is absent, do not invent or explore child paths.
+- `listTools()` returns the root summaries below.
+- `getToolDetails('Tool/Path')` returns that tool's functions, positional parameter order, defaults, safety flags, and direct `subTools` when present.
+- Import only the tool you need with `await import('tools://Tool/Path')`; the imported module also exports its `functions` metadata.
+- If `subTools` is absent, do not invent child paths. Plain imports use the configured JavaScript loader and are unrelated to Tool lookup.
 
-Available tools:
+Available root tools:
 {string.Join("\n", lines)}
 
-Call pattern:
-- C# tools are imported as direct method modules, for example `const runtime = await import('tools://Runtime'); runtime.getState()`.
-- Generated C# tool functions use positional arguments in the order shown by `functions[].parameters`.
-- Prefer helper tools for common Unity workflows; use direct PuerTS `CS.*` interop only when no helper covers the task.
-- Plain imports such as `import('path/test.mjs')` use the configured JavaScript loader and never fall back to Tool lookup.
-
-{puertsInteropTutorial}
+Direct C# fallback:
+- Prefer helper modules. Use full names under `CS.*` only when no module covers the API.
+- Use `puer.$typeof` for `System.Type`, `puer.$generic` with CLR arity names for runtime generics, `get_Item`/`set_Item` for C# indexers, `puer.$ref`/`puer.$unref` for ref/out, and `await puer.$promise(task)` for C# Task.
 ".Trim();
         }
     }

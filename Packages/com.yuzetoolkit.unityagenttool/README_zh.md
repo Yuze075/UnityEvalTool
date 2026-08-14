@@ -27,6 +27,10 @@ Agent 与 Command Line 会话在侧栏中分组显示，各自保存独立输入
 Provider 页面内联显示，不再反复弹窗；所有自有下拉菜单都会限制在工作区视口内，供应商、Profile 或模型列表
 较长时可纵向滚动。
 
+Conversation 只渲染非空的 User/Assistant 文本与待处理审批卡片。ToolCall 参数和 ToolResult 仍会完整持久化并
+返回模型，但不会显示在转录区。工作台继承当前 Unity PanelSettings / Theme 的字体，不打包、枚举、动态创建或
+显式指定字体。
+
 ## Agent 循环
 
 内建 HTTP Agent 使用刻意保持简单的顺序循环：先持久化一次模型响应，再为每个 ToolCall 按顺序写入且仅写入
@@ -37,6 +41,9 @@ Provider 页面内联显示，不再反复弹窗；所有自有下拉菜单都�
 Provider Profile 保存模型 Context Window。HTTP 对话接近窗口时，对话文档继续保留完整消息；发给模型的内容
 改用一份语义摘要检查点和最近的完整消息边界。网络瞬时错误、429 与可恢复的 5xx 最多重试两次，并且只能发生
 在收到第一条 SSE 事件之前；任何部分模型输出都不会重试。
+
+内建 Editor/Runtime System Prompt 统一使用英文，只负责 Unity 角色、可用工具类别和工作循环。MCP/CLI
+生命周期、eval JavaScript 契约、模块发现方式与具体函数参数由对应 Tool 描述各自持有，不在系统提示词中重复。
 
 Editor 中若活动对话触发脚本编译，本包会先在 `Application.persistentDataPath` 写入同时绑定当前项目与 Editor
 进程的恢复 marker，再中断并持久化该轮。成功编译与 Domain Reload 后，或失败编译结束后，系统会追加一次包含

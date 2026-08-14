@@ -191,17 +191,11 @@ namespace YuzeToolkit
         }
 
         private const string Description =
-            "Execute JavaScript inside Unity through the current eval session's persistent PuerTS VM. " +
-            "Your code must define `async function execute() { ... }` and return concise serializable data. " +
-            "First discover tools with `const index = await import('tools://'); return index.description;`; this returns eval usage, tool discovery rules, available root tools, and a compact PuerTS C# interop tutorial. " +
-            "Import a tool with `const runtime = await import('tools://Runtime');` after choosing it from the tool summaries. " +
-            "Use `index.getToolDetails('Tool/Path')` or an imported tool's `functions` array when you need method descriptions and parameters. " +
-            "Tool details include `subTools` only when direct child tools exist; if absent, do not invent child paths. " +
-            "Generated C# tool functions use positional arguments. " +
-            "Prefer helper tools for common workflows; use PuerTS `CS.*` interop only when no helper covers the task. " +
-            "Return primitives, lists, or dictionaries. Editor-only tools require the Unity Editor. " +
-            "Before an eval that may compile, retain a fresh unity_status capturedAtUtc. After calling `tools://Editor`.scheduleAssetRefresh(), return from the eval and wait through unity_status(waitFor: 'compilation-complete', observedAfterUtc: capturedAtUtc); never poll eval while Unity is busy. " +
-            "CompilationFailed is repair mode: eval runs against the last successfully loaded assemblies so you can read compiler messages, fix code, and request another refresh. " +
-            "Destructive operations require explicit confirmation flags.";
+            "Run JavaScript inside Unity through this eval session's persistent PuerTS VM. Define `async function execute() { ... }` " +
+            "and return concise serializable data. For unfamiliar Unity work, import `tools://` to read the root summaries, use " +
+            "`getToolDetails(path)` or a module's `functions` metadata when needed, then import only the relevant `tools://Path` " +
+            "module. Generated tool methods use positional parameters. Prefer helper modules and use `CS.*` only for uncovered " +
+            "APIs. Editor-only modules require the Unity Editor. If code schedules an asset refresh or compilation, return from " +
+            "execute immediately and do not issue another eval while Unity is busy.";
     }
 }

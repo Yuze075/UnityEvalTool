@@ -10,6 +10,10 @@ namespace YuzeToolkit
     [DisallowMultipleComponent]
     public sealed class UnityAgentPanelModule : MonoBehaviour, IDebugPanelModule
     {
+        private const float DefaultMargin = 24f;
+        private const int GeometryVersion = 1;
+        private const string GeometryVersionKey = "UnityAgent.Runtime.GeometryVersion";
+
         [SerializeField, Tooltip("Keyboard key used with DebugPanel modifiers to show or hide Unity Agent.")]
         private Key toggleKey = Key.F8;
 
@@ -19,6 +23,7 @@ namespace YuzeToolkit
         private VisualElement? _layer;
         private VisualElement? _window;
         private VisualElement? _content;
+        private AgentButton? _collapseButton;
         private VisualElement? _resizeGrip;
         private UnityAgentWorkbenchView? _workbench;
         private bool _collapsed;
@@ -39,8 +44,13 @@ namespace YuzeToolkit
 
             _window = new VisualElement { name = "unity-agent-runtime-window" };
             _window.style.position = Position.Absolute;
-            _window.style.left = PlayerPrefs.GetFloat("UnityAgent.Runtime.Left", 24f);
-            _window.style.bottom = PlayerPrefs.GetFloat("UnityAgent.Runtime.Bottom", 24f);
+            var hasBottomLeftGeometry = PlayerPrefs.GetInt(GeometryVersionKey) == GeometryVersion;
+            _window.style.left = hasBottomLeftGeometry
+                ? PlayerPrefs.GetFloat("UnityAgent.Runtime.Left", DefaultMargin)
+                : DefaultMargin;
+            _window.style.bottom = hasBottomLeftGeometry
+                ? PlayerPrefs.GetFloat("UnityAgent.Runtime.Bottom", DefaultMargin)
+                : DefaultMargin;
             _window.style.width = PlayerPrefs.GetFloat("UnityAgent.Runtime.Width", initialSize.x);
             _window.style.height = PlayerPrefs.GetFloat("UnityAgent.Runtime.Height", initialSize.y);
             _window.style.minWidth = minimumSize.x;
@@ -69,11 +79,11 @@ namespace YuzeToolkit
             title.style.flexGrow = 1;
             AgentUi.ApplyTypography(title, AgentTypography.BodyStrong);
             header.Add(title);
-            var collapse = AgentUi.IconButton(AgentIconKind.ChevronUp,
+            _collapseButton = AgentUi.IconButton(AgentIconKind.ChevronDown,
                 "Collapse or expand Unity Agent without affecting other debug overlays.", ToggleCollapsed,
                 30, AgentUi.Transparent, AgentUi.TextSecondary);
-            collapse.name = "unity-agent-runtime-collapse";
-            header.Add(collapse);
+            _collapseButton.name = "unity-agent-runtime-collapse";
+            header.Add(_collapseButton);
             _resizeGrip = AgentUi.IconButton(AgentIconKind.Sliders,
                 "Drag to resize Unity Agent from the upper-right corner.", () => { }, 30,
                 AgentUi.Transparent, AgentUi.TextSecondary);
@@ -112,14 +122,16 @@ namespace YuzeToolkit
             _layer = null;
             _window = null;
             _content = null;
+            _collapseButton = null;
             _resizeGrip = null;
             _collapsed = false;
         }
 
         private void ToggleCollapsed()
         {
-            if (_window == null || _content == null || _resizeGrip == null) return;
+            if (_window == null || _content == null || _collapseButton == null || _resizeGrip == null) return;
             _collapsed = !_collapsed;
+            _collapseButton.SetIcon(_collapsed ? AgentIconKind.ChevronUp : AgentIconKind.ChevronDown);
             if (_collapsed)
             {
                 _expandedHeight = _window.resolvedStyle.height;
@@ -173,6 +185,7 @@ namespace YuzeToolkit
                 Mathf.Max(0, layerHeight - (_window.layout.y + _window.resolvedStyle.height)));
             PlayerPrefs.SetFloat("UnityAgent.Runtime.Width", _window.resolvedStyle.width);
             PlayerPrefs.SetFloat("UnityAgent.Runtime.Height", _window.resolvedStyle.height);
+            PlayerPrefs.SetInt(GeometryVersionKey, GeometryVersion);
         }
 
         private void ReleaseFocus()

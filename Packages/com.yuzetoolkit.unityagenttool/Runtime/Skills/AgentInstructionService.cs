@@ -188,7 +188,7 @@ namespace YuzeToolkit.UnityAgent
             var prompt = new StringBuilder();
             AppendBounded(prompt,
                 "\n<agents_instructions priority=\"ascending; 1 is highest\">\n" +
-                "When instructions conflict, follow the lower priority number.\n");
+                "Apply the instructions that match the current work. When they conflict, the lower priority number wins.\n");
             var seenAgentsFiles = new HashSet<string>(PathComparer);
             for (var rootIndex = 0; rootIndex < agentsRoots.Count; rootIndex++)
             {
@@ -213,8 +213,8 @@ namespace YuzeToolkit.UnityAgent
             if (skills.Count > 0)
             {
                 AppendBounded(prompt,
-                    "\n<available_skills>\nUse skill_read when a listed skill applies. " +
-                    "Read its complete SKILL.md before following it. Earlier entries have higher priority.\n");
+                    "\n<available_skills>\nWhen a listed Skill applies, use skill_read to read its complete SKILL.md before acting. " +
+                    "Earlier entries have higher priority.\n");
                 foreach (var skill in skills)
                 {
                     var description = (skill.Description ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ');
@@ -528,7 +528,7 @@ namespace YuzeToolkit.UnityAgent
             _getSettings = getSettings;
             Descriptor = new AgentToolDescriptor(
                 "skill_list",
-                "List configured Skills and their descriptions.",
+                "List the available project Skills and their trigger descriptions.",
                 AgentToolAccess.ReadOnly,
                 AgentToolArguments.ObjectSchema(new Dictionary<string, object?>()));
         }
@@ -557,7 +557,7 @@ namespace YuzeToolkit.UnityAgent
             _getSettings = getSettings;
             Descriptor = new AgentToolDescriptor(
                 "skill_read",
-                "Read a Skill's complete SKILL.md or one referenced file inside that Skill directory.",
+                "Read the complete SKILL.md for an applicable Skill, or one file it references inside the same Skill directory.",
                 AgentToolAccess.ReadOnly,
                 AgentToolArguments.ObjectSchema(AgentJson.Object(
                         ("skill", AgentToolArguments.StringProperty("Skill id from skill_list, or an unambiguous name.")),

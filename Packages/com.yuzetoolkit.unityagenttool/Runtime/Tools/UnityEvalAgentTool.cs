@@ -116,9 +116,12 @@ namespace YuzeToolkit.UnityAgent
             _service = service;
             Descriptor = new AgentToolDescriptor(
                 "unity_eval_js",
-                "Execute JavaScript natively inside this Unity process through a persistent PuerTS VM. " +
-                "Code must define async function execute(). Import IEvalTool modules with tools://. " +
-                "This is full-trust same-process execution and does not use Broker, MCP or CLI.",
+                "Run JavaScript directly in the current Unity process. Define async function execute() and return concise " +
+                "serializable data. The PuerTS VM persists for this conversation unless resetSession is true. For unfamiliar " +
+                "Unity work, import tools:// to discover root modules and details, then import only the relevant module; generated " +
+                "tool methods use positional parameters. Prefer those modules and use CS.* only for uncovered APIs. If an Editor " +
+                "action schedules compilation, return immediately; the Agent host will resume this conversation afterward. " +
+                "This direct tool does not use Broker, MCP, or CLI.",
                 AgentToolAccess.Write,
                 AgentToolArguments.ObjectSchema(AgentJson.Object(
                         ("code", AgentToolArguments.StringProperty(

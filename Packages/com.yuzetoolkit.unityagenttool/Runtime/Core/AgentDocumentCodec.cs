@@ -37,15 +37,10 @@ namespace YuzeToolkit.UnityAgent
                 MaximumAgentSteps = Math.Max(1, EvalData.GetInt(root, "maximumAgentSteps", 64))
             };
 
-            if (sourceSchemaVersion < 4)
-            {
-                if (string.Equals(settings.EditorSystemPrompt, AgentPromptDefaults.PreviousEditorSystemPrompt,
-                        StringComparison.Ordinal))
-                    settings.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
-                if (string.Equals(settings.RuntimeSystemPrompt, AgentPromptDefaults.PreviousRuntimeSystemPrompt,
-                        StringComparison.Ordinal))
-                    settings.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
-            }
+            if (AgentPromptDefaults.IsPreviousEditorPrompt(settings.EditorSystemPrompt))
+                settings.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
+            if (AgentPromptDefaults.IsPreviousRuntimePrompt(settings.RuntimeSystemPrompt))
+                settings.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
 
             foreach (var value in AgentJson.GetObjectArray(root, "providerProfiles"))
                 settings.ProviderProfiles.Add(ReadProviderProfile(value));
@@ -206,15 +201,10 @@ namespace YuzeToolkit.UnityAgent
                 AgentsRoots = AgentJson.GetObjectArray(root, "agentsRoots").Select(ReadPathLocation).ToList(),
                 SkillRoots = AgentJson.GetObjectArray(root, "skillRoots").Select(ReadPathLocation).ToList()
             };
-            if (version < 2)
-            {
-                if (string.Equals(result.EditorSystemPrompt, AgentPromptDefaults.PreviousEditorSystemPrompt,
-                        StringComparison.Ordinal))
-                    result.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
-                if (string.Equals(result.RuntimeSystemPrompt, AgentPromptDefaults.PreviousRuntimeSystemPrompt,
-                        StringComparison.Ordinal))
-                    result.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
-            }
+            if (AgentPromptDefaults.IsPreviousEditorPrompt(result.EditorSystemPrompt))
+                result.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
+            if (AgentPromptDefaults.IsPreviousRuntimePrompt(result.RuntimeSystemPrompt))
+                result.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
             return result;
         }
 
