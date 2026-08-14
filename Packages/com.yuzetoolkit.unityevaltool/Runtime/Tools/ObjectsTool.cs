@@ -14,7 +14,8 @@ namespace YuzeToolkit
 
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "Find active scene GameObjects by exact name. Use findByPath for hierarchy paths, findByTag for tags, and Runtime/Components.find for component types.")]
+            "Find active scene GameObjects by exact name. Use findByPath for hierarchy paths, findByTag for tags, and Runtime/Components.find for component types.",
+            Safety = EvalToolSafety.ReadOnly)]
         public List<Dictionary<string, object?>> find(string name, int limit = DefaultFindLimit)
         {
             return ToolUtilities.FindActiveGameObjectsByName(name, Math.Max(1, limit))
@@ -24,7 +25,8 @@ namespace YuzeToolkit
 
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "Find the first active scene GameObject by exact name and return a lightweight selector summary.")]
+            "Find the first active scene GameObject by exact name and return a lightweight selector summary.",
+            Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?>? findOne(string name)
         {
             var go = ToolUtilities.FindActiveGameObjectsByName(name, 1).FirstOrDefault();
@@ -32,7 +34,7 @@ namespace YuzeToolkit
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("Find one scene GameObject by exact hierarchy path. This explicit path query may include inactive objects.")]
+        [EvalFunction("Find one scene GameObject by exact hierarchy path. This explicit path query may include inactive objects.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?>? findByPath(string path, bool includeInactive = true)
         {
             var go = ToolUtilities.FindGameObjectByPath(path, includeInactive);
@@ -41,7 +43,8 @@ namespace YuzeToolkit
 
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "Find active scene GameObjects by tag using Unity GameObject.FindGameObjectsWithTag. Inactive tagged objects are intentionally unsupported.")]
+            "Find active scene GameObjects by tag using Unity GameObject.FindGameObjectsWithTag. Inactive tagged objects are intentionally unsupported.",
+            Safety = EvalToolSafety.ReadOnly)]
         public List<Dictionary<string, object?>> findByTag(string tag, int limit = DefaultFindLimit)
         {
             return ToolUtilities.FindActiveGameObjectsByTag(tag, Math.Max(1, limit))
@@ -51,7 +54,8 @@ namespace YuzeToolkit
 
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "Resolve one GameObject and return its summary. Target may be instance id, exact name/path string, GameObject, Component, or selector object with instanceId/path/name.")]
+            "Resolve one GameObject and return its summary. Target may be instance id, exact name/path string, GameObject, Component, or selector object with instanceId/path/name.",
+            Safety = EvalToolSafety.ReadOnly)]
         public GameObject get(object target)
         {
             var go = ToolUtilities.ResolveGameObject(target);

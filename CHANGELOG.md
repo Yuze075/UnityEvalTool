@@ -2,7 +2,13 @@
 
 **English** | [简体中文](CHANGELOG_zh.md)
 
-## Unreleased
+## 2.0.3 - 2026-08-15
+
+- Require every C# and loader-backed JavaScript Eval Function to declare non-empty safety
+  metadata, reject invalid read/write combinations during registration, and report transient
+  process or Tool-owned writes through the new `MutatesRuntimeState` flag.
+- Publish the accumulated Unity package, Broker/CLI, npm, Roslyn, Tool, and Agent changes as
+  one immutable 2.0.3 source and artifact set instead of reusing the published 2.0.2 version.
 
 - Split the built-in Agent prompt into explicit Editor-development and standalone-Player diagnosis workflows,
   route every built-in file, process, Skill, and Unity Tool by task target, and provide an executable
@@ -17,6 +23,9 @@
   make the repository README the complete installation and first-use entry point, separate
   reproducible source packaging from maintainer-defined distribution, and remove
   host-project-specific development instructions.
+
+## 2.0.2 - 2026-08-13
+
 - Preserve npm metadata lookup failures during artifact preflight and pass tarballs through
   build checks as explicit local paths.
 - Pin .NET SDK 10.0.300, exclude source-control revisions from the SourceGenerator

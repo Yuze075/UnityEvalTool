@@ -134,7 +134,7 @@ Module requirements:
 - Export const description as a non-empty string.
 - Export const functions as an array of function descriptors. `parameters` is the only parameter metadata source.
 - Every descriptor includes name or methodName, description, parameters, and a `safety` array.
-- Valid safety flags are ReadOnly, MutatesScene, MutatesProject, Destructive, RequiresConfirmation, TriggersReload, ReflectionDangerous, NetworkService, LongRunning, MutatesEditorState, and PersistsData. PersistsData means the function writes durable user or application data outside Unity project assets and is high risk.
+- Valid safety flags are ReadOnly, MutatesScene, MutatesProject, Destructive, RequiresConfirmation, TriggersReload, ReflectionDangerous, NetworkService, LongRunning, MutatesEditorState, PersistsData, and MutatesRuntimeState. PersistsData means the function writes durable user or application data outside Unity project assets and is high risk. MutatesRuntimeState means the function changes transient process or Tool-owned state without changing scene, project, or durable user data.
 - Every descriptor methodName must be a non-reserved JavaScript identifier and match an exported function.
 - Optionally export const subTools as an array of direct child summaries. Omit subTools entirely when there are no direct children.
 - Each sub tool summary includes name, path, and description.
@@ -671,6 +671,8 @@ export function echo(value) {
                 safety |= flag;
             }
 
+            EvalToolSafetyUtility.ValidateDeclared(safety,
+                $"JS tool '{toolPath}' function '{methodName}'");
             return safety;
         }
 

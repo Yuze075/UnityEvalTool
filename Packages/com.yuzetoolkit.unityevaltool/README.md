@@ -27,7 +27,7 @@ Do not install multiple PuerTS backends in one Unity project.
 Use Unity Package Manager's **Add package from git URL** command:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3
 ```
 
 For a local source checkout, use **Add package from disk** and select this package's
@@ -96,6 +96,8 @@ Define a partial C# class with `[EvalTool]`, mark exported methods with `[EvalFu
 and let the bundled Roslyn analyzer generate its `IEvalTool` metadata. Every function must
 declare an explicit safety level. Tool registration validates paths, callable sub-tools,
 JavaScript export names, parameters, and safety metadata before making a module visible.
+`MutatesRuntimeState` is reserved for transient process or Tool-owned state such as log buffers
+and observation sessions; it does not imply scene, project, Editor, or durable user-data writes.
 
 For manually composed runtime tools, derive from `EvalToolBase` or use `EvalToolGroup`,
 `EvalReadOnlyValueTool<T>`, `EvalWritableValueTool<T>`, and `EvalActionTool`. These types only

@@ -19,7 +19,8 @@ namespace YuzeToolkit
     {
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "Return environment, Unity version, platform, play state, paths, active scene, and registered tools.")]
+            "Return environment, Unity version, platform, play state, paths, active scene, and registered tools.",
+            Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getState()
         {
             var scene = SceneManager.GetActiveScene();
@@ -45,14 +46,14 @@ namespace YuzeToolkit
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("Return the newest captured Unity logs, optionally limited by count and log type.")]
+        [EvalFunction("Return the newest captured Unity logs, optionally limited by count and log type.", Safety = EvalToolSafety.ReadOnly)]
         public List<object?> getRecentLogs(int count = 50, string type = "all")
         {
             return UnityLogBuffer.GetRecent(count, type);
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("Clear only the eval tool log buffer.")]
+        [EvalFunction("Clear only the eval tool log buffer.", Safety = EvalToolSafety.MutatesRuntimeState)]
         public string clearLogs()
         {
             UnityLogBuffer.Clear();

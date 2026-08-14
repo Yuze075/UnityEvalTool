@@ -5,7 +5,11 @@
 The repository-level [changelog](../../../CHANGELOG.md) is the canonical release history
 for the Unity package, computer-level Broker/CLI, npm packages, and Roslyn generator.
 
-## Unreleased
+## 2.0.3 - 2026-08-15
+
+- Require explicit non-empty safety metadata for every C# and JavaScript Tool function,
+  validate it before registration, and distinguish transient runtime-state writes from scene,
+  project, Editor, and durable-data mutations.
 
 - Make loopback-only Broker token authentication opt-in instead of a default prerequisite;
   one explicit environment switch applies the token boundary to MCP, Unity, and CLI.
@@ -14,6 +18,9 @@ for the Unity package, computer-level Broker/CLI, npm packages, and Roslyn gener
   observation helpers.
 - Add matching English and Simplified Chinese package documentation and route complete
   installation and first-use guidance through the repository README.
+
+## 2.0.2 - 2026-08-13
+
 - Prepare package version 2.0.2 and pin Git URL installation to immutable tag `v2.0.2`.
 - Keep the committed source-generator analyzer as a normal Git blob for UPM Git installs
   and deterministic binary validation.

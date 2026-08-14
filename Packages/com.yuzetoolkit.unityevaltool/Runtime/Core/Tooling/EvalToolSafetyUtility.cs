@@ -29,7 +29,8 @@ namespace YuzeToolkit
                 ("networkService", Has(safety, EvalToolSafety.NetworkService)),
                 ("longRunning", Has(safety, EvalToolSafety.LongRunning)),
                 ("mutatesEditorState", Has(safety, EvalToolSafety.MutatesEditorState)),
-                ("persistsData", Has(safety, EvalToolSafety.PersistsData))
+                ("persistsData", Has(safety, EvalToolSafety.PersistsData)),
+                ("mutatesRuntimeState", Has(safety, EvalToolSafety.MutatesRuntimeState))
             );
         }
 
@@ -45,9 +46,44 @@ namespace YuzeToolkit
                 Has(safety, EvalToolSafety.PersistsData))
                 return "high";
             if (Has(safety, EvalToolSafety.MutatesScene) ||
-                Has(safety, EvalToolSafety.MutatesEditorState))
+                Has(safety, EvalToolSafety.MutatesEditorState) ||
+                Has(safety, EvalToolSafety.MutatesRuntimeState))
                 return "medium";
             return "low";
+        }
+
+        public static void ValidateDeclared(EvalToolSafety safety, string context)
+        {
+            const EvalToolSafety knownFlags =
+                EvalToolSafety.ReadOnly |
+                EvalToolSafety.MutatesScene |
+                EvalToolSafety.MutatesProject |
+                EvalToolSafety.Destructive |
+                EvalToolSafety.RequiresConfirmation |
+                EvalToolSafety.TriggersReload |
+                EvalToolSafety.ReflectionDangerous |
+                EvalToolSafety.NetworkService |
+                EvalToolSafety.LongRunning |
+                EvalToolSafety.MutatesEditorState |
+                EvalToolSafety.PersistsData |
+                EvalToolSafety.MutatesRuntimeState;
+            const EvalToolSafety incompatibleWithReadOnly =
+                EvalToolSafety.MutatesScene |
+                EvalToolSafety.MutatesProject |
+                EvalToolSafety.Destructive |
+                EvalToolSafety.TriggersReload |
+                EvalToolSafety.MutatesEditorState |
+                EvalToolSafety.PersistsData |
+                EvalToolSafety.MutatesRuntimeState;
+
+            if (safety == EvalToolSafety.Unspecified)
+                throw new InvalidOperationException($"{context} must declare at least one safety flag.");
+            if ((safety & ~knownFlags) != 0)
+                throw new InvalidOperationException($"{context} contains an unknown safety flag value.");
+            if (Has(safety, EvalToolSafety.ReadOnly) && (safety & incompatibleWithReadOnly) != 0)
+                throw new InvalidOperationException($"{context} cannot combine ReadOnly with mutation safety flags.");
+            if (Has(safety, EvalToolSafety.Destructive) && !Has(safety, EvalToolSafety.RequiresConfirmation))
+                throw new InvalidOperationException($"{context} must require confirmation when it is destructive.");
         }
 
         private static bool Has(EvalToolSafety safety, EvalToolSafety flag) => (safety & flag) != 0;

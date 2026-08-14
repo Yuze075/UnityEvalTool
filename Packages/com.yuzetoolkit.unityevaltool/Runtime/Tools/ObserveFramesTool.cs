@@ -60,7 +60,7 @@ namespace YuzeToolkit
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("Cancel a running observation session and keep its captured samples.")]
+        [EvalFunction("Cancel a running observation session and keep its captured samples.", Safety = EvalToolSafety.MutatesRuntimeState)]
         public Dictionary<string, object?> cancel(
             [EvalParameter("Observation session id returned by start.")] string id)
         {
@@ -68,7 +68,7 @@ namespace YuzeToolkit
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("Release one observation session and its in-memory samples.")]
+        [EvalFunction("Release one observation session and its in-memory samples.", Safety = EvalToolSafety.MutatesRuntimeState)]
         public Dictionary<string, object?> release(
             [EvalParameter("Observation session id whose retained samples should be released.")] string id)
         {

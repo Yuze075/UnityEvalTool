@@ -9,7 +9,7 @@ namespace YuzeToolkit
     [EvalTool("Project", "Project settings, profiler, and editor tool diagnostics.")]
     public sealed partial class ProjectTool
     {
-        [EvalFunction("Read project settings.")]
+        [EvalFunction("Read project settings.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getProjectSettings()
         {
             return EvalData.Obj(
@@ -20,7 +20,7 @@ namespace YuzeToolkit
                 ("layers", UnityEditorInternal.InternalEditorUtility.layers.Cast<object?>().ToList()));
         }
 
-        [EvalFunction("Read profiler state.")]
+        [EvalFunction("Read profiler state.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getProfilerState()
         {
             var driver = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditorInternal.ProfilerDriver");
@@ -38,7 +38,7 @@ namespace YuzeToolkit
                 ("profileEditor", isRecording));
         }
 
-        [EvalFunction("Read MCP/editor tool state.")]
+        [EvalFunction("Read MCP/editor tool state.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getToolState()
         {
             var toolManager = typeof(Editor).Assembly.GetType("UnityEditor.EditorTools.ToolManager");

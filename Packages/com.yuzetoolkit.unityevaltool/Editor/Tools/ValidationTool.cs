@@ -33,7 +33,7 @@ namespace YuzeToolkit
             return result;
         }
 
-        [EvalFunction("Find missing scripts.")]
+        [EvalFunction("Find missing scripts.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> missingScripts(object? folders = null, int limit = 100) =>
             GetMissingScriptsResult(folders, limit);
 
@@ -72,7 +72,7 @@ namespace YuzeToolkit
             return EvalData.Obj(("count", issues.Count), ("issues", issues));
         }
 
-        [EvalFunction("Find broken serialized object references in loaded scenes.")]
+        [EvalFunction("Find broken serialized object references in loaded scenes.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> missingReferences(int limit = 200) => GetMissingReferencesResult(limit);
 
         private static Dictionary<string, object?> GetMissingReferencesResult(int limit)
@@ -155,7 +155,7 @@ namespace YuzeToolkit
             }
         }
 
-        [EvalFunction("Check SerializeField Tooltip convention.")]
+        [EvalFunction("Check SerializeField Tooltip convention.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> serializedFieldTooltips(object? folders = null, int limit = 0) => GetSerializedFieldTooltipsResult(folders, limit);
 
         private static Dictionary<string, object?> GetSerializedFieldTooltipsResult(object? foldersValue, int limit)

@@ -17,7 +17,8 @@ namespace YuzeToolkit
         NetworkService = 1 << 7,
         LongRunning = 1 << 8,
         MutatesEditorState = 1 << 9,
-        PersistsData = 1 << 10
+        PersistsData = 1 << 10,
+        MutatesRuntimeState = 1 << 11
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]

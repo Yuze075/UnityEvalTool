@@ -11,7 +11,7 @@ namespace YuzeToolkit
     public sealed partial class ReflectionTool
     {
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("List public C# namespaces currently loaded in the AppDomain.")]
+        [EvalFunction("List public C# namespaces currently loaded in the AppDomain.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getNamespaces()
         {
             var namespaces = AppDomain.CurrentDomain.GetAssemblies()
@@ -28,7 +28,7 @@ namespace YuzeToolkit
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("List public C# types in the exact namespaceName returned by getNamespaces.")]
+        [EvalFunction("List public C# types in the exact namespaceName returned by getNamespaces.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getTypes(string namespaceName)
         {
             if (string.IsNullOrWhiteSpace(namespaceName))
@@ -51,7 +51,8 @@ namespace YuzeToolkit
 
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "Get public C# type details by full type name, including declared public methods, fields, and properties.")]
+            "Get public C# type details by full type name, including declared public methods, fields, and properties.",
+            Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getTypeDetails(string fullName)
         {
             if (string.IsNullOrWhiteSpace(fullName))

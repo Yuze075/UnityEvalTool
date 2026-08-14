@@ -7,7 +7,7 @@ namespace YuzeToolkit
     [EvalTool("Importers", "AssetImporter inspection, serialized edits, and reimport.")]
     public sealed partial class ImportersTool
     {
-        [EvalFunction("Read importer summary.")]
+        [EvalFunction("Read importer summary.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> get(string path, bool includeProperties = false, int propertyLimit = 200)
         {
             var importer = AssetImporter.GetAtPath(path);

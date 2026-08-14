@@ -9,7 +9,7 @@ namespace YuzeToolkit
     [EvalTool("Serialized", "SerializedObject and Inspector property reads/writes.")]
     public sealed partial class SerializedTool
     {
-        [EvalFunction("Read serialized properties.")]
+        [EvalFunction("Read serialized properties.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> get(object target, string propertyPath = "", int limit = 200)
         {
             var obj = ResolveUnityObject(target);

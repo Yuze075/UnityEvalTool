@@ -25,7 +25,7 @@ Unity Package 与必需 Broker/CLI 的安装和首次使用说明见[仓库使�
 使用 Unity Package Manager 的 **Add package from git URL**：
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.2
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3
 ```
 
 如果使用本地源码 checkout，选择 **Add package from disk**，然后选中该 Package
@@ -86,6 +86,8 @@ Framework 运行状态和有界序列化代码用法搜索。应优先使用这�
 定义带 `[EvalTool]` 的 partial C# class，使用 `[EvalFunction]` 标记导出方法，再由随包
 Roslyn Analyzer 生成 `IEvalTool` 元数据。每个函数都必须声明明确的安全级别。Tool 注册
 会在 module 可见前校验路径、可调用子 Tool、JavaScript 导出名、参数和安全元数据。
+`MutatesRuntimeState` 只表示 log buffer、观察 session 等进程或 Tool 自有的瞬时状态写入，
+不代表 Scene、Project、Editor 或持久用户数据发生变化。
 
 需要运行时手工组合 Tool 时，可以继承 `EvalToolBase`，或直接使用 `EvalToolGroup`、
 `EvalReadOnlyValueTool<T>`、`EvalWritableValueTool<T>` 与 `EvalActionTool`。这些类型只负责

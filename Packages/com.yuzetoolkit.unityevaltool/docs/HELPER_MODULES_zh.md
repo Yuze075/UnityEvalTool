@@ -53,11 +53,11 @@ Runtime helper 可在 Editor 或 Runtime/Player 中运行，前提是底层 Unit
 
 环境状态和 Unity 日志。
 
-| 函数 | 用途 |
-|---|---|
-| `getState()` | 环境、Unity 版本、平台、播放状态、路径、active scene、已注册 tools。 |
-| `getRecentLogs(count?, type?)` | MCP 捕获的 Unity 日志。 |
-| `clearLogs()` | 清空 MCP log buffer。 |
+| 函数 | 用途 | 安全 |
+|---|---|---|
+| `getState()` | 环境、Unity 版本、平台、播放状态、路径、active scene、已注册 tools。 | 只读 |
+| `getRecentLogs(count?, type?)` | MCP 捕获的 Unity 日志。 | 只读 |
+| `clearLogs()` | 清空 MCP log buffer。 | 修改瞬时 Runtime 状态 |
 
 ### `tools://Runtime/Objects`
 

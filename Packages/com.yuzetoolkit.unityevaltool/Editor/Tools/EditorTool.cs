@@ -22,7 +22,7 @@ namespace YuzeToolkit
     [EvalSubTool(typeof(ValidationTool))]
     public sealed partial class EditorTool
     {
-        [EvalFunction("Return Editor state.")]
+        [EvalFunction("Return Editor state.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getState()
         {
             var scene = SceneManager.GetActiveScene();
@@ -65,7 +65,7 @@ namespace YuzeToolkit
             );
         }
 
-        [EvalFunction("Return compilation/import state and the last compilation or refresh request.")]
+        [EvalFunction("Return compilation/import state and the last compilation or refresh request.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getCompilationState() => EditorCompilationMonitor.GetStateObject();
 
         [EvalFunction("Request script compilation and return the observable request state. If Unity is playing or changing play mode, the request exits PlayMode first and runs after stable EditMode.", Safety = EvalToolSafety.MutatesProject | EvalToolSafety.TriggersReload)]
@@ -80,7 +80,7 @@ namespace YuzeToolkit
             return EditorCompilationMonitor.RefreshAssetDatabaseNow();
         }
 
-        [EvalFunction("Read compiler messages.")]
+        [EvalFunction("Read compiler messages.", Safety = EvalToolSafety.ReadOnly)]
         public List<object?> getCompilerMessages(int count = 50) => UnityLogBuffer.GetCompilerLikeMessages(count);
 
         [EvalFunction("Enter or exit play mode.", Safety = EvalToolSafety.MutatesEditorState)]
@@ -107,7 +107,7 @@ namespace YuzeToolkit
             return EvalData.Obj(("path", path), ("executed", ok));
         }
 
-        [EvalFunction("Read current selection.")]
+        [EvalFunction("Read current selection.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getSelection()
         {
             var items = Selection.objects

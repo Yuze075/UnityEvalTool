@@ -5,7 +5,10 @@
 仓库级[变更记录](../../../CHANGELOG_zh.md) 是 Unity Package、电脑级 Broker/CLI、npm Package 和
 Roslyn Generator 的规范发行历史。
 
-## 未发布
+## 2.0.3 - 2026-08-15
+
+- 要求每个 C# 与 JavaScript Tool 函数提供显式非空 safety metadata，在注册前完成校验，
+  并把瞬时 Runtime 状态写入与 Scene、Project、Editor 及持久数据写入区分开。
 
 - 将仅 loopback 的 Broker token 认证从默认前置改为显式可选；一个环境开关会同时为
   MCP、Unity 与 CLI 应用 token 边界。
@@ -13,6 +16,9 @@ Roslyn Generator 的规范发行历史。
   发现/运行/取消、序列化代码用法搜索和有界跨帧观察 helper。
 - 增加一一对应的英文与简体中文 Package 文档，并把完整安装与首次使用指南统一导向
   仓库 README。
+
+## 2.0.2 - 2026-08-13
+
 - 准备 Package 2.0.2，并将 Git URL 安装锁定到不可变 tag `v2.0.2`。
 - 将已提交 Source Generator Analyzer 保存为普通 Git blob，用于 UPM Git 安装和确定性
   二进制校验。

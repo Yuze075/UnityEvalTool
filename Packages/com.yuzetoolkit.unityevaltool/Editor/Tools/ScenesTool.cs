@@ -9,7 +9,7 @@ namespace YuzeToolkit
     [EvalTool("Scenes", "Scene file and open scene hierarchy operations.")]
     public sealed partial class ScenesTool
     {
-        [EvalFunction("List open scenes.")]
+        [EvalFunction("List open scenes.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> listOpenScenes()
         {
             var scenes = new List<object?>();
@@ -31,7 +31,7 @@ namespace YuzeToolkit
                 ("roots", includeRoots ? ToolUtilities.GetRootSummaries(scene) : new List<object?>()));
         }
 
-        [EvalFunction("Get scene hierarchy.")]
+        [EvalFunction("Get scene hierarchy.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getSceneHierarchy(int depth = 2, bool includeComponents = false, int limit = 200)
         {
             var scene = SceneManager.GetActiveScene();

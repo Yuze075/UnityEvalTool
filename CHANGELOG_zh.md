@@ -2,7 +2,12 @@
 
 [English](CHANGELOG.md) | **简体中文**
 
-## 未发布
+## 2.0.3 - 2026-08-15
+
+- 要求所有 C# 与 loader-backed JavaScript Eval Function 声明非空安全 metadata，在注册阶段
+  拒绝非法读写组合，并通过新增的 `MutatesRuntimeState` 标记进程或 Tool 自有的瞬时状态写入。
+- 将 2.0.2 发布后累积的 Unity Package、Broker/CLI、npm、Roslyn、Tool 与 Agent 变化作为
+  同一套不可变 2.0.3 源码和产物发布，不再复用已公开的 2.0.2 版本。
 
 - 将内建 Agent Prompt 明确拆分为 Editor 开发与独立 Player 诊断工作流，按任务对象引导全部文件、
   进程、Skill 和 Unity Tool，并提供可执行的 `tools://` 发现入口；设置 schema 迁移会更新已有默认提示词。
@@ -14,6 +19,9 @@
 - 将公共文档重构为一一对应的英文与简体中文指南；让仓库 README 成为完整的安装与
   首次使用入口；将可重现的源码打包与维护者自行定义的分发拆开；移除与宿主项目
   绑定的开发说明。
+
+## 2.0.2 - 2026-08-13
+
 - 在产物预检中保留 npm metadata 查询失败，并使构建检查通过显式本地路径传递 tarball。
 - 锁定 .NET SDK 10.0.300，从 SourceGenerator 程序集中排除源码控制 revision，并重新生成
   已提交 Analyzer，使字节级验证不受仓库布局影响。

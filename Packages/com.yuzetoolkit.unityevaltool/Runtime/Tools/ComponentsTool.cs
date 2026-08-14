@@ -13,7 +13,8 @@ namespace YuzeToolkit
     {
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "List components on one resolved GameObject, including component index values used by get/remove/set calls.")]
+            "List components on one resolved GameObject, including component index values used by get/remove/set calls.",
+            Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> list(object target)
         {
             var go = ToolUtilities.ResolveGameObject(target);
@@ -25,7 +26,8 @@ namespace YuzeToolkit
 
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "Get one component summary and readable public fields/properties. Select by component type name and optional index, or by component index when type is empty.")]
+            "Get one component summary and readable public fields/properties. Select by component type name and optional index, or by component index when type is empty.",
+            Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> get(object target, string type = "", int index = -1, bool includeValues = false)
         {
             var component = ResolveComponent(target, type, index, out var error);
@@ -38,7 +40,8 @@ namespace YuzeToolkit
 
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "Find live Components by C# type name using Unity object lookup. Returns component summaries and lightweight GameObject selectors.")]
+            "Find live Components by C# type name using Unity object lookup. Returns component summaries and lightweight GameObject selectors.",
+            Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> find(string typeName, int limit = 20, bool includeInactive = false)
         {
             var type = ToolUtilities.FindType(typeName);
@@ -311,7 +314,8 @@ namespace YuzeToolkit
 
         [UnityEngine.Scripting.Preserve]
         [EvalFunction(
-            "List available non-abstract Component types. Query filters by full type name; use returned fullName with add/get/set/call methods.")]
+            "List available non-abstract Component types. Query filters by full type name; use returned fullName with add/get/set/call methods.",
+            Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> listTypes(string query = "", int limit = 200)
         {
             limit = Math.Max(1, limit);

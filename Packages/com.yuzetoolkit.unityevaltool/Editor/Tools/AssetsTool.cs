@@ -11,7 +11,7 @@ namespace YuzeToolkit
     [EvalTool("Assets", "AssetDatabase search, text IO, asset moves, scripts, materials, dependencies, and script-safe refresh.")]
     public sealed partial class AssetsTool
     {
-        [EvalFunction("AssetDatabase search returning asset summaries.")]
+        [EvalFunction("AssetDatabase search returning asset summaries.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> find(string filter, int limit = 0, object? folders = null)
         {
             if (string.IsNullOrWhiteSpace(filter)) throw new InvalidOperationException("Argument 'filter' is required.");
@@ -20,14 +20,14 @@ namespace YuzeToolkit
             return EvalData.Obj(("count", assets.Count), ("assets", assets));
         }
 
-        [EvalFunction("AssetDatabase search returning asset paths.")]
+        [EvalFunction("AssetDatabase search returning asset paths.", Safety = EvalToolSafety.ReadOnly)]
         public List<string> findPaths(string filter, int limit = 0, object? folders = null)
         {
             if (string.IsNullOrWhiteSpace(filter)) throw new InvalidOperationException("Argument 'filter' is required.");
             return FindGuids(filter, folders, limit).Select(AssetDatabase.GUIDToAssetPath).ToList();
         }
 
-        [EvalFunction("AssetDatabase search returning asset names.")]
+        [EvalFunction("AssetDatabase search returning asset names.", Safety = EvalToolSafety.ReadOnly)]
         public List<string> findNames(string filter, int limit = 0, object? folders = null)
         {
             if (string.IsNullOrWhiteSpace(filter)) throw new InvalidOperationException("Argument 'filter' is required.");
@@ -57,14 +57,14 @@ namespace YuzeToolkit
                 ("exists", asset != null || File.Exists(path) || Directory.Exists(path)));
         }
 
-        [EvalFunction("Get asset info.")]
+        [EvalFunction("Get asset info.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getInfo(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) throw new InvalidOperationException("Argument 'path' is required.");
             return SummarizeAsset(path);
         }
 
-        [EvalFunction("Read a project text asset.")]
+        [EvalFunction("Read a project text asset.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> readText(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) throw new InvalidOperationException("Argument 'path' is required.");
@@ -140,14 +140,14 @@ namespace YuzeToolkit
             return EditorCompilationMonitor.RefreshAssetDatabaseNow();
         }
 
-        [EvalFunction("Get asset dependencies.")]
+        [EvalFunction("Get asset dependencies.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getDependencies(string path, bool recursive = true)
         {
             var deps = AssetDatabase.GetDependencies(path, recursive).Select(p => (object?)SummarizeAsset(p)).ToList();
             return EvalData.Obj(("path", path), ("count", deps.Count), ("dependencies", deps));
         }
 
-        [EvalFunction("Find asset references.")]
+        [EvalFunction("Find asset references.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> findReferences(string path, [EvalParameter("Required folder path or array of folder paths that limits the search scope.")] object folders, int limit = 0)
         {
             var scope = ToStringArray(folders);

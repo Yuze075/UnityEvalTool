@@ -13,7 +13,7 @@ namespace YuzeToolkit
     public sealed partial class DiagnosticsTool
     {
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("List cameras.")]
+        [EvalFunction("List cameras.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> listCameras()
         {
             var cameras = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None)
@@ -39,7 +39,7 @@ namespace YuzeToolkit
                 ("depth", camera.depth));
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("Read 2D/3D physics settings.")]
+        [EvalFunction("Read 2D/3D physics settings.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getPhysicsState()
         {
             var colliders2D = UnityEngine.Object.FindObjectsByType<Collider2D>(FindObjectsInactive.Include, FindObjectsSortMode.None)
@@ -101,7 +101,7 @@ namespace YuzeToolkit
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("Read render pipeline and quality state.")]
+        [EvalFunction("Read render pipeline and quality state.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getGraphicsState()
         {
             var pipeline = GraphicsSettings.currentRenderPipeline;
@@ -118,7 +118,7 @@ namespace YuzeToolkit
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("List UI canvases and EventSystems.")]
+        [EvalFunction("List UI canvases and EventSystems.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> listCanvases()
         {
             var canvases = UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None)
@@ -149,7 +149,7 @@ namespace YuzeToolkit
         }
 
         [UnityEngine.Scripting.Preserve]
-        [EvalFunction("List loaded textures.")]
+        [EvalFunction("List loaded textures.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> listLoadedTextures(int limit = 100)
         {
             limit = Math.Max(1, limit);

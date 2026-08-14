@@ -53,11 +53,11 @@ Catalog inspection, enabled-state management, and JavaScript Tool authoring guid
 
 Environment state and Unity logs.
 
-| Function | Purpose |
-|---|---|
-| `getState()` | Environment, Unity version, platform, play state, paths, active scene, registered tools. |
-| `getRecentLogs(count?, type?)` | MCP-captured Unity logs. |
-| `clearLogs()` | Clear the MCP log buffer. |
+| Function | Purpose | Safety |
+|---|---|---|
+| `getState()` | Environment, Unity version, platform, play state, paths, active scene, registered tools. | Read-only |
+| `getRecentLogs(count?, type?)` | MCP-captured Unity logs. | Read-only |
+| `clearLogs()` | Clear the MCP log buffer. | Mutates transient runtime state |
 
 ### `tools://Runtime/Objects`
 

@@ -228,7 +228,8 @@ namespace YuzeToolkit
                 EvalToolSafety.NetworkService |
                 EvalToolSafety.LongRunning |
                 EvalToolSafety.MutatesEditorState |
-                EvalToolSafety.PersistsData;
+                EvalToolSafety.PersistsData |
+                EvalToolSafety.MutatesRuntimeState;
             const EvalToolSafety knownFlags =
                 EvalToolSafety.ReadOnly |
                 mutationFlags |

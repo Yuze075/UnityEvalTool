@@ -12,7 +12,7 @@ namespace YuzeToolkit
     [EvalTool("Pipeline", "Package Manager, Test Runner, and BuildPipeline workflows.")]
     public sealed partial class PipelineTool
     {
-        [EvalFunction("List packages.")]
+        [EvalFunction("List packages.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> listPackages()
         {
             var packages = PackageInfo.GetAllRegisteredPackages()
@@ -49,7 +49,7 @@ namespace YuzeToolkit
             return PipelineRequestStore.GetPackageRequest(id);
         }
 
-        [EvalFunction("Read package request status.")]
+        [EvalFunction("Read package request status.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getPackageRequest(string id) => PipelineRequestStore.GetPackageRequest(id);
 
         [EvalFunction("Start tests.", Safety = EvalToolSafety.MutatesEditorState | EvalToolSafety.TriggersReload | EvalToolSafety.LongRunning)]
@@ -59,7 +59,7 @@ namespace YuzeToolkit
             return ToLegacyTestRun(new TestsTool().run(mode, tests: tests));
         }
 
-        [EvalFunction("Read test run status.")]
+        [EvalFunction("Read test run status.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getTestRun(string id)
         {
             return ToLegacyTestRun(new TestsTool().get(id, "summary", 0, UnityTestToolUtility.DefaultPageSize));
@@ -75,7 +75,7 @@ namespace YuzeToolkit
             return value;
         }
 
-        [EvalFunction("Read build settings.")]
+        [EvalFunction("Read build settings.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getBuildSettings()
         {
             var scenes = EditorBuildSettings.scenes
@@ -103,7 +103,7 @@ namespace YuzeToolkit
             return PipelineRequestStore.GetBuild(id);
         }
 
-        [EvalFunction("Read build result.")]
+        [EvalFunction("Read build result.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getBuild(string id) => PipelineRequestStore.GetBuild(id);
 
         private static class PipelineRequestStore

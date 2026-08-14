@@ -334,6 +334,8 @@ namespace YuzeToolkit
                 if (string.IsNullOrWhiteSpace(function.Description))
                     throw new InvalidOperationException(
                         $"Eval tool type '{toolType.FullName}' function '{function.MethodName}' must define a non-empty Description.");
+                EvalToolSafetyUtility.ValidateDeclared(function.Safety,
+                    $"Eval tool type '{toolType.FullName}' function '{function.MethodName}'");
 
                 foreach (var parameter in function.Parameters)
                 {

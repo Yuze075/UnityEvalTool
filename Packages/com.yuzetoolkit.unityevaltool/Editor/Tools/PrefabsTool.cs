@@ -109,7 +109,7 @@ namespace YuzeToolkit
             return EvalData.Obj(("assetPath", stage.assetPath), ("saved", true));
         }
 
-        [EvalFunction("Get prefab overrides.")]
+        [EvalFunction("Get prefab overrides.", Safety = EvalToolSafety.ReadOnly)]
         public Dictionary<string, object?> getOverrides(object target)
         {
             var go = ToolUtilities.ResolveGameObject(target);
