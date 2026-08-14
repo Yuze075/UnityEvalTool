@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UIElements;
+using YuzeToolkit.UnityAgent;
 
 namespace YuzeToolkit
 {
@@ -198,10 +199,22 @@ namespace YuzeToolkit
 
         private static VisualElement CreateGroup(DebugGroupNode group, ICollection<IDebugValueBinding> bindings)
         {
-            var foldout = new Foldout { text = group.Label, value = false };
+            var foldout = new VisualElement();
             DebugWindowUss.ApplyFoldout(foldout);
+            var content = new VisualElement { style = { display = DisplayStyle.None, minWidth = 0 } };
+            AgentButton? header = null;
+            header = CreateAgentButton(group.Label, DebugButtonStyle.Default, () =>
+            {
+                var open = content.resolvedStyle.display == DisplayStyle.None;
+                content.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
+                header!.SetIcon(open ? AgentIconKind.ChevronDown : AgentIconKind.ChevronRight);
+            });
+            header.SetIcon(AgentIconKind.ChevronRight);
+            DebugWindowUss.ApplyFoldoutHeader(header);
+            foldout.Add(header);
             foreach (var child in group.Children)
-                foldout.Add(CreateNode(child, bindings));
+                content.Add(CreateNode(child, bindings));
+            foldout.Add(content);
             return foldout;
         }
 
@@ -214,8 +227,13 @@ namespace YuzeToolkit
             {
                 var child = group.Children[index];
                 var visual = CreateNode(child, bindings);
-                if (group.Direction == FlexDirection.Row && index == 0 && visual is Label label)
-                    DebugWindowUss.ApplyInlineFieldLabel(label);
+                if (group.Direction == FlexDirection.Row && visual is Label label)
+                {
+                    if (index == 0)
+                        DebugWindowUss.ApplyInlineFieldLabel(label);
+                    else
+                        DebugWindowUss.ApplyInlineValueLabel(label);
+                }
                 root.Add(visual);
             }
             return root;
@@ -274,45 +292,44 @@ namespace YuzeToolkit
 
         private static VisualElement CreateButton(DebugButtonNode node)
         {
-            var iconDirection = GetDirectionIcon(node.Label);
-            var button = new Button(() => node.Action()) { text = iconDirection == 0 ? node.Label : string.Empty };
-            DebugWindowUss.ApplyButton(button);
-            if (iconDirection == 0)
-                DebugWindowUss.ApplyPrimaryButton(button);
-            else
-                DebugWindowUss.ApplyIconButton(button, iconDirection < 0);
-            return button;
+            return CreateAgentButton(node.Label, node.Style, node.Action);
         }
 
-        private static int GetDirectionIcon(string label)
+        private static AgentButton CreateAgentButton(string label, DebugButtonStyle style, Action action)
         {
-            if (label.Length != 1) return 0;
-            return label[0] switch
+            var icon = style switch
             {
-                '\u2039' => -1,
-                '\u203a' => 1,
-                _ => 0
+                DebugButtonStyle.Previous => AgentIconKind.Back,
+                DebugButtonStyle.Next => AgentIconKind.ChevronRight,
+                _ => AgentIconKind.None
             };
+            var surface = style == DebugButtonStyle.Primary ? AgentUi.Accent : AgentUi.Surface3;
+            var foreground = style == DebugButtonStyle.Primary ? AgentUi.AccentForeground : AgentUi.Text;
+            var button = new AgentButton(label, string.Empty, action, surface, foreground, icon);
+            button.EnableContentWrapping();
+            button.focusable = false;
+            button.tabIndex = -1;
+            DebugWindowUss.ApplyButton(button, style);
+            return button;
         }
 
         private static VisualElement CreateStateButton(
             DebugStateButtonNode node,
             ICollection<IDebugValueBinding> bindings)
         {
-            Button? button = null;
-            button = new Button(() =>
+            AgentButton? button = null;
+            button = CreateAgentButton(node.LabelGetter(), DebugButtonStyle.Default, () =>
             {
                 node.Action();
-                ApplyState(button!, node.StateGetter(), node.Tone);
+                ApplyButtonState(button!, node.StateGetter(), node.Tone);
                 button!.text = node.LabelGetter();
             });
-            DebugWindowUss.ApplyButton(button);
             DebugWindowUss.ApplyStateButton(button);
 
             var binding = new FieldBinding<bool>(node.StateGetter, value =>
             {
                 button.text = node.LabelGetter();
-                ApplyState(button!, value, node.Tone);
+                ApplyButtonState(button!, value, node.Tone);
             });
             bindings.Add(binding);
             binding.Refresh();
@@ -339,48 +356,34 @@ namespace YuzeToolkit
             DebugBoolButtonNode node,
             ICollection<IDebugValueBinding> bindings)
         {
-            Button? button = null;
-            Label? status = null;
+            AgentButton? button = null;
             void Apply(bool value)
             {
-                status!.text = value ? "On" : "Off";
-                ApplyState(button!, value, node.Tone);
+                button!.text = value ? "On" : "Off";
+                ApplyButtonState(button, value, node.Tone);
             }
 
-            button = new Button(() =>
+            var root = new VisualElement();
+            DebugWindowUss.ApplyControlRow(root);
+            if (!string.IsNullOrWhiteSpace(node.Label))
+            {
+                var label = new Label(node.Label);
+                DebugWindowUss.ApplyControlLabel(label);
+                root.Add(label);
+            }
+            button = CreateAgentButton(string.Empty, DebugButtonStyle.Default, () =>
             {
                 var value = !node.Getter();
                 node.Setter?.Invoke(value);
                 Apply(node.Getter());
             });
-            DebugWindowUss.ApplyButton(button);
             DebugWindowUss.ApplyBoolButton(button);
-
-            var label = new Label(string.IsNullOrWhiteSpace(node.Label) ? "Value" : node.Label)
-            {
-                pickingMode = PickingMode.Ignore,
-                enableRichText = false
-            };
-            label.AddToClassList(DebugWindowUss.BoolButtonLabelClass);
-            button.Add(label);
-            status = new Label
-            {
-                pickingMode = PickingMode.Ignore,
-                enableRichText = false
-            };
-            status.AddToClassList(DebugWindowUss.BoolButtonStatusClass);
-            button.Add(status);
-            var toggle = new VisualElement { pickingMode = PickingMode.Ignore };
-            toggle.AddToClassList(DebugWindowUss.BoolSwitchClass);
-            var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
-            thumb.AddToClassList(DebugWindowUss.BoolSwitchThumbClass);
-            toggle.Add(thumb);
-            button.Add(toggle);
+            root.Add(button);
 
             var binding = new FieldBinding<bool>(node.Getter, Apply);
             bindings.Add(binding);
             binding.Refresh();
-            return button;
+            return root;
         }
 
         private static VisualElement CreateSegmentedInt(
@@ -393,20 +396,19 @@ namespace YuzeToolkit
             if (!string.IsNullOrWhiteSpace(node.Label))
             {
                 var label = new Label(node.Label);
-                DebugWindowUss.ApplyLabel(label, true);
+                DebugWindowUss.ApplyInlineFieldLabel(label);
                 root.Add(label);
             }
 
-            var buttons = new List<Button>();
+            var buttons = new List<AgentButton>();
             for (var value = node.LowValue + 1; value <= node.HighValue; value++)
             {
                 var targetValue = value;
-                var button = new Button(() =>
+                var button = CreateAgentButton(targetValue.ToString(), DebugButtonStyle.Default, () =>
                 {
                     var current = Mathf.Clamp(node.Getter(), node.LowValue, node.HighValue);
                     node.Setter?.Invoke(current == targetValue ? targetValue - 1 : targetValue);
-                }) { text = targetValue.ToString() };
-                DebugWindowUss.ApplyButton(button);
+                });
                 DebugWindowUss.ApplySegmentButton(button);
                 buttons.Add(button);
                 root.Add(button);
@@ -416,7 +418,7 @@ namespace YuzeToolkit
             {
                 current = Mathf.Clamp(current, node.LowValue, node.HighValue);
                 for (var index = 0; index < buttons.Count; index++)
-                    ApplyState(buttons[index], current >= node.LowValue + index + 1, node.Tone);
+                    ApplyButtonState(buttons[index], current >= node.LowValue + index + 1, node.Tone);
             });
             bindings.Add(binding);
             binding.Refresh();
@@ -427,6 +429,14 @@ namespace YuzeToolkit
         {
             DebugWindowUss.ApplyActiveState(element, active);
             DebugWindowUss.ApplyTone(element, active ? tone : DebugTone.Default);
+        }
+
+        private static void ApplyButtonState(AgentButton button, bool active, DebugTone tone)
+        {
+            var foreground = active ? DebugWindowUss.GetToneColor(tone) : AgentUi.Text;
+            button.SetPalette(active ? AgentUi.Active : AgentUi.Surface3, foreground);
+            DebugWindowUss.ApplyActiveStateClass(button, active);
+            DebugWindowUss.ApplyToneClasses(button, active ? tone : DebugTone.Default);
         }
 
         private static VisualElement CreateField(
@@ -508,28 +518,34 @@ namespace YuzeToolkit
             string label,
             ICollection<IDebugValueBinding> bindings)
         {
-            var field = new Toggle { label = label };
-            field.SetEnabled(!node.IsReadOnly);
-            DebugWindowUss.ApplyField(field);
-            if (string.IsNullOrEmpty(label))
-                DebugWindowUss.ApplyFieldWithoutLabel(field);
-            var status = DebugWindowUss.ApplyOwnedToggle(field);
-            void Sync(bool value)
+            var root = new VisualElement();
+            DebugWindowUss.ApplyControlRow(root);
+            if (!string.IsNullOrWhiteSpace(label))
             {
-                status.text = value ? "On" : "Off";
-                DebugWindowUss.ApplyActiveState(field, value);
+                var fieldLabel = new Label(label);
+                DebugWindowUss.ApplyControlLabel(fieldLabel);
+                root.Add(fieldLabel);
             }
 
-            var binding = new ObjectFieldBinding<bool>(node, field, Sync);
-            bindings.Add(binding);
-            binding.Refresh();
-            field.RegisterValueChangedCallback(evt =>
+            AgentButton? button = null;
+            void Sync(bool value)
             {
-                if (binding.IsRefreshing) return;
-                node.SetObjectValue(evt.newValue);
+                button!.text = value ? "On" : "Off";
+                ApplyButtonState(button, value, DebugTone.Default);
+            }
+
+            bool GetCurrentValue() => node.GetObjectValue() is bool value && value;
+            var binding = new FieldBinding<bool>(GetCurrentValue, Sync);
+            button = CreateAgentButton(string.Empty, DebugButtonStyle.Default, () =>
+            {
+                node.SetObjectValue(!GetCurrentValue());
                 binding.Refresh();
             });
-            return field;
+            DebugWindowUss.ApplyBoolButton(button);
+            root.Add(button);
+            bindings.Add(binding);
+            binding.Refresh();
+            return root;
         }
 
         private static VisualElement CreateEnumField(
@@ -578,7 +594,7 @@ namespace YuzeToolkit
             DebugWindowUss.ApplyRow(row);
 
             var name = new Label(label);
-            DebugWindowUss.ApplyLabel(name, true);
+            DebugWindowUss.ApplyInlineFieldLabel(name);
             row.Add(name);
 
             var value = new Label();
@@ -598,39 +614,31 @@ namespace YuzeToolkit
 
             var root = new VisualElement();
             DebugWindowUss.ApplySliderRow(root);
-
-            var slider = new Slider(node.LowValue, node.HighValue)
-            {
-                label = node.Label
-            };
-            slider.SetEnabled(!node.IsReadOnly);
-            DebugWindowUss.ApplySlider(slider);
+            var label = new Label(node.Label);
+            DebugWindowUss.ApplyControlLabel(label);
+            root.Add(label);
+            var slider = new DebugRangeControl(true);
 
             var valueLabel = new Label();
             DebugWindowUss.ApplySliderValue(valueLabel);
-            var chrome = CreateSliderChrome(slider);
 
             void Apply(float value)
             {
                 var clamped = Mathf.Clamp(value, node.LowValue, node.HighValue);
-                slider.SetValueWithoutNotify(clamped);
+                slider.SetValueWithoutNotify(Mathf.InverseLerp(node.LowValue, node.HighValue, clamped));
                 valueLabel.text = DebugToolUtility.FormatNumber(node.Format, clamped);
-                ApplySliderChrome(chrome, node.LowValue, node.HighValue, clamped);
             }
 
             var binding = new FieldBinding<float>(() => node.Getter(), Apply);
             bindings.Add(binding);
             binding.Refresh();
 
-            if (!node.IsReadOnly)
+            slider.ValueChanged += normalized =>
             {
-                slider.RegisterValueChangedCallback(evt =>
-                {
-                    var clamped = Mathf.Clamp(evt.newValue, node.LowValue, node.HighValue);
-                    node.Setter?.Invoke(clamped);
-                    Apply(clamped);
-                });
-            }
+                var value = Mathf.Lerp(node.LowValue, node.HighValue, normalized);
+                node.Setter?.Invoke(value);
+                Apply(node.Getter());
+            };
 
             root.Add(slider);
             root.Add(valueLabel);
@@ -644,39 +652,31 @@ namespace YuzeToolkit
 
             var root = new VisualElement();
             DebugWindowUss.ApplySliderRow(root);
-
-            var slider = new SliderInt(node.LowValue, node.HighValue)
-            {
-                label = node.Label
-            };
-            slider.SetEnabled(!node.IsReadOnly);
-            DebugWindowUss.ApplySlider(slider);
+            var label = new Label(node.Label);
+            DebugWindowUss.ApplyControlLabel(label);
+            root.Add(label);
+            var slider = new DebugRangeControl(true);
 
             var valueLabel = new Label();
             DebugWindowUss.ApplySliderValue(valueLabel);
-            var chrome = CreateSliderChrome(slider);
 
             void Apply(int value)
             {
                 var clamped = Mathf.Clamp(value, node.LowValue, node.HighValue);
-                slider.SetValueWithoutNotify(clamped);
+                slider.SetValueWithoutNotify(Mathf.InverseLerp(node.LowValue, node.HighValue, clamped));
                 valueLabel.text = DebugToolUtility.FormatNumber(node.Format, clamped);
-                ApplySliderChrome(chrome, node.LowValue, node.HighValue, clamped);
             }
 
             var binding = new FieldBinding<int>(() => node.Getter(), Apply);
             bindings.Add(binding);
             binding.Refresh();
 
-            if (!node.IsReadOnly)
+            slider.ValueChanged += normalized =>
             {
-                slider.RegisterValueChangedCallback(evt =>
-                {
-                    var clamped = Mathf.Clamp(evt.newValue, node.LowValue, node.HighValue);
-                    node.Setter?.Invoke(clamped);
-                    Apply(clamped);
-                });
-            }
+                var value = Mathf.RoundToInt(Mathf.Lerp(node.LowValue, node.HighValue, normalized));
+                node.Setter?.Invoke(value);
+                Apply(node.Getter());
+            };
 
             root.Add(slider);
             root.Add(valueLabel);
@@ -685,57 +685,120 @@ namespace YuzeToolkit
 
         private static VisualElement CreateProgress(DebugProgressNode node, ICollection<IDebugValueBinding> bindings)
         {
-            var progress = new ProgressBar
-            {
-                lowValue = node.LowValue,
-                highValue = node.HighValue,
-                title = node.Label
-            };
-            DebugWindowUss.ApplyProgress(progress);
+            var progress = new VisualElement();
+            DebugWindowUss.ApplySliderRow(progress);
+            var label = new Label(node.Label);
+            DebugWindowUss.ApplyControlLabel(label);
+            progress.Add(label);
+            var bar = new DebugRangeControl(false);
+            progress.Add(bar);
+            var valueLabel = new Label();
+            DebugWindowUss.ApplySliderValue(valueLabel);
+            progress.Add(valueLabel);
             var binding = new FieldBinding<float>(node.Getter, value =>
             {
-                progress.value = value;
-                progress.title = $"{node.Label} {DebugToolUtility.FormatNumber(node.Format, value)}";
+                bar.SetValueWithoutNotify(Mathf.InverseLerp(node.LowValue, node.HighValue, value));
+                valueLabel.text = DebugToolUtility.FormatNumber(node.Format, value);
             });
             bindings.Add(binding);
             binding.Refresh();
             return progress;
         }
 
-        private static SliderChrome CreateSliderChrome(VisualElement slider)
+        private sealed class DebugRangeControl : VisualElement
         {
-            var filler = new VisualElement();
-            DebugWindowUss.ApplySliderFiller(filler);
-            filler.pickingMode = PickingMode.Ignore;
-            var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
-            DebugWindowUss.ApplySliderThumb(thumb);
+            private readonly VisualElement _fill;
+            private readonly VisualElement _thumb;
+            private readonly bool _interactive;
+            private float _value;
 
-            var tracker = slider.Q<VisualElement>(className: "unity-base-slider__tracker") ??
-                          throw new InvalidOperationException("Unity 2022.3 Slider tracker was not created.");
-            tracker.Insert(0, filler);
-            tracker.Add(thumb);
-
-            return new SliderChrome(filler, thumb);
-        }
-
-        private static void ApplySliderChrome(SliderChrome chrome, float lowValue, float highValue, float value)
-        {
-            var percentage = Mathf.InverseLerp(lowValue, highValue, value) * 100f;
-            chrome.Filler.style.width = Length.Percent(percentage);
-            chrome.Thumb.style.left = Length.Percent(percentage);
-        }
-
-        private readonly struct SliderChrome
-        {
-            public SliderChrome(VisualElement filler, VisualElement thumb)
+            public DebugRangeControl(bool interactive)
             {
-                Filler = filler;
-                Thumb = thumb;
+                _interactive = interactive;
+                pickingMode = interactive ? PickingMode.Position : PickingMode.Ignore;
+                focusable = false;
+                style.flexGrow = 1;
+                style.minWidth = 80;
+                style.height = 28;
+                style.justifyContent = Justify.Center;
+
+                var track = new VisualElement { pickingMode = PickingMode.Ignore };
+                track.style.position = Position.Absolute;
+                track.style.left = 0;
+                track.style.right = 0;
+                track.style.top = 12;
+                track.style.height = 4;
+                track.style.backgroundColor = AgentUi.Surface3;
+                track.style.borderTopLeftRadius = 2;
+                track.style.borderTopRightRadius = 2;
+                track.style.borderBottomLeftRadius = 2;
+                track.style.borderBottomRightRadius = 2;
+                Add(track);
+
+                _fill = new VisualElement { pickingMode = PickingMode.Ignore };
+                _fill.style.height = Length.Percent(100);
+                _fill.style.backgroundColor = AgentUi.Accent;
+                _fill.style.borderTopLeftRadius = 2;
+                _fill.style.borderTopRightRadius = 2;
+                _fill.style.borderBottomLeftRadius = 2;
+                _fill.style.borderBottomRightRadius = 2;
+                track.Add(_fill);
+
+                _thumb = new VisualElement { pickingMode = PickingMode.Ignore };
+                _thumb.style.position = Position.Absolute;
+                _thumb.style.width = 12;
+                _thumb.style.height = 12;
+                _thumb.style.top = -4;
+                _thumb.style.marginLeft = -6;
+                _thumb.style.backgroundColor = AgentUi.Text;
+                _thumb.style.borderTopLeftRadius = 6;
+                _thumb.style.borderTopRightRadius = 6;
+                _thumb.style.borderBottomLeftRadius = 6;
+                _thumb.style.borderBottomRightRadius = 6;
+                _thumb.style.display = interactive ? DisplayStyle.Flex : DisplayStyle.None;
+                track.Add(_thumb);
+
+                if (!interactive) return;
+                RegisterCallback<PointerDownEvent>(evt =>
+                {
+                    if (evt.button != 0 || !enabledInHierarchy) return;
+                    this.CapturePointer(evt.pointerId);
+                    UpdateFromPointer(evt.localPosition.x);
+                    evt.StopPropagation();
+                });
+                RegisterCallback<PointerMoveEvent>(evt =>
+                {
+                    if (!this.HasPointerCapture(evt.pointerId)) return;
+                    UpdateFromPointer(evt.localPosition.x);
+                    evt.StopPropagation();
+                });
+                RegisterCallback<PointerUpEvent>(evt =>
+                {
+                    if (!this.HasPointerCapture(evt.pointerId)) return;
+                    this.ReleasePointer(evt.pointerId);
+                    UpdateFromPointer(evt.localPosition.x);
+                    evt.StopPropagation();
+                });
             }
 
-            public VisualElement Filler { get; }
+            public event Action<float>? ValueChanged;
 
-            public VisualElement Thumb { get; }
+            public void SetValueWithoutNotify(float value)
+            {
+                _value = Mathf.Clamp01(value);
+                var percentage = Length.Percent(_value * 100f);
+                _fill.style.width = percentage;
+                _thumb.style.left = percentage;
+            }
+
+            private void UpdateFromPointer(float localX)
+            {
+                if (!_interactive) return;
+                var width = Mathf.Max(1f, resolvedStyle.width);
+                var value = Mathf.Clamp01(localX / width);
+                SetValueWithoutNotify(value);
+                ValueChanged?.Invoke(_value);
+            }
         }
 
         private sealed class ObjectFieldBinding<TValue> : IDebugValueBinding

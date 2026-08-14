@@ -79,9 +79,10 @@ namespace YuzeToolkit.UnityAgent
             style.minHeight = 0;
             Add(AgentWorkspaceUi.Header("Debug Panel", "Every registered DebugWindow is available as an independent tab."));
             _tabs = new VisualElement();
-            _tabs.style.height = 44;
+            _tabs.style.minHeight = 44;
             _tabs.style.flexShrink = 0;
             _tabs.style.flexDirection = FlexDirection.Row;
+            _tabs.style.flexWrap = Wrap.Wrap;
             _tabs.style.alignItems = Align.Center;
             _tabs.style.paddingLeft = 14;
             _tabs.style.paddingRight = 14;
@@ -136,8 +137,13 @@ namespace YuzeToolkit.UnityAgent
                 var captured = registration;
                 var button = AgentUi.Button(registration.Title, "Open this Debug Panel page.",
                     () => Select(captured), 0, AgentUi.Transparent, AgentUi.TextSecondary);
-                button.style.height = 32;
+                button.style.minHeight = 32;
+                button.style.height = StyleKeyword.Auto;
                 button.style.flexGrow = 0;
+                button.style.flexShrink = 1;
+                button.style.minWidth = 72;
+                button.style.maxWidth = Length.Percent(100);
+                button.EnableContentWrapping();
                 button.style.marginRight = 6;
                 _buttons.Add(registration, button);
                 _tabs.Add(button);

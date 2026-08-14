@@ -10,20 +10,17 @@ namespace YuzeToolkit
     {
         private readonly DebugWindowNode _windowNode;
 
-        private DebugWindowRegistration(DebugWindowNode windowNode, IEvalTool? rootTool)
+        private DebugWindowRegistration(DebugWindowNode windowNode)
         {
             _windowNode = windowNode;
-            RootTool = rootTool;
         }
-
-        public IEvalTool? RootTool { get; }
 
         public string Title => _windowNode.Title;
 
-        public static DebugWindowRegistration Create(DebugWindowBuilder builder, IEvalTool? explicitRootTool = null)
+        public static DebugWindowRegistration Create(DebugWindowBuilder builder)
         {
             if (builder == null) throw new ArgumentNullException(nameof(builder));
-            return new DebugWindowRegistration(builder.WindowNode, explicitRootTool);
+            return new DebugWindowRegistration(builder.WindowNode);
         }
 
         public DebugWindowVisualInstance CreateVisualElement(bool allowDragging)

@@ -20,8 +20,6 @@ namespace YuzeToolkit
         public const string WindowBackgroundClass = "yuzu-debug-window-background";
         public const string FoldoutClass = "yuzu-debug-foldout";
         public const string HeaderClass = "yuzu-debug-header";
-        public const string DisclosureClass = "yuzu-debug-disclosure";
-        public const string DisclosureOpenClass = "yuzu-debug-disclosure-open";
         public const string RowClass = "yuzu-debug-row";
         public const string SectionClass = "yuzu-debug-section";
         public const string FirstSectionClass = "yuzu-debug-first-section";
@@ -36,16 +34,8 @@ namespace YuzeToolkit
         public const string ButtonClass = "yuzu-debug-button";
         public const string StateButtonClass = "yuzu-debug-state-button";
         public const string BoolButtonClass = "yuzu-debug-bool-button";
-        public const string BoolButtonLabelClass = "yuzu-debug-bool-button-label";
-        public const string BoolButtonStatusClass = "yuzu-debug-bool-button-status";
-        public const string BoolSwitchClass = "yuzu-debug-bool-switch";
-        public const string BoolSwitchThumbClass = "yuzu-debug-bool-switch-thumb";
-        public const string OwnedToggleClass = "yuzu-debug-owned-toggle";
-        public const string OwnedToggleStatusClass = "yuzu-debug-owned-toggle-status";
         public const string PrimaryButtonClass = "yuzu-debug-primary-button";
         public const string IconButtonClass = "yuzu-debug-icon-button";
-        public const string PreviousIconClass = "yuzu-debug-previous-icon";
-        public const string NextIconClass = "yuzu-debug-next-icon";
         public const string StateLabelClass = "yuzu-debug-state-label";
         public const string TagClass = "yuzu-debug-tag";
         public const string ReadOnlyLabelClass = "yuzu-debug-readonly-label";
@@ -61,27 +51,18 @@ namespace YuzeToolkit
         public const string TonePinkClass = "yuzu-debug-tone-pink";
         public const string ToneWhiteClass = "yuzu-debug-tone-white";
         public const string MiniValueClass = "yuzu-debug-mini-value";
-        public const string ProgressClass = "yuzu-debug-progress";
         public const string SliderRowClass = "yuzu-debug-slider-row";
-        public const string SliderClass = "yuzu-debug-slider";
         public const string SliderValueClass = "yuzu-debug-slider-value";
-        public const string SliderFillerClass = "yuzu-debug-slider-filler";
-        public const string SliderThumbClass = "yuzu-debug-slider-thumb";
         public const string PreviewClass = "yuzu-debug-preview";
         public const string ImageClass = "yuzu-debug-image";
         public const string EnumFieldClass = "yuzu-debug-enum-field";
         public const string EnumLabelClass = "yuzu-debug-enum-label";
         public const string EnumButtonClass = "yuzu-debug-enum-button";
         public const string EnumButtonOpenClass = "yuzu-debug-enum-button-open";
-        public const string EnumButtonTextClass = "yuzu-debug-enum-button-text";
-        public const string EnumChevronClass = "yuzu-debug-enum-chevron";
         public const string EnumPopupClass = "yuzu-debug-enum-popup";
         public const string EnumPopupScrollClass = "yuzu-debug-enum-popup-scroll";
         public const string EnumPopupItemClass = "yuzu-debug-enum-popup-item";
         public const string EnumPopupItemSelectedClass = "yuzu-debug-enum-popup-item-selected";
-        public const string EnumPopupItemTextClass = "yuzu-debug-enum-popup-item-text";
-        public const string EnumPopupCheckClass = "yuzu-debug-enum-popup-check";
-        public const string EnumPopupCheckGlyphClass = "yuzu-debug-enum-popup-check-glyph";
 
         public static void ApplyLayer(VisualElement layer)
         {
@@ -147,7 +128,7 @@ namespace YuzeToolkit
             }
         }
 
-        public static void ApplyFoldout(Foldout foldout)
+        public static void ApplyFoldout(VisualElement foldout)
         {
             foldout.AddToClassList(FoldoutClass);
             foldout.style.marginBottom = 10;
@@ -162,26 +143,15 @@ namespace YuzeToolkit
             foldout.style.borderBottomRightRadius = 10;
             AgentUi.SetBorder(foldout, AgentUi.Border, 1);
             DisableKeyboardFocus(foldout);
-            if (foldout.Q<Toggle>() is { } toggle)
-            {
-                DisableKeyboardFocus(toggle);
-                var indicator = new VisualElement { pickingMode = PickingMode.Ignore };
-                indicator.AddToClassList(DisclosureClass);
-                (toggle.Q<VisualElement>(className: "unity-toggle__input") ?? toggle).Insert(0, indicator);
-                void Sync(bool open) => indicator.EnableInClassList(DisclosureOpenClass, open);
-                Sync(foldout.value);
-                foldout.RegisterValueChangedCallback(evt => Sync(evt.newValue));
-            }
         }
 
-        public static void ApplyHeader(Toggle? header)
+        public static void ApplyFoldoutHeader(AgentButton header)
         {
-            if (header == null) return;
             header.AddToClassList(HeaderClass);
-            header.pickingMode = PickingMode.Position;
-            header.style.minHeight = 32;
-            header.style.color = AgentUi.Text;
-            DisableKeyboardFocus(header);
+            header.style.width = Length.Percent(100);
+            header.style.justifyContent = Justify.FlexStart;
+            header.style.marginBottom = 6;
+            header.style.backgroundColor = AgentUi.Transparent;
         }
 
         public static void ApplyRow(VisualElement row)
@@ -190,6 +160,7 @@ namespace YuzeToolkit
             row.style.minWidth = 0;
             row.style.minHeight = 38;
             row.style.flexDirection = FlexDirection.Row;
+            row.style.flexWrap = Wrap.Wrap;
             row.style.alignItems = Align.Center;
             row.style.marginBottom = 6;
             row.style.paddingLeft = 10;
@@ -208,7 +179,8 @@ namespace YuzeToolkit
         {
             label.enableRichText = false;
             label.AddToClassList(SectionClass);
-            AgentUi.ApplyTypography(label, AgentTypography.BodyStrong);
+            AgentUi.ApplyTypography(label, AgentTypography.BodyStrong, false);
+            label.style.minWidth = 0;
             label.style.color = AgentUi.Text;
             label.style.marginTop = 14;
             label.style.marginBottom = 8;
@@ -224,23 +196,61 @@ namespace YuzeToolkit
         {
             group.AddToClassList(InlineGroupClass);
             group.style.minWidth = 0;
+            group.style.minHeight = 36;
+            group.style.alignSelf = Align.Stretch;
             group.style.marginBottom = 6;
             group.style.alignItems = Align.Center;
+        }
+
+        public static void ApplyControlRow(VisualElement row)
+        {
+            row.AddToClassList(RowClass);
+            row.style.minWidth = 0;
+            row.style.minHeight = 36;
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.flexWrap = Wrap.Wrap;
+            row.style.alignItems = Align.Center;
+            row.style.marginBottom = 6;
+        }
+
+        public static void ApplyControlLabel(Label label)
+        {
+            label.enableRichText = false;
+            label.style.width = StyleKeyword.Auto;
+            label.style.minWidth = 130;
+            label.style.flexShrink = 1;
+            label.style.color = AgentUi.TextSecondary;
+            AgentUi.ApplyTypography(label, AgentTypography.Control, false);
+            ApplyContentWrapping(label);
         }
 
         public static void ApplyInlineGroupDirection(VisualElement group, FlexDirection direction)
         {
             group.AddToClassList(direction == FlexDirection.Row ? InlineRowGroupClass : InlineColumnGroupClass);
             group.style.flexDirection = direction;
+            group.style.alignItems = direction == FlexDirection.Row ? Align.Center : Align.Stretch;
+            group.style.flexWrap = direction == FlexDirection.Row ? Wrap.Wrap : Wrap.NoWrap;
         }
 
         public static void ApplyInlineFieldLabel(Label label)
         {
             label.enableRichText = false;
             label.AddToClassList(InlineFieldLabelClass);
+            label.style.width = StyleKeyword.Auto;
             label.style.minWidth = 130;
-            label.style.color = AgentUi.TextSecondary;
-            AgentUi.ApplyTypography(label, AgentTypography.Control);
+            label.style.flexShrink = 1;
+            if (!label.ClassListContains(StateLabelClass))
+                label.style.color = AgentUi.TextSecondary;
+            AgentUi.ApplyTypography(label, AgentTypography.Control, false);
+            ApplyContentWrapping(label);
+        }
+
+        public static void ApplyInlineValueLabel(Label label)
+        {
+            label.style.flexGrow = 1;
+            label.style.flexShrink = 1;
+            label.style.minWidth = 0;
+            ApplyContentWrapping(label);
         }
 
         public static void ApplyLabel(Label label, bool muted = false)
@@ -248,8 +258,8 @@ namespace YuzeToolkit
             label.enableRichText = false;
             label.AddToClassList(LabelClass);
             label.style.color = muted ? AgentUi.Muted : AgentUi.Text;
-            label.style.whiteSpace = WhiteSpace.Normal;
-            AgentUi.ApplyTypography(label, AgentTypography.Body);
+            label.style.minWidth = 0;
+            AgentUi.ApplyTypography(label, AgentTypography.Body, false);
             if (muted)
                 label.AddToClassList(MutedLabelClass);
         }
@@ -260,17 +270,36 @@ namespace YuzeToolkit
             field.style.minWidth = 0;
             field.style.flexGrow = 1;
             field.style.height = 32;
-            field.style.marginLeft = 6;
+            field.style.marginLeft = 0;
             field.style.marginRight = 0;
             field.style.marginTop = 0;
             field.style.marginBottom = 0;
-            field.style.backgroundColor = AgentUi.Input;
-            field.style.borderTopLeftRadius = 8;
-            field.style.borderTopRightRadius = 8;
-            field.style.borderBottomLeftRadius = 8;
-            field.style.borderBottomRightRadius = 8;
+            field.style.backgroundImage = StyleKeyword.None;
+            field.style.backgroundColor = AgentUi.Transparent;
             field.style.color = AgentUi.Text;
-            AgentUi.SetBorder(field, AgentUi.Border, 1);
+            AgentUi.SetBorder(field, AgentUi.Transparent, 0);
+
+            var label = field.labelElement;
+            ApplyControlLabel(label);
+            label.style.display = string.IsNullOrWhiteSpace(field.label) ? DisplayStyle.None : DisplayStyle.Flex;
+
+            var input = field.Q<VisualElement>(className: "unity-base-field__input");
+            if (input != null)
+            {
+                input.style.minWidth = 0;
+                input.style.flexGrow = 1;
+                input.style.height = 32;
+                input.style.marginLeft = 0;
+                input.style.paddingLeft = 8;
+                input.style.paddingRight = 8;
+                input.style.backgroundImage = StyleKeyword.None;
+                input.style.backgroundColor = AgentUi.Input;
+                input.style.borderTopLeftRadius = 8;
+                input.style.borderTopRightRadius = 8;
+                input.style.borderBottomLeftRadius = 8;
+                input.style.borderBottomRightRadius = 8;
+                AgentUi.SetBorder(input, AgentUi.BorderStrong, 1);
+            }
             if (field is TextField)
             {
                 // Pointer focus is admitted by DebugVisualFactory only after a left-click in this field.
@@ -288,78 +317,58 @@ namespace YuzeToolkit
             field.AddToClassList(FieldWithoutLabelClass);
         }
 
-        public static void ApplyButton(Button button)
+        public static void ApplyButton(AgentButton button, DebugButtonStyle style)
         {
-            button.enableRichText = false;
+            var fixedDirectionButton = style is DebugButtonStyle.Previous or DebugButtonStyle.Next;
             button.AddToClassList(ButtonClass);
-            button.style.height = 32;
-            button.style.minWidth = 72;
-            button.style.flexShrink = 0;
+            button.style.minHeight = 32;
+            button.style.height = fixedDirectionButton
+                ? new StyleLength(32)
+                : new StyleLength(StyleKeyword.Auto);
+            button.style.minWidth = fixedDirectionButton
+                ? new StyleLength(32)
+                : new StyleLength(StyleKeyword.Auto);
+            button.style.width = fixedDirectionButton
+                ? new StyleLength(32)
+                : new StyleLength(StyleKeyword.Auto);
+            button.style.maxWidth = fixedDirectionButton
+                ? new StyleLength(32)
+                : new StyleLength(Length.Percent(100));
+            button.style.flexGrow = 0;
+            button.style.flexShrink = fixedDirectionButton ? 0 : 1;
+            button.style.flexBasis = StyleKeyword.Auto;
+            button.style.alignSelf = Align.FlexStart;
+            button.style.overflow = Overflow.Hidden;
             button.style.marginLeft = 3;
             button.style.marginRight = 3;
-            button.style.paddingLeft = 12;
-            button.style.paddingRight = 12;
-            button.style.backgroundImage = StyleKeyword.None;
-            button.style.backgroundColor = AgentUi.Surface3;
-            button.style.color = AgentUi.Text;
             button.style.borderTopLeftRadius = 16;
             button.style.borderTopRightRadius = 16;
             button.style.borderBottomLeftRadius = 16;
             button.style.borderBottomRightRadius = 16;
-            AgentUi.SetBorder(button, AgentUi.Border, 1);
-            AgentUi.ApplyTypography(button, AgentTypography.Control);
+            if (style == DebugButtonStyle.Primary)
+                button.AddToClassList(PrimaryButtonClass);
+            if (style is DebugButtonStyle.Previous or DebugButtonStyle.Next)
+                button.AddToClassList(IconButtonClass);
             DisableKeyboardFocus(button);
         }
 
-        public static void ApplyStateButton(Button button)
+        public static void ApplyStateButton(AgentButton button)
         {
             button.AddToClassList(StateButtonClass);
-            button.style.flexGrow = 1;
+            button.style.minWidth = StyleKeyword.Auto;
+            button.style.width = StyleKeyword.Auto;
+            button.style.maxWidth = Length.Percent(100);
+            button.style.flexGrow = 0;
+            button.style.flexShrink = 1;
         }
 
-        public static void ApplyBoolButton(Button button)
+        public static void ApplyBoolButton(AgentButton button)
         {
             button.AddToClassList(BoolButtonClass);
-            button.style.flexGrow = 1;
-        }
-
-        public static Label ApplyOwnedToggle(Toggle toggle)
-        {
-            toggle.AddToClassList(OwnedToggleClass);
-            var input = toggle.Q<VisualElement>(className: "unity-toggle__input")
-                ?? throw new System.InvalidOperationException("Toggle input visual was not created.");
-
-            var status = new Label { pickingMode = PickingMode.Ignore };
-            status.enableRichText = false;
-            status.AddToClassList(OwnedToggleStatusClass);
-            input.Add(status);
-
-            var track = new VisualElement { pickingMode = PickingMode.Ignore };
-            track.AddToClassList(BoolSwitchClass);
-            var thumb = new VisualElement { pickingMode = PickingMode.Ignore };
-            thumb.AddToClassList(BoolSwitchThumbClass);
-            track.Add(thumb);
-            input.Add(track);
-            return status;
-        }
-
-        public static void ApplyPrimaryButton(Button button)
-        {
-            button.AddToClassList(PrimaryButtonClass);
-            button.style.backgroundColor = AgentUi.Accent;
-            button.style.color = AgentUi.AccentForeground;
-        }
-
-        public static void ApplyIconButton(Button button, bool previous)
-        {
-            button.AddToClassList(IconButtonClass);
-            button.style.minWidth = 32;
-            button.style.width = 32;
-            button.style.paddingLeft = 0;
-            button.style.paddingRight = 0;
-            var icon = new DirectionArrowIcon(previous) { pickingMode = PickingMode.Ignore };
-            icon.AddToClassList(previous ? PreviousIconClass : NextIconClass);
-            button.Add(icon);
+            button.style.width = 78;
+            button.style.minWidth = 78;
+            button.style.maxWidth = 78;
+            button.style.flexShrink = 0;
         }
 
         public static void ApplyStateLabel(Label label)
@@ -376,6 +385,9 @@ namespace YuzeToolkit
             label.style.borderTopRightRadius = 12;
             label.style.borderBottomLeftRadius = 12;
             label.style.borderBottomRightRadius = 12;
+            label.style.maxWidth = Length.Percent(100);
+            label.style.flexShrink = 1;
+            ApplyContentWrapping(label);
         }
 
         public static void ApplyTag(Label label)
@@ -391,6 +403,8 @@ namespace YuzeToolkit
             label.style.borderTopRightRadius = 10;
             label.style.borderBottomLeftRadius = 10;
             label.style.borderBottomRightRadius = 10;
+            label.style.flexShrink = 1;
+            ApplyContentWrapping(label);
         }
 
         public static void ApplyReadOnlyLabel(Label label)
@@ -399,6 +413,8 @@ namespace YuzeToolkit
             label.AddToClassList(ReadOnlyLabelClass);
             ApplyLabel(label, true);
             label.style.flexGrow = 1;
+            label.style.minWidth = 0;
+            ApplyContentWrapping(label);
         }
 
         public static void ApplySegmentedRow(VisualElement row)
@@ -409,10 +425,13 @@ namespace YuzeToolkit
             row.style.minWidth = 0;
         }
 
-        public static void ApplySegmentButton(Button button)
+        public static void ApplySegmentButton(AgentButton button)
         {
             button.AddToClassList(SegmentButtonClass);
-            ApplyButton(button);
+            button.style.minWidth = 38;
+            button.style.width = 38;
+            button.style.marginLeft = 2;
+            button.style.marginRight = 2;
         }
 
         public static void ApplyActiveState(VisualElement element, bool active)
@@ -422,7 +441,10 @@ namespace YuzeToolkit
             element.style.color = active ? AgentUi.Accent : AgentUi.Text;
         }
 
-        public static void ApplyTone(VisualElement element, DebugTone tone)
+        public static void ApplyActiveStateClass(VisualElement element, bool active) =>
+            element.EnableInClassList(ActiveClass, active);
+
+        public static void ApplyToneClasses(VisualElement element, DebugTone tone)
         {
             element.EnableInClassList(ToneSuccessClass, tone == DebugTone.Success);
             element.EnableInClassList(ToneDangerClass, tone == DebugTone.Danger);
@@ -432,71 +454,54 @@ namespace YuzeToolkit
             element.EnableInClassList(ToneYellowClass, tone == DebugTone.Yellow);
             element.EnableInClassList(TonePinkClass, tone == DebugTone.Pink);
             element.EnableInClassList(ToneWhiteClass, tone == DebugTone.White);
-            element.style.color = tone switch
-            {
-                DebugTone.Success or DebugTone.Green => AgentUi.Success,
-                DebugTone.Danger or DebugTone.Red => AgentUi.Error,
-                DebugTone.Yellow => AgentUi.Warning,
-                DebugTone.Blue => AgentUi.Accent,
-                DebugTone.Pink => (Color)new Color32(236, 128, 191, 255),
-                _ => AgentUi.Text
-            };
+        }
+
+        public static Color GetToneColor(DebugTone tone) => tone switch
+        {
+            DebugTone.Success or DebugTone.Green => AgentUi.Success,
+            DebugTone.Danger or DebugTone.Red => AgentUi.Error,
+            DebugTone.Yellow => AgentUi.Warning,
+            DebugTone.Blue => AgentUi.Accent,
+            DebugTone.Pink => new Color32(236, 128, 191, 255),
+            _ => AgentUi.Text
+        };
+
+        public static void ApplyTone(VisualElement element, DebugTone tone)
+        {
+            ApplyToneClasses(element, tone);
+            element.style.color = GetToneColor(tone);
         }
 
         public static void ApplyMiniValue(Label label)
         {
             label.AddToClassList(MiniValueClass);
             ApplyLabel(label);
-        }
-
-        public static void ApplyProgress(ProgressBar progress)
-        {
-            progress.AddToClassList(ProgressClass);
-            progress.style.flexGrow = 1;
-            progress.style.height = 18;
-            progress.style.color = AgentUi.Text;
+            label.style.flexGrow = 1;
+            label.style.flexShrink = 1;
+            ApplyContentWrapping(label);
         }
 
         public static void ApplySliderRow(VisualElement row)
         {
             row.AddToClassList(SliderRowClass);
             row.style.flexDirection = FlexDirection.Row;
+            row.style.flexWrap = Wrap.Wrap;
             row.style.alignItems = Align.Center;
-            row.style.flexGrow = 1;
-        }
-
-        public static void ApplySlider(Slider slider)
-        {
-            slider.AddToClassList(SliderClass);
-            slider.style.flexGrow = 1;
-            DisableKeyboardFocus(slider);
-        }
-
-        public static void ApplySlider(SliderInt slider)
-        {
-            slider.AddToClassList(SliderClass);
-            slider.style.flexGrow = 1;
-            DisableKeyboardFocus(slider);
+            row.style.minWidth = 0;
+            row.style.minHeight = 36;
+            row.style.marginBottom = 6;
         }
 
         public static void ApplySliderValue(Label label)
         {
             label.AddToClassList(SliderValueClass);
             ApplyLabel(label);
-            label.style.width = 58;
+            label.style.width = StyleKeyword.Auto;
+            label.style.minWidth = 58;
+            label.style.flexShrink = 0;
+            label.style.marginLeft = 10;
             label.style.unityTextAlign = TextAnchor.MiddleRight;
-        }
-
-        public static void ApplySliderFiller(VisualElement filler)
-        {
-            filler.AddToClassList(SliderFillerClass);
-            filler.style.backgroundColor = AgentUi.Accent;
-        }
-
-        public static void ApplySliderThumb(VisualElement thumb)
-        {
-            thumb.AddToClassList(SliderThumbClass);
-            thumb.style.backgroundColor = AgentUi.Text;
+            ApplyContentWrapping(label);
         }
 
         public static void ApplyPreview(VisualElement previewRoot)
@@ -522,31 +527,13 @@ namespace YuzeToolkit
             element.tabIndex = -1;
         }
 
-        private sealed class DirectionArrowIcon : VisualElement
+        private static void ApplyContentWrapping(Label label)
         {
-            private readonly bool _previous;
-
-            public DirectionArrowIcon(bool previous)
-            {
-                _previous = previous;
-                generateVisualContent += Draw;
-            }
-
-            private void Draw(MeshGenerationContext context)
-            {
-                var painter = context.painter2D;
-                var center = contentRect.center;
-                var direction = _previous ? 1f : -1f;
-                painter.strokeColor = new Color32(207, 211, 214, 255);
-                painter.lineWidth = 2f;
-                painter.lineCap = LineCap.Round;
-                painter.lineJoin = LineJoin.Round;
-                painter.BeginPath();
-                painter.MoveTo(new Vector2(center.x + direction * 3.5f, center.y - 5f));
-                painter.LineTo(new Vector2(center.x - direction * 2.5f, center.y));
-                painter.LineTo(new Vector2(center.x + direction * 3.5f, center.y + 5f));
-                painter.Stroke();
-            }
+            label.style.maxWidth = Length.Percent(100);
+            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.overflow = Overflow.Visible;
+            label.style.textOverflow = TextOverflow.Clip;
         }
+
     }
 }

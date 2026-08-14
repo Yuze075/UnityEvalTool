@@ -13,8 +13,7 @@ namespace YuzeToolkit
     internal sealed class DebugEnumDropdown : VisualElement
     {
         private readonly Label _label;
-        private readonly Button _button;
-        private readonly Label _buttonText;
+        private readonly AgentButton _button;
         private readonly Type _enumType;
         private VisualElement? _popup;
         private VisualElement? _popupHost;
@@ -37,23 +36,23 @@ namespace YuzeToolkit
 
             _label = new Label(label) { enableRichText = false };
             _label.AddToClassList(DebugWindowUss.EnumLabelClass);
-            _label.style.minWidth = 130;
-            _label.style.color = AgentUi.TextSecondary;
+            DebugWindowUss.ApplyControlLabel(_label);
             _label.style.display = string.IsNullOrWhiteSpace(label) ? DisplayStyle.None : DisplayStyle.Flex;
             Add(_label);
 
-            _button = new Button(TogglePopup)
+            _button = new AgentButton(string.Empty, string.Empty, TogglePopup,
+                AgentUi.Input, AgentUi.Text, AgentIconKind.ChevronDown)
             {
                 name = "unity-debug-tool-enum-button"
             };
+            _button.EnableContentWrapping();
             _button.focusable = false;
             _button.tabIndex = -1;
             _button.AddToClassList(DebugWindowUss.EnumButtonClass);
             _button.style.flexGrow = 1;
-            _button.style.height = 32;
+            _button.style.minHeight = 32;
+            _button.style.height = StyleKeyword.Auto;
             _button.style.minWidth = 0;
-            _button.style.flexDirection = FlexDirection.Row;
-            _button.style.alignItems = Align.Center;
             _button.style.paddingLeft = 10;
             _button.style.paddingRight = 8;
             _button.style.backgroundImage = StyleKeyword.None;
@@ -63,22 +62,6 @@ namespace YuzeToolkit
             _button.style.borderBottomLeftRadius = 8;
             _button.style.borderBottomRightRadius = 8;
             AgentUi.SetBorder(_button, AgentUi.Border, 1);
-            _buttonText = new Label { enableRichText = false };
-            _buttonText.AddToClassList(DebugWindowUss.EnumButtonTextClass);
-            _buttonText.style.flexGrow = 1;
-            _buttonText.style.minWidth = 0;
-            _buttonText.style.color = AgentUi.Text;
-            _button.Add(_buttonText);
-            var chevron = new VisualElement { pickingMode = PickingMode.Ignore };
-            chevron.AddToClassList(DebugWindowUss.EnumChevronClass);
-            chevron.style.width = 8;
-            chevron.style.height = 8;
-            chevron.style.borderRightWidth = 2;
-            chevron.style.borderBottomWidth = 2;
-            chevron.style.borderRightColor = AgentUi.TextSecondary;
-            chevron.style.borderBottomColor = AgentUi.TextSecondary;
-            chevron.style.rotate = new Rotate(new Angle(45, AngleUnit.Degree));
-            _button.Add(chevron);
             Add(_button);
 
             RefreshButton();
@@ -135,37 +118,30 @@ namespace YuzeToolkit
             {
                 if (values.GetValue(index) is not Enum option) continue;
                 var captured = option;
-                var item = new Button(() => Select(captured));
+                var selected = Equals(captured, _value);
+                var item = new AgentButton(
+                    FormatOption(captured),
+                    string.Empty,
+                    () => Select(captured),
+                    selected ? AgentUi.Active : AgentUi.Transparent,
+                    selected ? AgentUi.Accent : AgentUi.Text,
+                    selected ? AgentIconKind.Check : AgentIconKind.None);
+                item.EnableContentWrapping();
                 item.focusable = false;
                 item.tabIndex = -1;
                 item.AddToClassList(DebugWindowUss.EnumPopupItemClass);
                 item.EnableInClassList(DebugWindowUss.EnumPopupItemSelectedClass, Equals(captured, _value));
-                item.style.height = 36;
-                item.style.flexDirection = FlexDirection.Row;
-                item.style.alignItems = Align.Center;
+                item.style.minHeight = 36;
+                item.style.height = StyleKeyword.Auto;
+                item.style.width = Length.Percent(100);
+                item.style.justifyContent = Justify.FlexStart;
                 item.style.paddingLeft = 10;
                 item.style.paddingRight = 10;
                 item.style.backgroundImage = StyleKeyword.None;
-                item.style.backgroundColor = Equals(captured, _value) ? AgentUi.Active : AgentUi.Transparent;
                 item.style.borderTopWidth = 0;
                 item.style.borderRightWidth = 0;
                 item.style.borderBottomWidth = 0;
                 item.style.borderLeftWidth = 0;
-                var itemText = new Label(FormatOption(captured))
-                {
-                    pickingMode = PickingMode.Ignore,
-                    enableRichText = false
-                };
-                itemText.AddToClassList(DebugWindowUss.EnumPopupItemTextClass);
-                itemText.style.flexGrow = 1;
-                itemText.style.color = Equals(captured, _value) ? AgentUi.Accent : AgentUi.Text;
-                item.Add(itemText);
-                var check = new VisualElement { pickingMode = PickingMode.Ignore };
-                check.AddToClassList(DebugWindowUss.EnumPopupCheckClass);
-                var checkGlyph = new VisualElement { pickingMode = PickingMode.Ignore };
-                checkGlyph.AddToClassList(DebugWindowUss.EnumPopupCheckGlyphClass);
-                check.Add(checkGlyph);
-                item.Add(check);
                 scroll.Add(item);
             }
 
@@ -194,7 +170,7 @@ namespace YuzeToolkit
 
         private void RefreshButton()
         {
-            _buttonText.text = FormatOption(_value);
+            _button.text = FormatOption(_value);
         }
 
         private static string FormatOption(Enum value)

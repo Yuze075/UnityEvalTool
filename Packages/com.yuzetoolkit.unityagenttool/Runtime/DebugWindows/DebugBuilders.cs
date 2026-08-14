@@ -18,10 +18,18 @@ namespace YuzeToolkit
         White
     }
 
+    public enum DebugButtonStyle : byte
+    {
+        Default,
+        Primary,
+        Previous,
+        Next
+    }
+
     public sealed class DebugWindowBuilder : DebugGroupBuilder
     {
-        internal DebugWindowBuilder(string? toolName, string? description)
-            : base(new DebugWindowNode(toolName, description))
+        internal DebugWindowBuilder()
+            : base(new DebugWindowNode())
         {
         }
 
@@ -66,11 +74,9 @@ namespace YuzeToolkit
         public new DebugWindowBuilder AddStateLabel(
             string label,
             Func<bool> getter,
-            DebugTone tone = DebugTone.Default,
-            string? toolName = null,
-            string? description = null)
+            DebugTone tone = DebugTone.Default)
         {
-            base.AddStateLabel(label, getter, tone, toolName, description);
+            base.AddStateLabel(label, getter, tone);
             return this;
         }
 
@@ -78,11 +84,9 @@ namespace YuzeToolkit
             Func<string> labelGetter,
             Func<bool> stateGetter,
             Action action,
-            DebugTone tone = DebugTone.Default,
-            string? toolName = null,
-            string? description = null)
+            DebugTone tone = DebugTone.Default)
         {
-            base.AddStateButton(labelGetter, stateGetter, action, tone, toolName, description);
+            base.AddStateButton(labelGetter, stateGetter, action, tone);
             return this;
         }
 
@@ -90,11 +94,9 @@ namespace YuzeToolkit
             string label,
             Func<bool> getter,
             Action<bool> setter,
-            DebugTone tone = DebugTone.Default,
-            string? toolName = null,
-            string? description = null)
+            DebugTone tone = DebugTone.Default)
         {
-            base.AddBoolButton(label, getter, setter, tone, toolName, description);
+            base.AddBoolButton(label, getter, setter, tone);
             return this;
         }
 
@@ -104,11 +106,9 @@ namespace YuzeToolkit
             int highValue,
             Func<int> getter,
             Action<int> setter,
-            DebugTone tone = DebugTone.Danger,
-            string? toolName = null,
-            string? description = null)
+            DebugTone tone = DebugTone.Danger)
         {
-            base.AddSegmentedInt(label, lowValue, highValue, getter, setter, tone, toolName, description);
+            base.AddSegmentedInt(label, lowValue, highValue, getter, setter, tone);
             return this;
         }
 
@@ -124,9 +124,21 @@ namespace YuzeToolkit
             return this;
         }
 
-        public new DebugWindowBuilder AddButton(string label, Action action, string? toolName, string? description)
+        public new DebugWindowBuilder AddPrimaryButton(string label, Action action)
         {
-            base.AddButton(label, action, toolName, description);
+            base.AddPrimaryButton(label, action);
+            return this;
+        }
+
+        public new DebugWindowBuilder AddPreviousButton(Action action)
+        {
+            base.AddPreviousButton(action);
+            return this;
+        }
+
+        public new DebugWindowBuilder AddNextButton(Action action)
+        {
+            base.AddNextButton(action);
             return this;
         }
 
@@ -136,30 +148,9 @@ namespace YuzeToolkit
             return this;
         }
 
-        public new DebugWindowBuilder AddReadOnly<TValue>(
-            string label,
-            Func<TValue> getter,
-            string? toolName,
-            string? description)
-        {
-            base.AddReadOnly(label, getter, toolName, description);
-            return this;
-        }
-
         public new DebugWindowBuilder AddValue<TValue>(string label, Func<TValue> getter, Action<TValue> setter)
         {
             base.AddValue(label, getter, setter);
-            return this;
-        }
-
-        public new DebugWindowBuilder AddValue<TValue>(
-            string label,
-            Func<TValue> getter,
-            Action<TValue> setter,
-            string? toolName,
-            string? description)
-        {
-            base.AddValue(label, getter, setter, toolName, description);
             return this;
         }
 
@@ -175,51 +166,51 @@ namespace YuzeToolkit
             return this;
         }
 
-        public new DebugWindowBuilder AddReadOnlyBool(string label, Func<bool> getter, string? toolName = null, string? description = null)
+        public new DebugWindowBuilder AddReadOnlyBool(string label, Func<bool> getter)
         {
-            base.AddReadOnly(label, getter, toolName, description);
+            base.AddReadOnly(label, getter);
             return this;
         }
 
-        public new DebugWindowBuilder AddReadOnlyInt(string label, Func<int> getter, string? toolName = null, string? description = null)
+        public new DebugWindowBuilder AddReadOnlyInt(string label, Func<int> getter)
         {
-            base.AddReadOnly(label, getter, toolName, description);
+            base.AddReadOnly(label, getter);
             return this;
         }
 
-        public new DebugWindowBuilder AddReadOnlyFloat(string label, Func<float> getter, string? toolName = null, string? description = null)
+        public new DebugWindowBuilder AddReadOnlyFloat(string label, Func<float> getter)
         {
-            base.AddReadOnly(label, getter, toolName, description);
+            base.AddReadOnly(label, getter);
             return this;
         }
 
-        public new DebugWindowBuilder AddReadOnlyString(string label, Func<string> getter, string? toolName = null, string? description = null)
+        public new DebugWindowBuilder AddReadOnlyString(string label, Func<string> getter)
         {
-            base.AddReadOnly(label, getter, toolName, description);
+            base.AddReadOnly(label, getter);
             return this;
         }
 
-        public new DebugWindowBuilder AddBool(string label, Func<bool> getter, Action<bool> setter, string? toolName = null, string? description = null)
+        public new DebugWindowBuilder AddBool(string label, Func<bool> getter, Action<bool> setter)
         {
-            base.AddBool(label, getter, setter, toolName, description);
+            base.AddBool(label, getter, setter);
             return this;
         }
 
-        public new DebugWindowBuilder AddInt(string label, Func<int> getter, Action<int> setter, string? toolName = null, string? description = null)
+        public new DebugWindowBuilder AddInt(string label, Func<int> getter, Action<int> setter)
         {
-            base.AddValue(label, getter, setter, toolName, description);
+            base.AddValue(label, getter, setter);
             return this;
         }
 
-        public new DebugWindowBuilder AddFloat(string label, Func<float> getter, Action<float> setter, string? toolName = null, string? description = null)
+        public new DebugWindowBuilder AddFloat(string label, Func<float> getter, Action<float> setter)
         {
-            base.AddValue(label, getter, setter, toolName, description);
+            base.AddValue(label, getter, setter);
             return this;
         }
 
-        public new DebugWindowBuilder AddString(string label, Func<string> getter, Action<string> setter, string? toolName = null, string? description = null)
+        public new DebugWindowBuilder AddString(string label, Func<string> getter, Action<string> setter)
         {
-            base.AddValue(label, getter, setter, toolName, description);
+            base.AddValue(label, getter, setter);
             return this;
         }
 
@@ -229,11 +220,9 @@ namespace YuzeToolkit
             float highValue,
             Func<float> getter,
             Action<float>? setter = null,
-            string format = "0.##",
-            string? toolName = null,
-            string? description = null)
+            string format = "0.##")
         {
-            base.AddSlider(label, lowValue, highValue, getter, setter, format, toolName, description);
+            base.AddSlider(label, lowValue, highValue, getter, setter, format);
             return this;
         }
 
@@ -243,11 +232,9 @@ namespace YuzeToolkit
             int highValue,
             Func<int> getter,
             Action<int>? setter = null,
-            string format = "0",
-            string? toolName = null,
-            string? description = null)
+            string format = "0")
         {
-            base.AddSlider(label, lowValue, highValue, getter, setter, format, toolName, description);
+            base.AddSlider(label, lowValue, highValue, getter, setter, format);
             return this;
         }
 
@@ -259,19 +246,6 @@ namespace YuzeToolkit
             string format)
         {
             base.AddSlider(label, lowValue, highValue, getter, format);
-            return this;
-        }
-
-        public new DebugWindowBuilder AddSlider(
-            string label,
-            int lowValue,
-            int highValue,
-            Func<int> getter,
-            Action<int> setter,
-            string toolName,
-            string description)
-        {
-            base.AddSlider(label, lowValue, highValue, getter, setter, toolName, description);
             return this;
         }
 
@@ -373,27 +347,6 @@ namespace YuzeToolkit
             return this;
         }
 
-        [Obsolete("Visual groups no longer register Eval Tools. Use DebugEvalToolBuilder.AddGroup for the explicit Tool tree.")]
-        public new DebugWindowBuilder AddGroup(
-            string label,
-            Action<DebugGroupBuilder> configure,
-            bool registerAsTool)
-        {
-            base.AddGroup(label, configure);
-            return this;
-        }
-
-        [Obsolete("Visual metadata no longer registers Eval Tools. Use DebugEvalToolBuilder.AddGroup for the explicit Tool tree.")]
-        public new DebugWindowBuilder AddGroup(
-            string label,
-            string toolName,
-            string description,
-            Action<DebugGroupBuilder> configure)
-        {
-            base.AddGroup(label, configure);
-            return this;
-        }
-
         public new DebugWindowBuilder AddFoldout(string label, Action<DebugGroupBuilder> configure)
         {
             base.AddFoldout(label, configure);
@@ -449,12 +402,9 @@ namespace YuzeToolkit
         public DebugGroupBuilder AddStateLabel(
             string label,
             Func<bool> getter,
-            DebugTone tone = DebugTone.Default,
-            string? toolName = null,
-            string? description = null)
+            DebugTone tone = DebugTone.Default)
         {
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
-            GroupNode.Children.Add(new DebugStateLabelNode(label, getter, tone, toolName, description));
+            GroupNode.Children.Add(new DebugStateLabelNode(label, getter, tone));
             return this;
         }
 
@@ -462,13 +412,10 @@ namespace YuzeToolkit
             Func<string> labelGetter,
             Func<bool> stateGetter,
             Action action,
-            DebugTone tone = DebugTone.Default,
-            string? toolName = null,
-            string? description = null)
+            DebugTone tone = DebugTone.Default)
         {
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
             GroupNode.Children.Add(new DebugStateButtonNode(
-                labelGetter, stateGetter, action, tone, toolName, description));
+                labelGetter, stateGetter, action, tone));
             return this;
         }
 
@@ -476,12 +423,9 @@ namespace YuzeToolkit
             string label,
             Func<bool> getter,
             Action<bool> setter,
-            DebugTone tone = DebugTone.Default,
-            string? toolName = null,
-            string? description = null)
+            DebugTone tone = DebugTone.Default)
         {
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
-            GroupNode.Children.Add(new DebugBoolButtonNode(label, getter, setter, tone, toolName, description));
+            GroupNode.Children.Add(new DebugBoolButtonNode(label, getter, setter, tone));
             return this;
         }
 
@@ -491,14 +435,11 @@ namespace YuzeToolkit
             int highValue,
             Func<int> getter,
             Action<int> setter,
-            DebugTone tone = DebugTone.Danger,
-            string? toolName = null,
-            string? description = null)
+            DebugTone tone = DebugTone.Danger)
         {
             if (highValue <= lowValue) throw new ArgumentOutOfRangeException(nameof(highValue));
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
             GroupNode.Children.Add(new DebugSegmentedIntNode(
-                label, lowValue, highValue, getter, setter, tone, toolName, description));
+                label, lowValue, highValue, getter, setter, tone));
             return this;
         }
 
@@ -510,82 +451,73 @@ namespace YuzeToolkit
 
         public DebugGroupBuilder AddButton(string label, Action action)
         {
-            return AddButton(label, action, null, null);
+            GroupNode.Children.Add(new DebugButtonNode(label, action, DebugButtonStyle.Default));
+            return this;
         }
 
-        public DebugGroupBuilder AddButton(string label, Action action, string? toolName, string? description)
+        public DebugGroupBuilder AddPrimaryButton(string label, Action action)
         {
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
-            GroupNode.Children.Add(new DebugButtonNode(label, action, toolName, description));
+            GroupNode.Children.Add(new DebugButtonNode(label, action, DebugButtonStyle.Primary));
+            return this;
+        }
+
+        public DebugGroupBuilder AddPreviousButton(Action action)
+        {
+            GroupNode.Children.Add(new DebugButtonNode(string.Empty, action, DebugButtonStyle.Previous));
+            return this;
+        }
+
+        public DebugGroupBuilder AddNextButton(Action action)
+        {
+            GroupNode.Children.Add(new DebugButtonNode(string.Empty, action, DebugButtonStyle.Next));
             return this;
         }
 
         public DebugGroupBuilder AddReadOnly<TValue>(string label, Func<TValue> getter)
         {
-            return AddReadOnly(label, getter, null, null);
-        }
-
-        public DebugGroupBuilder AddReadOnly<TValue>(
-            string label,
-            Func<TValue> getter,
-            string? toolName,
-            string? description)
-        {
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
-            GroupNode.Children.Add(new DebugFieldNode<TValue>(label, getter, null, toolName, description));
+            GroupNode.Children.Add(new DebugFieldNode<TValue>(label, getter, null));
             return this;
         }
 
         public DebugGroupBuilder AddValue<TValue>(string label, Func<TValue> getter, Action<TValue> setter)
         {
-            return AddValue(label, getter, setter, null, null);
-        }
-
-        public DebugGroupBuilder AddValue<TValue>(
-            string label,
-            Func<TValue> getter,
-            Action<TValue> setter,
-            string? toolName,
-            string? description)
-        {
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
-            GroupNode.Children.Add(new DebugFieldNode<TValue>(label, getter, setter, toolName, description));
+            GroupNode.Children.Add(new DebugFieldNode<TValue>(label, getter, setter));
             return this;
         }
 
         public DebugGroupBuilder AddField<TValue>(string label, Func<TValue> getter)
         {
-            return AddReadOnly(label, getter, null, null);
+            return AddReadOnly(label, getter);
         }
 
         public DebugGroupBuilder AddField<TValue>(string label, Func<TValue> getter, Action<TValue> setter)
         {
-            return AddValue(label, getter, setter, null, null);
+            return AddValue(label, getter, setter);
         }
 
-        public DebugGroupBuilder AddReadOnlyBool(string label, Func<bool> getter, string? toolName = null, string? description = null) =>
-            AddReadOnly(label, getter, toolName, description);
+        public DebugGroupBuilder AddReadOnlyBool(string label, Func<bool> getter) =>
+            AddReadOnly(label, getter);
 
-        public DebugGroupBuilder AddReadOnlyInt(string label, Func<int> getter, string? toolName = null, string? description = null) =>
-            AddReadOnly(label, getter, toolName, description);
+        public DebugGroupBuilder AddReadOnlyInt(string label, Func<int> getter) =>
+            AddReadOnly(label, getter);
 
-        public DebugGroupBuilder AddReadOnlyFloat(string label, Func<float> getter, string? toolName = null, string? description = null) =>
-            AddReadOnly(label, getter, toolName, description);
+        public DebugGroupBuilder AddReadOnlyFloat(string label, Func<float> getter) =>
+            AddReadOnly(label, getter);
 
-        public DebugGroupBuilder AddReadOnlyString(string label, Func<string> getter, string? toolName = null, string? description = null) =>
-            AddReadOnly(label, getter, toolName, description);
+        public DebugGroupBuilder AddReadOnlyString(string label, Func<string> getter) =>
+            AddReadOnly(label, getter);
 
-        public DebugGroupBuilder AddBool(string label, Func<bool> getter, Action<bool> setter, string? toolName = null, string? description = null) =>
-            AddBoolButton(label, getter, setter, DebugTone.Success, toolName, description);
+        public DebugGroupBuilder AddBool(string label, Func<bool> getter, Action<bool> setter) =>
+            AddBoolButton(label, getter, setter, DebugTone.Success);
 
-        public DebugGroupBuilder AddInt(string label, Func<int> getter, Action<int> setter, string? toolName = null, string? description = null) =>
-            AddValue(label, getter, setter, toolName, description);
+        public DebugGroupBuilder AddInt(string label, Func<int> getter, Action<int> setter) =>
+            AddValue(label, getter, setter);
 
-        public DebugGroupBuilder AddFloat(string label, Func<float> getter, Action<float> setter, string? toolName = null, string? description = null) =>
-            AddValue(label, getter, setter, toolName, description);
+        public DebugGroupBuilder AddFloat(string label, Func<float> getter, Action<float> setter) =>
+            AddValue(label, getter, setter);
 
-        public DebugGroupBuilder AddString(string label, Func<string> getter, Action<string> setter, string? toolName = null, string? description = null) =>
-            AddValue(label, getter, setter, toolName, description);
+        public DebugGroupBuilder AddString(string label, Func<string> getter, Action<string> setter) =>
+            AddValue(label, getter, setter);
 
         public DebugGroupBuilder AddSlider(
             string label,
@@ -593,13 +525,10 @@ namespace YuzeToolkit
             float highValue,
             Func<float> getter,
             Action<float>? setter = null,
-            string format = "0.##",
-            string? toolName = null,
-            string? description = null)
+            string format = "0.##")
         {
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
             GroupNode.Children.Add(new DebugFloatSliderNode(
-                label, lowValue, highValue, getter, setter, format, toolName, description));
+                label, lowValue, highValue, getter, setter, format));
             return this;
         }
 
@@ -609,13 +538,10 @@ namespace YuzeToolkit
             int highValue,
             Func<int> getter,
             Action<int>? setter = null,
-            string format = "0",
-            string? toolName = null,
-            string? description = null)
+            string format = "0")
         {
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
             GroupNode.Children.Add(new DebugIntSliderNode(
-                label, lowValue, highValue, getter, setter, format, toolName, description));
+                label, lowValue, highValue, getter, setter, format));
             return this;
         }
 
@@ -627,20 +553,8 @@ namespace YuzeToolkit
             string format)
         {
             GroupNode.Children.Add(new DebugIntSliderNode(
-                label, lowValue, highValue, getter, null, format, null, null));
+                label, lowValue, highValue, getter, null, format));
             return this;
-        }
-
-        public DebugGroupBuilder AddSlider(
-            string label,
-            int lowValue,
-            int highValue,
-            Func<int> getter,
-            Action<int> setter,
-            string toolName,
-            string description)
-        {
-            return AddSlider(label, lowValue, highValue, getter, setter, "0", toolName, description);
         }
 
         public DebugGroupBuilder AddProgress(
@@ -741,26 +655,10 @@ namespace YuzeToolkit
         public DebugGroupBuilder AddGroup(string label, Action<DebugGroupBuilder> configure)
         {
             if (configure == null) throw new ArgumentNullException(nameof(configure));
-            return AddGroupInternal(label, null, null, configure);
-        }
-
-        [Obsolete("Visual groups no longer register Eval Tools. Use DebugEvalToolBuilder.AddGroup for the explicit Tool tree.")]
-        public DebugGroupBuilder AddGroup(string label, Action<DebugGroupBuilder> configure, bool registerAsTool)
-        {
-            if (configure == null) throw new ArgumentNullException(nameof(configure));
-            return AddGroupInternal(label, null, null, configure);
-        }
-
-        [Obsolete("Visual metadata no longer registers Eval Tools. Use DebugEvalToolBuilder.AddGroup for the explicit Tool tree.")]
-        public DebugGroupBuilder AddGroup(
-            string label,
-            string toolName,
-            string description,
-            Action<DebugGroupBuilder> configure)
-        {
-            if (configure == null) throw new ArgumentNullException(nameof(configure));
-            DebugToolUtility.ValidateOptionalToolMetadata(toolName, description);
-            return AddGroupInternal(label, null, null, configure);
+            var node = new DebugGroupNode(label);
+            configure(new DebugGroupBuilder(node));
+            GroupNode.Children.Add(node);
+            return this;
         }
 
         public DebugGroupBuilder AddFoldout(string label, Action<DebugGroupBuilder> configure)
@@ -786,16 +684,5 @@ namespace YuzeToolkit
             return this;
         }
 
-        private DebugGroupBuilder AddGroupInternal(
-            string label,
-            string? toolName,
-            string? description,
-            Action<DebugGroupBuilder> configure)
-        {
-            var node = new DebugGroupNode(label, toolName, description, false);
-            configure(new DebugGroupBuilder(node));
-            GroupNode.Children.Add(node);
-            return this;
-        }
     }
 }

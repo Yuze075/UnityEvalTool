@@ -67,13 +67,16 @@ var handle = DebugWindowModule.RegisterWindow(window =>
 {
     window.SetTitle("Player");
     window.AddReadOnly("State", () => player.StateName);
-    window.AddButton("Reset", player.Reset);
+    window.AddPrimaryButton("Reset", player.Reset);
 });
 ```
 
-Registrations do not require a scene host. Explicit `DebugEvalToolBuilder` roots are registered with
-`EvalToolRegistry` immediately and are removed with the returned handle. Visual controls are created
-with the Agent palette and owned interaction styling; the former DebugWindows USS is not reused.
+Registrations do not require a scene host. `DebugWindowModule` only registers visual windows; it never
+creates, registers, or disposes an `IEvalTool`. Feature owners implement automation independently and
+register its lifetime through `EvalToolRegistry.RegisterRootScoped`. `AddButton` is a neutral action,
+`AddPrimaryButton` is the page's primary action, and `AddPreviousButton` / `AddNextButton` are directional
+actions. Default boolean, enum, foldout, range, and progress controls use the Agent palette and package-owned
+interaction styling instead of Unity's default skin.
 
 ## Assemblies
 

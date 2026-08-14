@@ -18,13 +18,8 @@ namespace YuzeToolkit
 
     internal class DebugGroupNode : DebugNode
     {
-        public DebugGroupNode(string label, string? toolName, string? description, bool parentToolRooted)
+        public DebugGroupNode(string label)
             : base(label)
-        {
-        }
-
-        protected DebugGroupNode(string? toolName, string? description)
-            : base(string.IsNullOrWhiteSpace(toolName) ? "Debug" : toolName!)
         {
         }
 
@@ -34,13 +29,12 @@ namespace YuzeToolkit
 
     internal sealed class DebugWindowNode : DebugGroupNode
     {
-        public DebugWindowNode(string? toolName, string? description)
-            : base(toolName, description)
+        public DebugWindowNode()
+            : base("Debug")
         {
-            Title = string.IsNullOrWhiteSpace(toolName) ? "Debug" : toolName!;
         }
 
-        public string Title { get; set; }
+        public string Title { get; set; } = "Debug";
 
         public bool Draggable { get; set; } = true;
 
@@ -49,7 +43,7 @@ namespace YuzeToolkit
     internal sealed class DebugInlineGroupNode : DebugGroupNode
     {
         public DebugInlineGroupNode(FlexDirection direction)
-            : base(string.Empty, null, null, false)
+            : base(string.Empty)
         {
             Direction = direction;
         }
@@ -116,15 +110,16 @@ namespace YuzeToolkit
 
     internal sealed class DebugButtonNode : DebugNode
     {
-        public DebugButtonNode(string label, Action action, string? toolName, string? description)
+        public DebugButtonNode(string label, Action action, DebugButtonStyle style)
             : base(label)
         {
             Action = action ?? throw new ArgumentNullException(nameof(action));
+            Style = style;
         }
 
         public Action Action { get; }
 
-
+        public DebugButtonStyle Style { get; }
     }
 
     internal sealed class DebugStateButtonNode : DebugNode
@@ -133,9 +128,7 @@ namespace YuzeToolkit
             Func<string> labelGetter,
             Func<bool> stateGetter,
             Action action,
-            DebugTone tone,
-            string? toolName,
-            string? description)
+            DebugTone tone)
             : base(string.Empty)
         {
             LabelGetter = labelGetter ?? throw new ArgumentNullException(nameof(labelGetter));
@@ -171,9 +164,7 @@ namespace YuzeToolkit
         public DebugFieldNode(
             string label,
             Func<TValue> getter,
-            Action<TValue>? setter,
-            string? toolName,
-            string? description)
+            Action<TValue>? setter)
             : base(label)
         {
             Getter = getter ?? throw new ArgumentNullException(nameof(getter));
@@ -226,10 +217,8 @@ namespace YuzeToolkit
         public DebugStateLabelNode(
             string label,
             Func<bool> getter,
-            DebugTone tone,
-            string? toolName,
-            string? description)
-            : base(label, getter, null, toolName, description)
+            DebugTone tone)
+            : base(label, getter, null)
         {
             Tone = tone;
         }
@@ -243,10 +232,8 @@ namespace YuzeToolkit
             string label,
             Func<bool> getter,
             Action<bool> setter,
-            DebugTone tone,
-            string? toolName,
-            string? description)
-            : base(label, getter, setter, toolName, description)
+            DebugTone tone)
+            : base(label, getter, setter)
         {
             Tone = tone;
         }
@@ -262,10 +249,8 @@ namespace YuzeToolkit
             int highValue,
             Func<int> getter,
             Action<int> setter,
-            DebugTone tone,
-            string? toolName,
-            string? description)
-            : base(label, getter, setter, toolName, description)
+            DebugTone tone)
+            : base(label, getter, setter)
         {
             LowValue = lowValue;
             HighValue = highValue;
@@ -287,10 +272,8 @@ namespace YuzeToolkit
             float highValue,
             Func<float> getter,
             Action<float>? setter,
-            string format,
-            string? toolName,
-            string? description)
-            : base(label, getter, setter, toolName, description)
+            string format)
+            : base(label, getter, setter)
         {
             LowValue = lowValue;
             HighValue = highValue;
@@ -312,10 +295,8 @@ namespace YuzeToolkit
             int highValue,
             Func<int> getter,
             Action<int>? setter,
-            string format,
-            string? toolName,
-            string? description)
-            : base(label, getter, setter, toolName, description)
+            string format)
+            : base(label, getter, setter)
         {
             LowValue = lowValue;
             HighValue = highValue;

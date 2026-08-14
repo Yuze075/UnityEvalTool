@@ -96,6 +96,12 @@ and let the bundled Roslyn analyzer generate its `IEvalTool` metadata. Every fun
 declare an explicit safety level. Tool registration validates paths, callable sub-tools,
 JavaScript export names, parameters, and safety metadata before making a module visible.
 
+For manually composed runtime tools, derive from `EvalToolBase` or use `EvalToolGroup`,
+`EvalReadOnlyValueTool<T>`, `EvalWritableValueTool<T>`, and `EvalActionTool`. These types only
+own the Tool tree and function contract and have no Debug UI dependency. Register a root's
+independent lifetime with `EvalToolRegistry.RegisterRootScoped`; disposing its handle removes
+only that exact root instance.
+
 Loader-backed JavaScript tools can be registered through `EvalToolRegistry` and inspected
 or enabled through `tools://UnityEval`. Use `getJsToolAuthoringPrompt()` on that module for
 the current authoring contract. Return JSON-serializable primitives, lists, dictionaries,

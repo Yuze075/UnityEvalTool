@@ -36,6 +36,17 @@ namespace YuzeToolkit
                 throw new InvalidOperationException($"Eval root tool '{tool?.Name}' is already registered.");
         }
 
+        /// <summary>
+        /// Registers a root Tool and returns an independent lifetime handle. Disposing the handle only unregisters
+        /// this exact Tool instance and has no relationship to DebugPanel or any other UI.
+        /// </summary>
+        [UnityEngine.Scripting.Preserve]
+        public static IDisposable RegisterRootScoped(IEvalTool tool)
+        {
+            RegisterRoot(tool);
+            return new ScopedRootRegistration(tool);
+        }
+
         [UnityEngine.Scripting.Preserve]
         public static bool TryRegisterRoot(IEvalTool tool)
         {
@@ -421,6 +432,20 @@ namespace YuzeToolkit
             public IEvalTool Instance { get; }
             public Type ToolType => Instance.GetType();
             public IReadOnlyList<EvalToolFunctionDescriptor> Functions => Instance.Functions;
+        }
+
+        private sealed class ScopedRootRegistration : IDisposable
+        {
+            private IEvalTool? _tool;
+
+            public ScopedRootRegistration(IEvalTool tool) => _tool = tool;
+
+            public void Dispose()
+            {
+                if (_tool == null) return;
+                TryUnregisterRoot(_tool);
+                _tool = null;
+            }
         }
 
         private readonly struct JsToolRegistration

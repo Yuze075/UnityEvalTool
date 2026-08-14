@@ -219,6 +219,7 @@ namespace YuzeToolkit.UnityAgent
             style.paddingBottom = 0;
             style.paddingLeft = 10;
             style.opacity = 1;
+            style.overflow = Overflow.Hidden;
 
             _icon = new AgentIcon(icon);
             _icon.style.display = icon == AgentIconKind.None ? DisplayStyle.None : DisplayStyle.Flex;
@@ -314,7 +315,22 @@ namespace YuzeToolkit.UnityAgent
         public string text
         {
             get => _label.text;
-            set => _label.text = value ?? string.Empty;
+            set
+            {
+                _label.text = value ?? string.Empty;
+                _icon.style.marginRight = _icon.style.display == DisplayStyle.None || string.IsNullOrEmpty(_label.text)
+                    ? 0
+                    : 6;
+            }
+        }
+
+        public void EnableContentWrapping()
+        {
+            _label.style.whiteSpace = WhiteSpace.Normal;
+            _label.style.overflow = Overflow.Visible;
+            _label.style.textOverflow = TextOverflow.Clip;
+            _textStack.style.flexGrow = 0;
+            _textStack.style.maxWidth = Length.Percent(100);
         }
 
         public void SetIcon(AgentIconKind icon)

@@ -63,12 +63,14 @@ var handle = DebugWindowModule.RegisterWindow(window =>
 {
     window.SetTitle("Player");
     window.AddReadOnly("State", () => player.StateName);
-    window.AddButton("Reset", player.Reset);
+    window.AddPrimaryButton("Reset", player.Reset);
 });
 ```
 
-注册不再依赖场景宿主。显式 `DebugEvalToolBuilder` 根 Tool 会立即进入 `EvalToolRegistry`，释放句柄时
-同步移除。视觉控件使用 Agent 调色板和自有交互样式，不再复用旧 DebugWindows USS。
+注册不依赖场景宿主。`DebugWindowModule` 只注册视觉窗口，不创建、注册或释放 `IEvalTool`；自动化入口必须
+由功能所有者单独实现，并通过 `EvalToolRegistry.RegisterRootScoped` 独立注册和释放。`AddButton` 是普通动作，
+`AddPrimaryButton` 用于页面主动作，`AddPreviousButton` / `AddNextButton` 用于方向操作。布尔、枚举、折叠、
+范围和进度等默认控件均使用 Agent 调色板和包自有交互样式，不依赖 Unity 默认皮肤。
 
 ## 程序集
 

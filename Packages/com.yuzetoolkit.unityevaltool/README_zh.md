@@ -88,6 +88,11 @@ Framework 运行状态和有界序列化代码用法搜索。应优先使用这�
 Roslyn Analyzer 生成 `IEvalTool` 元数据。每个函数都必须声明明确的安全级别。Tool 注册
 会在 module 可见前校验路径、可调用子 Tool、JavaScript 导出名、参数和安全元数据。
 
+需要运行时手工组合 Tool 时，可以继承 `EvalToolBase`，或直接使用 `EvalToolGroup`、
+`EvalReadOnlyValueTool<T>`、`EvalWritableValueTool<T>` 与 `EvalActionTool`。这些类型只负责
+Tool 树和函数契约，不依赖任何 Debug UI。根 Tool 可通过 `EvalToolRegistry.RegisterRootScoped`
+独立注册；释放返回的句柄只会移除该根 Tool 的同一实例。
+
 可通过 `EvalToolRegistry` 注册 loader-backed JavaScript Tool，并通过 `tools://UnityEval`
 检查或启停它们。在该 module 上调用 `getJsToolAuthoringPrompt()` 可获取当前编写契约。
 返回值应尽量使用可 JSON 序列化的基础类型、列表、字典或由它们组成的数据。
