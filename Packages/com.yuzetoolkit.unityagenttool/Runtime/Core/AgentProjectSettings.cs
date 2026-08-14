@@ -41,6 +41,22 @@ namespace YuzeToolkit.UnityAgent
             return settings;
         }
 
+        /// <summary>Parses and validates one provider-free project settings document.</summary>
+        public static AgentProjectSettingsDocument Deserialize(string json)
+        {
+            var settings = AgentDocumentCodec.DeserializeProjectSettings(json);
+            Validate(settings);
+            return settings;
+        }
+
+        /// <summary>Validates and serializes one provider-free project settings document.</summary>
+        public static string Serialize(AgentProjectSettingsDocument settings)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            Validate(settings);
+            return AgentDocumentCodec.SerializeProjectSettings(settings);
+        }
+
         public static string Serialize(AgentSettingsDocument settings) =>
             AgentDocumentCodec.SerializeProjectSettings(AgentProjectSettingsDocument.FromSettings(settings));
 

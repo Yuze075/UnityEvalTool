@@ -55,12 +55,13 @@ last successfully loaded assemblies available as repair mode.
 
 Supported non-WebGL Players start a hidden `DontDestroyOnLoad` Broker client and register
 using the executable directory as their project path. Release Players intentionally retain
-the same authenticated arbitrary-JavaScript eval surface as the Editor. This is not gated
-by Development Build and is independent of the optional UnityAgentTool package.
+the same arbitrary-JavaScript eval surface as the Editor. This is not gated by Development
+Build and is independent of the optional UnityAgentTool package.
 
-The trust boundary is the current user's loopback Broker and per-user authentication token.
-If that capability is not appropriate for a shipped product, exclude or alter the package
-as an explicit product decision. WebGL is not a supported Broker target.
+The default trust boundary is the current user's loopback Broker; token authentication is
+an explicit opt-in through `UNITYEVALTOOL_REQUIRE_TOKEN=true`. If that capability is not
+appropriate for a shipped product, exclude or alter the package as an explicit product
+decision. WebGL is not a supported Broker target.
 
 Lifecycle details and public connection APIs are documented in
 [Editor and Player registration](docs/RUNTIME_SERVICES.md).
@@ -113,11 +114,12 @@ or data composed from those types whenever possible.
 |---|---|
 | `http://127.0.0.1:2347/health` | Broker health |
 | `http://127.0.0.1:2347/mcp` | MCP Streamable HTTP |
-| `ws://127.0.0.1:2347/unity` | Authenticated Unity registration and routing |
-| `ws://127.0.0.1:2347/cli` | Authenticated native CLI consoles |
+| `ws://127.0.0.1:2347/unity` | Unity registration and routing |
+| `ws://127.0.0.1:2347/cli` | Native CLI consoles |
 
-The Broker binds loopback only, authenticates every connection with the current user's
-token, and fails explicitly if port `2347` is unavailable.
+The Broker binds loopback only and fails explicitly if port `2347` is unavailable. Token
+authentication is disabled by default and can be enabled for MCP, Unity, and CLI together
+with `UNITYEVALTOOL_REQUIRE_TOKEN=true` in the Broker process environment.
 
 ## Build from source
 

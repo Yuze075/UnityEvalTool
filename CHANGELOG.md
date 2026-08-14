@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+- Split the built-in Agent prompt into explicit Editor-development and standalone-Player diagnosis workflows,
+  route every built-in file, process, Skill, and Unity Tool by task target, and provide an executable
+  `tools://` discovery quick start. Settings schema migration updates existing default prompts.
+- Disable token authentication by default for the loopback Broker so MCP and CLI work from
+  endpoint-only configuration. `UNITYEVALTOOL_REQUIRE_TOKEN=true` explicitly restores the
+  shared MCP, Unity, and CLI token boundary; health and doctor output expose the active mode.
 - Add synchronous Game/Scene/Editor-window image capture, a complete optional Unity Test
   Framework Tool with reload-persistent bounded records, serialized code/member usage
   search, and bounded cross-frame runtime observation sessions.

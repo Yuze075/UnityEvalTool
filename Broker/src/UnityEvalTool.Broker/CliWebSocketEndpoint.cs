@@ -5,7 +5,8 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 
 internal static class CliWebSocketEndpoint
 {
-    public static async Task HandleAsync(HttpContext context, BrokerRegistry registry, AuthTokenStore tokens)
+    public static async Task HandleAsync(HttpContext context, BrokerRegistry registry, AuthTokenStore tokens,
+        BrokerSecurityOptions security)
     {
         if (!context.WebSockets.IsWebSocketRequest)
         {
@@ -48,7 +49,7 @@ internal static class CliWebSocketEndpoint
                         var token = envelope.Payload.TryGetProperty("authToken", out var tokenElement)
                             ? tokenElement.GetString()
                             : null;
-                        if (!tokens.IsValid(token))
+                        if (!security.Accepts(tokens, token))
                             throw new BrokerOperationException(BrokerErrorCodes.AuthenticationFailed,
                                 "CLI Broker token is invalid.");
                         authorized = true;

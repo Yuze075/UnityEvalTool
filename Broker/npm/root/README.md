@@ -52,13 +52,17 @@ Connect a Streamable HTTP MCP client to:
 http://127.0.0.1:2347/mcp
 ```
 
-The Broker creates `~/.unityevaltool/auth.json` on first start. Read its `token` and send:
+Token authentication is disabled by default, so MCP clients only need the endpoint URL. To
+enable authentication, set `UNITYEVALTOOL_REQUIRE_TOKEN=true` in the Broker process
+environment before startup. The Broker then creates `~/.unityevaltool/auth.json`; read its
+`token` and send:
 
 ```text
 Authorization: Bearer <token>
 ```
 
-Do not commit the token. The MCP workflow is always
+Do not commit the token. Unity and the native CLI read an existing auth file automatically
+when authentication is enabled. The MCP workflow is always
 `unity_status` → `unity_connect` → `eval`; discovery and explicit selection are mandatory.
 See the [user guide](https://github.com/Yuze075/UnityEvalTool#readme) and
 [protocol specification](https://github.com/Yuze075/UnityEvalTool/blob/main/Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md).

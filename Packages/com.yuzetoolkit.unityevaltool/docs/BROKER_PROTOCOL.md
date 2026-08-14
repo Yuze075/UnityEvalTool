@@ -7,11 +7,14 @@ This document defines the stable boundary between the computer-level UnityEvalTo
 ## Endpoints
 
 - `http://127.0.0.1:2347/mcp`: MCP Streamable HTTP endpoint.
-- `ws://127.0.0.1:2347/unity`: authenticated Unity client connection.
-- `ws://127.0.0.1:2347/cli`: authenticated interactive CLI connection.
+- `ws://127.0.0.1:2347/unity`: Unity client connection.
+- `ws://127.0.0.1:2347/cli`: interactive CLI connection.
 - `http://127.0.0.1:2347/health`: Broker health snapshot.
 
 The Broker binds loopback only. It must not silently choose another port when `2347` is unavailable.
+Token authentication is disabled by default. `UNITYEVALTOOL_REQUIRE_TOKEN=true` in the
+Broker process environment enables it for MCP, Unity, and CLI together. The health snapshot
+reports this effective mode as `requireToken`.
 
 ## Envelope
 
@@ -33,7 +36,7 @@ Unity and CLI WebSockets exchange one UTF-8 JSON object per WebSocket message:
 
 The first Unity message must be `unity/register`. Its payload contains:
 
-- `authToken`
+- `authToken`: empty by default; required only when Broker token authentication is enabled
 - `instanceId`: stable across Domain Reload for one Unity process
 - `connectionEpoch`: incremented for each Unity-side connection generation
 - `processId` and `processStartedAtUtc`

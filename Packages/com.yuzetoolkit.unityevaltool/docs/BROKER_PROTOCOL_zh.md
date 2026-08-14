@@ -8,11 +8,13 @@
 ## 端点
 
 - `http://127.0.0.1:2347/mcp`：MCP Streamable HTTP 端点。
-- `ws://127.0.0.1:2347/unity`：经认证的 Unity Client 连接。
-- `ws://127.0.0.1:2347/cli`：经认证的交互式 CLI 连接。
+- `ws://127.0.0.1:2347/unity`：Unity Client 连接。
+- `ws://127.0.0.1:2347/cli`：交互式 CLI 连接。
 - `http://127.0.0.1:2347/health`：Broker 健康状态快照。
 
 Broker 只绑定 loopback。如果 `2347` 不可用，必须明确失败，不得静默改用其它端口。
+token 认证默认关闭。在 Broker 进程环境中设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true` 后，
+会为 MCP、Unity 与 CLI 一并开启；健康状态快照通过 `requireToken` 报告实际模式。
 
 ## 消息封装
 
@@ -35,7 +37,7 @@ Unity 和 CLI WebSocket 每条 WebSocket 消息交换一个 UTF-8 JSON object：
 
 Unity 的第一条消息必须是 `unity/register`。其 payload 包含：
 
-- `authToken`
+- `authToken`：默认为空；仅在 Broker 已开启 token 认证时必填
 - `instanceId`：在单个 Unity 进程的 Domain Reload 之间保持稳定
 - `connectionEpoch`：每个 Unity 侧连接 generation 递增
 - `processId` 和 `processStartedAtUtc`

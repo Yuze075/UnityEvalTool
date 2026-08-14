@@ -149,6 +149,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly Dictionary<string, IReadOnlyList<string>> _modelChoices = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _modelDisplayNames = new(StringComparer.Ordinal);
         private readonly HashSet<string> _discoveryStartedProfiles = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _expandedToolCalls = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _profileIdsByLabel = new(StringComparer.Ordinal);
         private long _lastRevision = -1;
         private string _selectedSessionId = string.Empty;
@@ -808,12 +809,51 @@ namespace YuzeToolkit.UnityAgent
                 _showError("Agent turn failed", current.LastError);
             }
 
-            var visibleMessages = current.Messages.Where(IsVisibleConversationMessage).ToList();
             _messageList.Clear();
-            if (visibleMessages.Count == 0)
+            var toolResults = current.Messages
+                .Where(message => message.Role == AgentMessageRole.Tool &&
+                                  !string.IsNullOrWhiteSpace(message.ToolCallId))
+                .GroupBy(message => message.ToolCallId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => new Queue<AgentMessage>(group), StringComparer.Ordinal);
+            var consumedToolResults = new HashSet<string>(StringComparer.Ordinal);
+            var renderedItems = 0;
+            foreach (var message in current.Messages)
+            {
+                if (message.Role is AgentMessageRole.User or AgentMessageRole.Assistant &&
+                    !string.IsNullOrWhiteSpace(message.Text))
+                {
+                    _messageList.Add(CreateMessage(message));
+                    renderedItems++;
+                }
+
+                if (message.Role == AgentMessageRole.Assistant)
+                {
+                    foreach (var call in message.ToolCalls)
+                    {
+                        AgentMessage? result = null;
+                        if (toolResults.TryGetValue(call.Id, out var candidates) && candidates.Count > 0)
+                        {
+                            result = candidates.Dequeue();
+                            consumedToolResults.Add(result.Id);
+                        }
+                        _messageList.Add(CreateToolCall(current.Id, message.Id, call, result));
+                        renderedItems++;
+                    }
+                }
+                else if (message.Role == AgentMessageRole.Tool && !consumedToolResults.Contains(message.Id))
+                {
+                    var call = new AgentToolCall
+                    {
+                        Id = message.ToolCallId,
+                        Name = string.IsNullOrWhiteSpace(message.ToolName) ? "Unknown Tool" : message.ToolName,
+                        ArgumentsJson = "{}"
+                    };
+                    _messageList.Add(CreateToolCall(current.Id, message.Id, call, message));
+                    renderedItems++;
+                }
+            }
+            if (renderedItems == 0 && !_host.Approvals.Pending.Any(value => value.SessionId == current.Id))
                 _messageList.Add(CreateEmptyState());
-            foreach (var message in visibleMessages)
-                _messageList.Add(CreateMessage(message));
             foreach (var approval in _host.Approvals.Pending.Where(value => value.SessionId == current.Id))
                 _messageList.Add(CreateApproval(approval));
             _messageScroll.ScrollToEnd();
@@ -1257,9 +1297,80 @@ namespace YuzeToolkit.UnityAgent
             return box;
         }
 
-        private static bool IsVisibleConversationMessage(AgentMessage message) =>
-            (message.Role is AgentMessageRole.User or AgentMessageRole.Assistant) &&
-            !string.IsNullOrWhiteSpace(message.Text);
+        private VisualElement CreateToolCall(
+            string sessionId,
+            string messageId,
+            AgentToolCall call,
+            AgentMessage? result)
+        {
+            var expansionKey = sessionId + ":" + messageId + ":" + call.Id;
+            var expanded = _expandedToolCalls.Contains(expansionKey);
+            var status = result == null ? "Running" : result.IsError ? "Failed" : "Completed";
+            var statusColor = result == null ? AgentUi.Warning : result.IsError ? AgentUi.Error : AgentUi.Success;
+            var card = AgentUi.RoundedPanel(10);
+            card.style.maxWidth = new Length(92, LengthUnit.Percent);
+            card.style.alignSelf = Align.FlexStart;
+            card.style.flexShrink = 0;
+            card.style.marginBottom = 9;
+            card.style.backgroundColor = AgentUi.ToolMessage;
+            AgentUi.SetBorder(card, result?.IsError == true ? AgentUi.Error : AgentUi.Border2, 1);
+
+            var details = new VisualElement();
+            details.style.display = expanded ? DisplayStyle.Flex : DisplayStyle.None;
+            details.style.minWidth = 0;
+            details.style.paddingLeft = 12;
+            details.style.paddingRight = 12;
+            details.style.paddingBottom = 10;
+
+            AgentButton? toggle = null;
+            toggle = AgentUi.Button(call.Name + "  ·  " + status,
+                "Expand or collapse this Tool call's arguments and result.",
+                () =>
+                {
+                    expanded = !expanded;
+                    if (expanded) _expandedToolCalls.Add(expansionKey);
+                    else _expandedToolCalls.Remove(expansionKey);
+                    details.style.display = expanded ? DisplayStyle.Flex : DisplayStyle.None;
+                    toggle?.SetIcon(expanded ? AgentIconKind.ChevronDown : AgentIconKind.ChevronRight);
+                }, 0, AgentUi.Transparent, AgentUi.TextSecondary,
+                expanded ? AgentIconKind.ChevronDown : AgentIconKind.ChevronRight);
+            toggle.style.width = new Length(100, LengthUnit.Percent);
+            toggle.style.height = 38;
+            toggle.style.justifyContent = Justify.FlexStart;
+            toggle.style.borderTopWidth = 0;
+            toggle.style.borderRightWidth = 0;
+            toggle.style.borderBottomWidth = 0;
+            toggle.style.borderLeftWidth = 3;
+            toggle.style.borderLeftColor = statusColor;
+            card.Add(toggle);
+
+            details.Add(CreateToolDetail("ARGUMENTS", string.IsNullOrWhiteSpace(call.ArgumentsJson)
+                ? "{}"
+                : call.ArgumentsJson));
+            details.Add(CreateToolDetail(result == null ? "RESULT · RUNNING" :
+                result.IsError ? "RESULT · FAILED" : "RESULT · COMPLETED",
+                result == null ? "Waiting for the Tool result…" : result.Text));
+            card.Add(details);
+            return card;
+        }
+
+        private static VisualElement CreateToolDetail(string heading, string value)
+        {
+            var section = new VisualElement { style = { minWidth = 0, marginTop = 8 } };
+            var title = new Label(heading);
+            AgentUi.ApplyTypography(title, AgentTypography.Caption);
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            title.style.color = AgentUi.TextCaption;
+            section.Add(title);
+            var text = new Label(value ?? string.Empty);
+            text.style.minWidth = 0;
+            text.style.whiteSpace = WhiteSpace.Normal;
+            text.style.marginTop = 3;
+            text.style.color = AgentUi.TextSecondary;
+            AgentUi.ApplyTypography(text, AgentTypography.Caption, false);
+            section.Add(text);
+            return section;
+        }
 
         private VisualElement CreateApproval(AgentApprovalRequest approval)
         {
@@ -1343,8 +1454,6 @@ namespace YuzeToolkit.UnityAgent
         private readonly AgentTextField _localSecret;
         private readonly VisualElement _localSecretActions;
         private readonly Label _localSecretStatus;
-        private readonly VisualElement _codexBlock;
-        private readonly Label _codexAccount;
         private readonly AgentChoiceField _permission;
         private readonly AgentIntegerField _toolTimeout;
         private readonly AgentIntegerField _maximumAgentSteps;
@@ -1502,7 +1611,7 @@ namespace YuzeToolkit.UnityAgent
             _protocol = AgentUi.Dropdown("API protocol", AgentProtocolIds.All);
             _protocol.RegisterValueChangedCallback(_ => ApplyProtocolDefaults());
             providerCard.Add(_protocol);
-            _baseUrl = AgentUi.Field("Base URL", string.Empty, "API root URL, or the local Codex executable.");
+            _baseUrl = AgentUi.Field("Base URL", string.Empty, "HTTP(S) API root URL.");
             providerCard.Add(_baseUrl);
             providerCard.Add(CreateSettingsGroupLabel("Model"));
             _model = AgentUi.Dropdown("Default model", Array.Empty<string>());
@@ -1573,23 +1682,6 @@ namespace YuzeToolkit.UnityAgent
                 ClearLocalSecret, 72, AgentUi.Danger, AgentUi.Text));
             providerCard.Add(providerActions);
 
-            _codexBlock = AgentUi.Inset();
-            _codexBlock.style.marginTop = 9;
-            _codexBlock.Add(new Label("Codex account"));
-            _codexAccount = new Label("Not checked");
-            _codexAccount.style.whiteSpace = WhiteSpace.Normal;
-            _codexAccount.style.color = AgentUi.Muted;
-            _codexBlock.Add(_codexAccount);
-            var codexActions = AgentUi.WrapRow();
-            codexActions.Add(AgentUi.Button("Browser login", "Start browser authentication.",
-                () => RunUiTask(() => StartCodexLoginAsync(false)), 112));
-            codexActions.Add(AgentUi.Button("Device code", "Start device-code authentication.",
-                () => RunUiTask(() => StartCodexLoginAsync(true)), 104));
-            codexActions.Add(AgentUi.Button("Refresh", "Refresh account state.",
-                () => RunUiTask(RefreshCodexAccountAsync), 82));
-            _codexBlock.Add(codexActions);
-            providerCard.Add(_codexBlock);
-
             var defaults = AgentUi.Card("Agent defaults", "Applied to new conversations. The workspace is always this Unity project.");
             FlattenSettingsCard(defaults);
             _scroll.Content.Add(defaults);
@@ -1650,17 +1742,19 @@ namespace YuzeToolkit.UnityAgent
                     () => RunUiTask(ReloadAsync)), 128));
 
             var projectCard = AgentUi.Card("Project Settings",
-                "Store these provider-free defaults with the project so new machines and Player builds start consistently.");
+                "Versioned provider-free defaults used only when an Editor or Player has no machine settings.json.");
             FlattenSettingsCard(projectCard);
-            var saveProject = AgentUi.Button("Save current configuration to Project Settings",
-                "Overwrite the project default asset without Provider profiles or API keys.",
-                () => RunUiTask(SaveProjectSettingsAsync), 330, AgentUi.Accent,
+            var projectActions = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap } };
+            var openProject = AgentUi.Button("Open Unity Project Settings",
+                "Open Project Settings > YuzeToolkit > Unity Agent to edit versioned project defaults.",
+                UnityAgentEvalSettingsBridge.OpenProjectSettings, 220, AgentUi.Accent,
                 AgentUi.AccentForeground, AgentIconKind.Settings);
-            saveProject.SetEnabled(UnityAgentEvalSettingsBridge.CanSaveProjectSettings);
-            projectCard.Add(saveProject);
-            var projectHint = new Label(UnityAgentEvalSettingsBridge.CanSaveProjectSettings
-                ? "Editor only · Providers and local secrets are never copied."
-                : "Unavailable in Player builds. Project Settings are read-only at runtime.");
+            openProject.SetEnabled(UnityAgentEvalSettingsBridge.CanOpenProjectSettings);
+            projectActions.Add(openProject);
+            projectCard.Add(projectActions);
+            var projectHint = new Label(UnityAgentEvalSettingsBridge.CanOpenProjectSettings
+                ? "Existing machine settings are never overwritten. Editor Play Mode uses the Editor Prompt; standalone Players use Runtime Prompt."
+                : "Project defaults are read-only in Player builds.");
             projectHint.style.color = AgentUi.Muted;
             projectHint.style.whiteSpace = WhiteSpace.Normal;
             projectCard.Add(projectHint);
@@ -1953,16 +2047,12 @@ namespace YuzeToolkit.UnityAgent
                 PresetLabel(value) == _providerPreset.value);
             profile.ProviderPresetId = selectedPreset?.Id ?? "custom";
             profile.Protocol = _protocol.value;
-            profile.BaseUrl = profile.Protocol == AgentProtocolIds.CodexAppServer && string.IsNullOrWhiteSpace(_baseUrl.value)
-                ? "codex"
-                : _baseUrl.value.Trim();
+            profile.BaseUrl = _baseUrl.value.Trim();
             profile.Model = _model.value;
             profile.ReasoningEffort = _effort.value == "default" ? string.Empty : _effort.value;
             profile.MaxOutputTokens = Math.Max(1, _maxTokens.value);
             profile.ContextWindowTokens = Math.Max(8_192, _contextWindow.value);
-            profile.SecretEnvironmentVariable = profile.Protocol == AgentProtocolIds.CodexAppServer
-                ? string.Empty
-                : _secretEnvironment.value.Trim();
+            profile.SecretEnvironmentVariable = _secretEnvironment.value.Trim();
             RefreshProfileChoices(false);
         }
 
@@ -1986,7 +2076,6 @@ namespace YuzeToolkit.UnityAgent
             _localSecret.SetValueWithoutNotify(string.Empty);
             RefreshLocalSecretStatus();
             UpdateProtocolPresentation();
-            if (profile.Protocol == AgentProtocolIds.CodexAppServer) RunUiTask(RefreshCodexAccountAsync);
         }
 
         private void ApplySettingsModelCatalog(IEnumerable<AgentModelOption> source, string preferred)
@@ -2155,21 +2244,14 @@ namespace YuzeToolkit.UnityAgent
 
         private void ApplyProtocolDefaults()
         {
-            if (_protocol.value == AgentProtocolIds.CodexAppServer)
+            if (_protocol.value == AgentProtocolIds.AnthropicMessages)
             {
-                if (string.IsNullOrWhiteSpace(_baseUrl.value) || LooksLikeHttpEndpoint(_baseUrl.value))
-                    _baseUrl.value = "codex";
-                _secretEnvironment.value = string.Empty;
-                _localSecret.value = string.Empty;
-            }
-            else if (_protocol.value == AgentProtocolIds.AnthropicMessages)
-            {
-                if (string.IsNullOrWhiteSpace(_baseUrl.value) || _baseUrl.value == "codex")
+                if (string.IsNullOrWhiteSpace(_baseUrl.value))
                     _baseUrl.value = "https://api.anthropic.com/v1/";
                 if (string.IsNullOrWhiteSpace(_secretEnvironment.value))
                     _secretEnvironment.value = "ANTHROPIC_API_KEY";
             }
-            else if (string.IsNullOrWhiteSpace(_baseUrl.value) || _baseUrl.value == "codex")
+            else if (string.IsNullOrWhiteSpace(_baseUrl.value))
             {
                 _baseUrl.value = "https://api.openai.com/v1/";
                 if (string.IsNullOrWhiteSpace(_secretEnvironment.value))
@@ -2180,11 +2262,6 @@ namespace YuzeToolkit.UnityAgent
 
         private void SaveLocalSecret()
         {
-            if (_protocol.value == AgentProtocolIds.CodexAppServer)
-            {
-                _showError("Codex authentication", "Codex uses its local account login and does not accept an API key here.");
-                return;
-            }
             var secret = _localSecret.value;
             if (string.IsNullOrWhiteSpace(secret))
             {
@@ -2219,40 +2296,10 @@ namespace YuzeToolkit.UnityAgent
 
         private void UpdateProtocolPresentation()
         {
-            var codex = _protocol.value == AgentProtocolIds.CodexAppServer;
-            _baseUrl.label = codex ? "Codex executable" : "Base URL";
-            _secretEnvironment.style.display = codex ? DisplayStyle.None : DisplayStyle.Flex;
-            _localSecret.style.display = codex ? DisplayStyle.None : DisplayStyle.Flex;
-            _localSecretActions.style.display = codex ? DisplayStyle.None : DisplayStyle.Flex;
-            _codexBlock.style.display = codex ? DisplayStyle.Flex : DisplayStyle.None;
-        }
-
-        private async Task RefreshCodexAccountAsync()
-        {
-            SaveSelectedProfileFields();
-            var account = await _host.GetCodexAccountAsync(SelectedProfile(), _lifetime.Token);
-            _codexAccount.text = account.IsSignedIn
-                ? "Signed in" + Part(account.Email) + Part(account.PlanType) + Part(account.AccountType)
-                : account.RequiresOpenAiAuth ? "Not signed in · ChatGPT authentication required" : "Not signed in";
-        }
-
-        private async Task StartCodexLoginAsync(bool deviceCode)
-        {
-            SaveSelectedProfileFields();
-            var login = await _host.StartCodexLoginAsync(SelectedProfile(), deviceCode, _lifetime.Token);
-            if (string.IsNullOrWhiteSpace(login.AuthorizationUrl))
-                throw new InvalidOperationException("Codex did not return an authorization URL.");
-            Application.OpenURL(login.AuthorizationUrl);
-            _codexAccount.text = string.IsNullOrWhiteSpace(login.UserCode)
-                ? "Complete authentication in the opened browser, then Refresh."
-                : "Enter code " + login.UserCode + " in the opened page, then Refresh.";
-        }
-
-        private async Task SaveProjectSettingsAsync()
-        {
-            await SaveAsync();
-            UnityAgentEvalSettingsBridge.SaveProjectSettings(_host.Settings);
-            _status.text = "Project Settings saved  ·  " + DateTime.Now.ToString("HH:mm:ss");
+            _baseUrl.label = "Base URL";
+            _secretEnvironment.style.display = DisplayStyle.Flex;
+            _localSecret.style.display = DisplayStyle.Flex;
+            _localSecretActions.style.display = DisplayStyle.Flex;
         }
 
         private void RefreshArchives()
@@ -2369,11 +2416,6 @@ namespace YuzeToolkit.UnityAgent
             field.choices = choices;
         }
 
-        private static bool LooksLikeHttpEndpoint(string value) =>
-            value.TrimStart().StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-            value.TrimStart().StartsWith("https://", StringComparison.OrdinalIgnoreCase);
-
-        private static string Part(string value) => string.IsNullOrWhiteSpace(value) ? string.Empty : " · " + value;
         private static string PresetLabel(AgentProviderPreset preset) => preset.DisplayName + "  ·  " + preset.Id;
         private static string ProfileLabel(AgentProviderProfile profile) =>
             profile.Name + "  ·  " + profile.Protocol + "  ·  " +
@@ -2409,6 +2451,8 @@ namespace YuzeToolkit.UnityAgent
                 icon: AgentIconKind.Add));
         }
 
+        public event Action? Changed;
+
         public void SetItems(IEnumerable<AgentPathLocation> items)
         {
             _items.Clear();
@@ -2434,6 +2478,7 @@ namespace YuzeToolkit.UnityAgent
                 IncludeInPlayerBuild = false
             });
             Refresh();
+            Changed?.Invoke();
         }
 
         private void Refresh()
@@ -2462,6 +2507,7 @@ namespace YuzeToolkit.UnityAgent
                 {
                     value.Id = item.Id;
                     _items[index] = value;
+                    Changed?.Invoke();
                 };
                 card.Add(editor);
                 _list.Add(card);
@@ -2483,12 +2529,14 @@ namespace YuzeToolkit.UnityAgent
             _items.RemoveAt(index);
             _items.Insert(target, item);
             Refresh();
+            Changed?.Invoke();
         }
 
         private void Remove(int index)
         {
             _items.RemoveAt(index);
             Refresh();
+            Changed?.Invoke();
         }
 
         private static AgentPathLocation Clone(AgentPathLocation value) => new()

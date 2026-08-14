@@ -4,6 +4,7 @@
   "references": [
     "UnityAgentTool",
     "UnityEvalTool",
+    "UnityEvalTool.Broker",
     "UnityEvalTool.Editor.Broker"
   ],
   "includePlatforms": [

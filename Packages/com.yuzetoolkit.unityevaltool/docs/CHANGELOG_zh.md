@@ -7,6 +7,8 @@ Roslyn Generator 的规范发行历史。
 
 ## 未发布
 
+- 将仅 loopback 的 Broker token 认证从默认前置改为显式可选；一个环境开关会同时为
+  MCP、Unity 与 CLI 应用 token 边界。
 - 增加直接 viewport image 结果、带跨 reload 持久有界记录的可选 Test Framework
   发现/运行/取消、序列化代码用法搜索和有界跨帧观察 helper。
 - 增加一一对应的英文与简体中文 Package 文档，并把完整安装与首次使用指南统一导向

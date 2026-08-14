@@ -32,7 +32,7 @@ internal static class WebSocketAuthenticationGate
         catch (OperationCanceledException) when (!requestAborted.IsCancellationRequested)
         {
             throw new BrokerOperationException(BrokerErrorCodes.AuthenticationFailed,
-                $"The first authenticated message was not received within {BrokerConstants.AuthenticationTimeout.TotalSeconds:0}s.");
+                $"The first handshake message was not received within {BrokerConstants.AuthenticationTimeout.TotalSeconds:0}s.");
         }
     }
 
@@ -54,7 +54,7 @@ internal static class WebSocketAuthenticationGate
             }
             catch (OperationCanceledException)
             {
-                // Cleanup remains bounded even when the unauthenticated peer stops reading.
+                // Cleanup remains bounded even when the pre-handshake peer stops reading.
             }
             catch (WebSocketException)
             {

@@ -147,32 +147,17 @@ namespace YuzeToolkit.UnityAgent
                     AgentSettingsDocument settings;
                     if (File.Exists(path) || File.Exists(path + ".bak"))
                     {
-                        try
-                        {
-                            var requiresUpgrade = StoredSettingsRequireUpgrade(path, cancellationToken);
-                            var restoreMissingPrimary = !File.Exists(path) && File.Exists(path + ".bak");
-                            settings = ReadDocument(path, AgentDocumentCodec.DeserializeSettings, cancellationToken);
-                            if (requiresUpgrade || restoreMissingPrimary)
-                                WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
-                        }
-                        catch (Exception exception) when (IsRecoverableDocumentError(exception))
-                        {
-                            settings = CreateMachineDefaults();
+                        var requiresUpgrade = StoredSettingsRequireUpgrade(path, cancellationToken);
+                        var restoreMissingPrimary = !File.Exists(path) && File.Exists(path + ".bak");
+                        settings = ReadDocument(path, AgentDocumentCodec.DeserializeSettings, cancellationToken);
+                        if (requiresUpgrade || restoreMissingPrimary)
                             WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
-                        }
                     }
                     else if (!string.IsNullOrEmpty(legacySettingsPath) &&
                              (File.Exists(legacySettingsPath) || File.Exists(legacySettingsPath + ".bak")))
                     {
-                        try
-                        {
-                            settings = ReadDocument(legacySettingsPath, AgentDocumentCodec.DeserializeSettings,
-                                cancellationToken);
-                        }
-                        catch (Exception exception) when (IsRecoverableDocumentError(exception))
-                        {
-                            settings = CreateMachineDefaults();
-                        }
+                        settings = ReadDocument(legacySettingsPath, AgentDocumentCodec.DeserializeSettings,
+                            cancellationToken);
                         WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
                     }
                     else
@@ -528,6 +513,10 @@ namespace YuzeToolkit.UnityAgent
                     !root.ContainsKey("skillRoots") ||
                     !root.ContainsKey("editorSystemPrompt") ||
                     !root.ContainsKey("runtimeSystemPrompt")) return true;
+                if (AgentPromptDefaults.IsPreviousEditorPrompt(
+                        AgentJson.GetString(root, "editorSystemPrompt")) ||
+                    AgentPromptDefaults.IsPreviousRuntimePrompt(
+                        AgentJson.GetString(root, "runtimeSystemPrompt"))) return true;
                 return AgentJson.GetObjectArray(root, "providerProfiles")
                     .Any(profile => !profile.ContainsKey("providerPresetId") ||
                                     string.IsNullOrWhiteSpace(

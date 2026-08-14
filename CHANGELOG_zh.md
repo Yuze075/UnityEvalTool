@@ -4,6 +4,11 @@
 
 ## 未发布
 
+- 将内建 Agent Prompt 明确拆分为 Editor 开发与独立 Player 诊断工作流，按任务对象引导全部文件、
+  进程、Skill 和 Unity Tool，并提供可执行的 `tools://` 发现入口；设置 schema 迁移会更新已有默认提示词。
+- loopback Broker 默认关闭 token 认证，使 MCP 与 CLI 只配置端点即可工作；通过
+  `UNITYEVALTOOL_REQUIRE_TOKEN=true` 可显式恢复 MCP、Unity 与 CLI 共用的 token 边界，
+  健康状态和 doctor 输出会公开当前模式。
 - 增加同步 Game/Scene/Editor 窗口图像捕获、带跨 reload 持久有界记录的完整可选 Unity
   Test Framework Tool、序列化代码/member 用法搜索，以及有界跨帧 Runtime 观察 session。
 - 将公共文档重构为一一对应的英文与简体中文指南；让仓库 README 成为完整的安装与

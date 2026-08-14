@@ -27,8 +27,9 @@ Agent 与 Command Line 会话在侧栏中分组显示，各自保存独立输入
 Provider 页面内联显示，不再反复弹窗；所有自有下拉菜单都会限制在工作区视口内，供应商、Profile 或模型列表
 较长时可纵向滚动。
 
-Conversation 只渲染非空的 User/Assistant 文本与待处理审批卡片。ToolCall 参数和 ToolResult 仍会完整持久化并
-返回模型，但不会显示在转录区。工作台继承当前 Unity PanelSettings / Theme 的字体，不打包、枚举、动态创建或
+Conversation 会渲染 User/Assistant 文本、待处理审批卡片，并把每个 Tool 调用显示为默认折叠的记录行。
+展开后可以查看调用参数以及等待中、成功或失败的结果。Tool 消息仍会完整持久化并返回模型。
+工作台继承当前 Unity PanelSettings / Theme 的字体，不打包、枚举、动态创建或
 显式指定字体。
 
 ## Agent 循环
@@ -42,8 +43,20 @@ Provider Profile 保存模型 Context Window。HTTP 对话接近窗口时，对�
 改用一份语义摘要检查点和最近的完整消息边界。网络瞬时错误、429 与可恢复的 5xx 最多重试两次，并且只能发生
 在收到第一条 SSE 事件之前；任何部分模型输出都不会重试。
 
-内建 Editor/Runtime System Prompt 统一使用英文，只负责 Unity 角色、可用工具类别和工作循环。MCP/CLI
-生命周期、eval JavaScript 契约、模块发现方式与具体函数参数由对应 Tool 描述各自持有，不在系统提示词中重复。
+内建 Editor/Runtime System Prompt 统一使用英文，声明 Unity 角色、文件、进程、Shell、Skill 与
+`unity_eval_js` 的真实 Tool 名和首次选用路径，并要求陌生 Unity 工作先从 `tools://` 发现模块。每次模型请求
+仍会携带完整结构化 Tool schema，具体参数与详细执行契约只由对应 Tool 描述维护。
+
+## 独立 Agent 边界
+
+AgentLoop、会话、审批、上下文压缩、Tool 调度和 `unity_eval_js` 全部在 Unity 进程内运行。默认 Host 直接创建
+HTTP 模型 Provider 与 UnityEvalTool 的进程内 `EvalExecutor`，不会启动或连接 Codex、Broker、MCP 或电脑级 CLI。
+Settings 中独立的 Eval 连接页面只管理外部程序访问 UnityEvalTool 的可选能力，不是 Agent 运行依赖。
+Process/Shell Tool 也只有在模型明确调用时才启动指定程序。
+
+OpenAI 模型通过 API Key 调用 OpenAI Responses API。ChatGPT/Codex 订阅不是可嵌入的 Provider 凭据，因此
+UnityAgentTool 不读取 Codex 登录缓存，也不再提供 Codex App Server。历史 `codex-app-server` Profile 会迁移为
+标准 OpenAI API 预设，之后需要 `OPENAI_API_KEY` 或本机保存的 API Key。
 
 Editor 中若活动对话触发脚本编译，本包会先在 `Application.persistentDataPath` 写入同时绑定当前项目与 Editor
 进程的恢复 marker，再中断并持久化该轮。成功编译与 Domain Reload 后，或失败编译结束后，系统会追加一次包含
@@ -62,7 +75,10 @@ UnityAgentEditorCompilationRecovery.json  仅 Editor 使用的活动轮次恢复
 
 命令行输入、输出和草稿会跨 Unity 重启保存；JavaScript `EvalSession` 不恢复。Provider 密钥只写入
 本机 `secrets.json`，不会进入项目默认配置。`Assets/Resources/UnityAgentProjectSettings.json`
-保存可打入 Player 的无 Provider 默认值；本机设置缺失或无法解析时回到这套默认值。
+保存可打入 Player 的无 Provider 默认值。只有当前 Editor 或 Player 不存在本机 `settings.json` 时，才从
+这套默认值生成完整本机配置；已经存在或内容损坏的本机配置都不会被 Project Settings 覆盖。通过
+**Edit > Project Settings > YuzeToolkit > Unity Agent** 编辑权限、Editor/Runtime Prompt、Tool 限制与
+有序 AGENTS.md/Skill 根目录。Editor Play Mode 使用 Editor Prompt，Runtime Prompt 只用于独立 Player。
 
 ## Runtime 宿主
 

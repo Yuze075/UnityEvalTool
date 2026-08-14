@@ -122,15 +122,17 @@ Broker 提供以下 Streamable HTTP MCP 端点：
 http://127.0.0.1:2347/mcp
 ```
 
-Broker 首次启动时会以仅当前用户可读的权限创建 `~/.unityevaltool/auth.json`。
-读取其中的 `token`，让 MCP Client 发送：
+本机可信环境默认关闭 token 认证，因此 MCP Client 只需配置端点 URL。若要显式开启，
+请在启动 Broker 前为其进程环境设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true`。Broker 随后会
+以仅当前用户可读的权限创建 `~/.unityevaltool/auth.json`；读取其中的 `token`，让
+MCP Client 发送：
 
 ```text
 Authorization: Bearer <token>
 ```
 
-不同 MCP Client 的配置格式不同。将上述端点设为 Server URL，将认证值加入
-HTTP Header；不要把 token 提交到版本控制。
+不同 MCP Client 的配置格式不同。仅在已开启 token 认证时加入上述 HTTP Header，
+且不要把 token 提交到版本控制；Unity 与原生 CLI 会在该模式下自动读取已有 auth 文件。
 
 MCP Server 只提供三个工具，必须按此顺序使用：
 
@@ -168,10 +170,11 @@ Prefab。面板不会自动创建。模块、持久化模型、默认快捷键�
 
 ## 安全边界
 
-Broker 只绑定 `127.0.0.1:2347`，拒绝非 loopback 访问，并使用当前用户 token 认证
-Unity、CLI 与 MCP 流量。包含 UnityEvalTool 的、受支持的非 WebGL Release Player 会有意
-向 Broker 注册，并保留经认证的任意 JavaScript eval 能力；它不仅限于 Development Build，
-也不依赖 UnityAgentTool。请明确决定发行的产品中是否应包含该能力。详见
+Broker 只绑定 `127.0.0.1:2347`，并拒绝非 loopback Host/Origin。token 认证默认关闭，
+可通过 `UNITYEVALTOOL_REQUIRE_TOKEN=true` 显式开启。包含 UnityEvalTool 的、受支持的
+非 WebGL Release Player 会有意向 Broker 注册，并保留任意 JavaScript eval 能力；它不仅限于
+Development Build，也不依赖 UnityAgentTool。请明确决定发行产品中应使用默认 loopback
+信任边界，还是显式开启 token 认证。详见
 [Editor 与 Player 注册](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES_zh.md)。
 
 ## 服务管理与卸载

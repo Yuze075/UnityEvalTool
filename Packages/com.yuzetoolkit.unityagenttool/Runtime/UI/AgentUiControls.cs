@@ -410,7 +410,7 @@ namespace YuzeToolkit.UnityAgent
     /// </summary>
     internal sealed class AgentTextField : TextField
     {
-        private VisualElement? _input;
+        private readonly VisualElement _input;
         private readonly Label _placeholder;
         private bool _surface;
         private bool _isFocused;
@@ -472,14 +472,20 @@ namespace YuzeToolkit.UnityAgent
             _placeholder.style.overflow = Overflow.Hidden;
             _placeholder.style.textOverflow = TextOverflow.Ellipsis;
             _placeholder.style.display = DisplayStyle.None;
-            Add(_placeholder);
+
+            // TextField builds its native editing hierarchy in the base constructor. Resolve and
+            // compose that hierarchy before this field can enter a Panel: moving the placeholder
+            // after attachment leaves Unity 2022.3's render chain with an Undetermined clip method
+            // until the next clipping pass and can assert during the current visuals pass.
+            _input = this.Q<VisualElement>(className: "unity-base-text-field__input")
+                     ?? this.Q<VisualElement>(className: "unity-text-field__input")
+                     ?? this.Q<VisualElement>(className: "unity-text-input")
+                     ?? throw new InvalidOperationException(
+                         "UnityAgentTool could not resolve Unity's native TextField input hierarchy.");
+            _input.Add(_placeholder);
+            StyleNativeInput();
 
             this.RegisterValueChangedCallback(_ => RefreshPlaceholder());
-            RegisterCallback<AttachToPanelEvent>(_ => schedule.Execute(StyleNativeInput));
-            RegisterCallback<GeometryChangedEvent>(_ =>
-            {
-                if (_input == null) StyleNativeInput();
-            });
             RegisterCallback<PointerEnterEvent>(_ => SetInputBorder(_invalid ? AgentUi.Error : AgentUi.BorderStrong));
             RegisterCallback<PointerLeaveEvent>(_ =>
             {
@@ -499,7 +505,6 @@ namespace YuzeToolkit.UnityAgent
             });
             RegisterCallback<ContextualMenuPopulateEvent>(evt => evt.StopImmediatePropagation(),
                 TrickleDown.TrickleDown);
-            schedule.Execute(StyleNativeInput);
         }
 
         public string Placeholder
@@ -521,8 +526,9 @@ namespace YuzeToolkit.UnityAgent
         public void SetInvalid(bool invalid)
         {
             _invalid = invalid;
-            if (_input != null)
-                _input.style.backgroundColor = invalid ? AgentUi.ErrorPanel : (_surface ? AgentUi.Input : AgentUi.Transparent);
+            _input.style.backgroundColor = invalid
+                ? AgentUi.ErrorPanel
+                : _surface ? AgentUi.Input : AgentUi.Transparent;
             SetInputBorder(invalid ? AgentUi.Error : _isFocused ? AgentUi.Focus : AgentUi.Border);
         }
 
@@ -534,10 +540,6 @@ namespace YuzeToolkit.UnityAgent
 
         private void StyleNativeInput()
         {
-            _input = this.Q<VisualElement>(className: "unity-base-text-field__input")
-                     ?? this.Q<VisualElement>(className: "unity-text-field__input")
-                     ?? this.Q<VisualElement>(className: "unity-text-input");
-            if (_input == null) return;
             var textElement = _input.Q<TextElement>();
             if (textElement != null)
             {
@@ -579,11 +581,7 @@ namespace YuzeToolkit.UnityAgent
             }
             SetInputBorder(_invalid ? AgentUi.Error : _surface ? AgentUi.Border : AgentUi.Transparent);
 
-            if (_placeholder.parent != _input)
-                _placeholder.RemoveFromHierarchy();
             ResetNativeTextVisuals(_input);
-            if (_placeholder.parent != _input)
-                _input.Add(_placeholder);
             _placeholder.style.left = _surface ? 8 : 0;
             _placeholder.style.right = _surface ? 8 : 0;
             _placeholder.style.top = 0;
@@ -628,7 +626,7 @@ namespace YuzeToolkit.UnityAgent
 
         private void SetInputBorder(Color color)
         {
-            if (_input == null || !_surface) return;
+            if (!_surface) return;
             _input.style.borderTopWidth = 1;
             _input.style.borderRightWidth = 1;
             _input.style.borderBottomWidth = 1;
@@ -1347,6 +1345,12 @@ namespace YuzeToolkit.UnityAgent
     public static class AgentTooltip
     {
         private const string LayerName = "unity-agent-owned-tooltip";
+        private const string RootClassName = "unity-agent-owned-tooltip-root";
+
+        /// <summary>
+        /// Constrains owned tooltips to a package-controlled visible surface embedded in a larger panel.
+        /// </summary>
+        public static void UseAsRoot(VisualElement root) => root.AddToClassList(RootClassName);
 
         public static void Attach(VisualElement target, string text) => Attach(target, () => text);
 
@@ -1429,7 +1433,7 @@ namespace YuzeToolkit.UnityAgent
             var panelRoot = target.panel?.visualTree;
             if (panelRoot == null) return null;
             for (var current = target; current != null && current != panelRoot; current = current.parent)
-                if (current is UnityAgentWorkbenchView) return current;
+                if (current.ClassListContains(RootClassName) || current is UnityAgentWorkbenchView) return current;
             return panelRoot;
         }
     }

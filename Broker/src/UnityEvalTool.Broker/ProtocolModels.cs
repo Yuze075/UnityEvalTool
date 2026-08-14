@@ -66,7 +66,8 @@ internal sealed record HealthSnapshot(
     string Endpoint,
     DateTimeOffset StartedAtUtc,
     long RegistryRevision,
-    int ConnectedUnityCount);
+    int ConnectedUnityCount,
+    bool RequireToken);
 
 internal sealed record UnityCommandRequest(
     string SessionId,

@@ -105,17 +105,20 @@ namespace YuzeToolkit.UnityAgent
     {
         private static Func<bool>? _getBrokerEnabled;
         private static Action<bool>? _setBrokerEnabled;
+        private static Func<UnityAgentEvalConnectionSnapshot>? _getConnectionSnapshot;
         private static Action? _reconnect;
         private static Action? _openBrokerFolder;
-        private static Action<string>? _saveProjectSettings;
+        private static Action? _openProjectSettings;
 
         public static bool IsBrokerControlAvailable => _getBrokerEnabled != null && _setBrokerEnabled != null;
         public static bool CanReconnect => _reconnect != null;
         public static bool CanOpenBrokerFolder => _openBrokerFolder != null;
-        public static bool CanSaveProjectSettings => _saveProjectSettings != null;
+        public static bool CanOpenProjectSettings => _openProjectSettings != null;
         public static bool IncludeEditorOnlyTools => IsBrokerControlAvailable;
         public static string RuntimeStateLabel => AgentPaths.IsEditor ? "Editor" : "Player";
         public static bool BrokerEnabled => _getBrokerEnabled?.Invoke() ?? false;
+        public static UnityAgentEvalConnectionSnapshot ConnectionSnapshot =>
+            _getConnectionSnapshot?.Invoke() ?? new UnityAgentEvalConnectionSnapshot();
 
         public static void SetBrokerEnabled(bool enabled)
         {
@@ -124,20 +127,25 @@ namespace YuzeToolkit.UnityAgent
             _setBrokerEnabled(enabled);
         }
 
-        public static void ConfigureBrokerControl(Func<bool> getEnabled, Action<bool> setEnabled)
+        public static void ConfigureBrokerControl(
+            Func<bool> getEnabled,
+            Action<bool> setEnabled,
+            Func<UnityAgentEvalConnectionSnapshot> getConnectionSnapshot)
         {
             _getBrokerEnabled = getEnabled ?? throw new ArgumentNullException(nameof(getEnabled));
             _setBrokerEnabled = setEnabled ?? throw new ArgumentNullException(nameof(setEnabled));
+            _getConnectionSnapshot = getConnectionSnapshot ??
+                                     throw new ArgumentNullException(nameof(getConnectionSnapshot));
         }
 
         public static void ConfigureEditorActions(
             Action reconnect,
             Action openBrokerFolder,
-            Action<string> saveProjectSettings)
+            Action openProjectSettings)
         {
             _reconnect = reconnect ?? throw new ArgumentNullException(nameof(reconnect));
             _openBrokerFolder = openBrokerFolder ?? throw new ArgumentNullException(nameof(openBrokerFolder));
-            _saveProjectSettings = saveProjectSettings ?? throw new ArgumentNullException(nameof(saveProjectSettings));
+            _openProjectSettings = openProjectSettings ?? throw new ArgumentNullException(nameof(openProjectSettings));
         }
 
         public static void Reconnect() =>
@@ -147,12 +155,34 @@ namespace YuzeToolkit.UnityAgent
             (_openBrokerFolder ?? throw new InvalidOperationException(
                 "The Broker folder is only available in the Unity Editor."))();
 
-        public static void SaveProjectSettings(AgentSettingsDocument settings)
-        {
-            if (settings == null) throw new ArgumentNullException(nameof(settings));
-            (_saveProjectSettings ?? throw new InvalidOperationException(
-                "Project Settings can only be written in the Unity Editor."))(
-                UnityAgentProjectSettings.Serialize(settings));
-        }
+        public static void OpenProjectSettings() =>
+            (_openProjectSettings ?? throw new InvalidOperationException(
+                "Project Settings are only available in the Unity Editor."))();
+    }
+
+    /// <summary>
+    /// Optional Editor diagnostics copied across the assembly boundary. The Agent runtime never
+    /// references or connects to the Broker client directly.
+    /// </summary>
+    public sealed class UnityAgentEvalConnectionSnapshot
+    {
+        public bool IsRunning { get; set; }
+        public bool IsConnected { get; set; }
+        public string Phase { get; set; } = string.Empty;
+        public bool CanEval { get; set; }
+        public string BusyReason { get; set; } = string.Empty;
+        public bool IsPlaying { get; set; }
+        public bool IsPaused { get; set; }
+        public bool IsUpdating { get; set; }
+        public int CompilerErrorCount { get; set; }
+        public int CompilerWarningCount { get; set; }
+        public string CompilationCycleId { get; set; } = string.Empty;
+        public string LastCompilationStartedAtUtc { get; set; } = string.Empty;
+        public string LastCompilationFinishedAtUtc { get; set; } = string.Empty;
+        public string InstanceId { get; set; } = string.Empty;
+        public long ConnectionEpoch { get; set; }
+        public long VmGeneration { get; set; }
+        public long MainThreadTick { get; set; }
+        public DateTime MainThreadTickAtUtc { get; set; }
     }
 }

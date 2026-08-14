@@ -52,13 +52,15 @@ unity tools
 http://127.0.0.1:2347/mcp
 ```
 
-Broker 首次启动时会创建 `~/.unityevaltool/auth.json`。读取其中的 `token` 并发送：
+token 认证默认关闭，MCP Client 只需配置端点 URL。若要启用认证，请在启动 Broker 前
+为其进程环境设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true`。Broker 随后会创建
+`~/.unityevaltool/auth.json`；读取其中的 `token` 并发送：
 
 ```text
 Authorization: Bearer <token>
 ```
 
-不要提交该 token。MCP 流程始终是
+不要提交该 token。开启认证时，Unity 与原生 CLI 会自动读取已有 auth 文件。MCP 流程始终是
 `unity_status` → `unity_connect` → `eval`；必须先发现并明确选择。详见
 [使用指南](https://github.com/Yuze075/UnityEvalTool/blob/main/README_zh.md) 和
 [Broker 协议](https://github.com/Yuze075/UnityEvalTool/blob/main/Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_zh.md)。

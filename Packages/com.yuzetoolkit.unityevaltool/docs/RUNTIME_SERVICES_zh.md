@@ -21,10 +21,11 @@ runner，报告运行时心跳和播放状态，以可执行程序目录作为�
 发布 `Exiting`。Broker 仍由已安装的用户服务负责托管。
 
 这是明确保留的正式产品契约，不是仅供 Editor 或 Development Build 使用的降级路径：
-受支持的 Release Player 同样会注册，并接受经过认证的任意 JavaScript eval。可选的
-UnityAgentTool UI Package 与 UnityEvalTool 的 Player runtime client 相互独立。信任边界是
-当前用户的 loopback Broker 与仅该用户可读的 token；集成本 Package 的项目除非明确改变
-产品设计，否则应完整保留这条链路。
+受支持的 Release Player 同样会注册，并接受任意 JavaScript eval。可选的 UnityAgentTool
+UI Package 与 UnityEvalTool 的 Player runtime client 相互独立。默认信任边界是当前用户的
+loopback Broker；在 Broker 进程环境中设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true` 后，会增加
+仅该用户可读的共享 token。集成本 Package 的项目除非明确改变产品设计，否则应完整保留
+所选择的链路。
 
 WebGL 不是受支持的 Broker 目标，因为该平台无法使用本地 ClientWebSocket/
 当前用户服务模型。

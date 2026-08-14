@@ -8,7 +8,8 @@ namespace YuzeToolkit.UnityAgent
 {
     /// <summary>
     /// Read-only build summary used by Editor settings surfaces. Build inclusion is represented by
-    /// the two ordered root lists in settings.json; there is no second hidden ProjectSettings asset.
+    /// the two ordered root lists in the active machine settings. Project Settings only seed a
+    /// machine settings file when none exists.
     /// </summary>
     internal sealed class AgentBuildContentView : VisualElement
     {

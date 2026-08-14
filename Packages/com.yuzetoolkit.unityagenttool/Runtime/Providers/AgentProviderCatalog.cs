@@ -393,11 +393,6 @@ namespace YuzeToolkit.UnityAgent
                         ReasoningAgent | AgentModelCapabilities.Vision | AgentModelCapabilities.StructuredOutput,
                         OpenAiEfforts, "medium")),
 
-                Provider("openai-codex", "OpenAI Codex Subscription", AgentProtocolIds.CodexAppServer,
-                    string.Empty, string.Empty, string.Empty,
-                    "https://developers.openai.com/codex/app-server", true, false,
-                    AgentWireCompatibility.ConservativeCustom),
-
                 Provider("anthropic", "Anthropic", AgentProtocolIds.AnthropicMessages,
                     "https://api.anthropic.com/v1/", "ANTHROPIC_API_KEY", "claude-opus-5",
                     "https://platform.claude.com/docs/en/about-claude/models/overview", true, false,

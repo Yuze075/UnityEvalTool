@@ -29,9 +29,9 @@ Eval connection, Eval Tools, archived conversations and archived command lines. 
 stay inline in the provider page instead of opening repeated dialogs, and all owned choice menus clamp to
 the workspace viewport and scroll when their provider, profile or model catalog is long.
 
-Conversation rendering shows only non-empty User and Assistant text plus a pending approval card. Tool-call
-arguments and Tool results remain fully persisted and are still sent back to the model, but are not rendered in
-the transcript. The workbench inherits the active Unity PanelSettings / Theme font; it does not bundle, enumerate,
+Conversation rendering shows User and Assistant text, pending approval cards, and every Tool call as a
+collapsed transcript row. Expanding a Tool row reveals its arguments and pending, successful, or failed result.
+Tool messages remain fully persisted and are still sent back to the model. The workbench inherits the active Unity PanelSettings / Theme font; it does not bundle, enumerate,
 dynamically create or explicitly assign a font.
 
 ## Agent loop
@@ -48,9 +48,23 @@ latest complete message boundary is projected to the model. Transient HTTP netwo
 and recoverable 5xx responses are retried at most twice and only before the first SSE event; partial model
 output is never retried.
 
-The built-in Editor and Runtime system prompts are English and only define the Unity role, available tool
-categories, and work loop. MCP/CLI lifecycle rules, eval JavaScript rules, module discovery, and concrete
-function parameters remain in their owning tool descriptions instead of being repeated in the system prompt.
+The built-in Editor and Runtime system prompts are English. They define the Unity role, name the actual file,
+process, shell, Skill, and `unity_eval_js` entry Tools, and tell the model which one to call first—including
+starting unfamiliar Unity work by discovering `tools://` modules. Exact arguments and detailed execution
+contracts remain in the structured Tool schemas sent with every model request.
+
+## Standalone Agent boundary
+
+The Agent loop, sessions, approvals, context compaction, Tool dispatch and `unity_eval_js` execution all run
+inside the Unity process. The default host directly creates the HTTP model Provider and an in-process
+UnityEvalTool `EvalExecutor`; it does not start or connect to Codex, a Broker, MCP or the computer-level CLI.
+The separate Eval connection page manages optional external access to UnityEvalTool and is not an Agent runtime
+dependency. Process and shell Tools start a requested program only when the model explicitly calls them.
+
+OpenAI models use the OpenAI Responses API with an API key. A ChatGPT/Codex subscription is not an embeddable
+Provider credential, so UnityAgentTool does not read Codex login caches or expose Codex App Server. Existing
+`codex-app-server` profiles are migrated to the standard OpenAI API preset and require `OPENAI_API_KEY` or a
+locally saved API key.
 
 In Editor, active conversations are paused when script compilation starts. The package writes a
 process- and project-bound recovery marker to `Application.persistentDataPath`, interrupts and persists the
@@ -71,8 +85,12 @@ UnityAgentEditorCompilationRecovery.json  Editor-only active-turn recovery marke
 
 Command Line input, output and drafts survive Unity restarts. JavaScript `EvalSession` instances do not.
 Provider secrets stay in the machine-local `secrets.json`. Provider-free defaults in
-`Assets/Resources/UnityAgentProjectSettings.json` are included in Player builds and seed a missing or
-invalid machine settings file.
+`Assets/Resources/UnityAgentProjectSettings.json` are included in Player builds. When—and only when—the current
+Editor or Player has no machine `settings.json`, the complete machine configuration is created from these
+defaults. An existing or malformed machine file is never replaced by Project Settings. Edit the defaults
+through **Edit > Project Settings > YuzeToolkit > Unity Agent**; the page covers permission, Editor/Runtime
+prompts, Tool limits, and ordered AGENTS.md/Skill roots. Editor Play Mode uses the Editor prompt; the Runtime
+prompt is reserved for standalone Players.
 
 ## Runtime Host
 

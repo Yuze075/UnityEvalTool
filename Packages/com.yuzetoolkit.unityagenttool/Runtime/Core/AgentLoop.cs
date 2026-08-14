@@ -253,7 +253,6 @@ namespace YuzeToolkit.UnityAgent
             string systemPrompt, int defaultToolTimeoutSeconds, Func<Task> save, Action changed,
             CancellationToken cancellationToken)
         {
-            if (string.Equals(profile.Protocol, AgentProtocolIds.CodexAppServer, StringComparison.Ordinal)) return;
             for (var pass = 0; pass < 32; pass++)
             {
                 cancellationToken.ThrowIfCancellationRequested();

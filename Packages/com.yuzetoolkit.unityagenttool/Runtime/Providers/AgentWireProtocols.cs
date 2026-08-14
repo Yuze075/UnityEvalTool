@@ -95,8 +95,6 @@ namespace YuzeToolkit.UnityAgent
                 AgentProtocolIds.OpenAiChat => new OpenAiChatWireProtocol(),
                 AgentProtocolIds.AnthropicMessages => new AnthropicMessagesWireProtocol(),
                 AgentProtocolIds.GoogleGeminiInteractions => new GoogleGeminiInteractionsWireProtocol(),
-                AgentProtocolIds.CodexAppServer => throw new AgentProviderException(
-                    "Codex App Server is an Agent backend, not an HTTP model protocol."),
                 _ => throw new AgentProviderException($"Unknown provider protocol '{protocol}'.")
             };
         }

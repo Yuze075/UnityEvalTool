@@ -75,16 +75,14 @@ namespace YuzeToolkit.UnityAgent
 
         public void Tick()
         {
-            var client = UnityBrokerClient.Shared;
+            var status = UnityAgentEvalSettingsBridge.ConnectionSnapshot;
             var enabled = UnityAgentEvalSettingsBridge.IsBrokerControlAvailable
                 ? UnityAgentEvalSettingsBridge.BrokerEnabled
-                : client.IsRunning;
-            var status = client.LatestStatus;
-            var identity = client.Identity;
-            Set("connection", !enabled ? "Disabled" : client.IsConnected ? "Connected" :
-                client.IsRunning ? "Reconnecting" : "Stopped");
+                : status.IsRunning;
+            Set("connection", !enabled ? "Disabled" : status.IsConnected ? "Connected" :
+                status.IsRunning ? "Reconnecting" : "Stopped");
             Set("phase", string.IsNullOrWhiteSpace(status.Phase) ? "Unavailable" : status.Phase);
-            Set("evaluation", status.CanEval && client.IsConnected
+            Set("evaluation", status.CanEval && status.IsConnected
                 ? string.Equals(status.Phase, "CompilationFailed", StringComparison.Ordinal) ? "Repair" : "Ready"
                 : "Unavailable");
             Set("busy", string.IsNullOrWhiteSpace(status.BusyReason) ? "—" : status.BusyReason);
@@ -97,8 +95,8 @@ namespace YuzeToolkit.UnityAgent
             Set("cycle", Short(status.CompilationCycleId));
             Set("lastCompilation", FormatTimes(status.LastCompilationStartedAtUtc,
                 status.LastCompilationFinishedAtUtc));
-            Set("instance", string.IsNullOrWhiteSpace(identity.InstanceId) ? "Unavailable" : identity.InstanceId);
-            Set("epoch", identity.ConnectionEpoch.ToString(CultureInfo.InvariantCulture));
+            Set("instance", string.IsNullOrWhiteSpace(status.InstanceId) ? "Unavailable" : status.InstanceId);
+            Set("epoch", status.ConnectionEpoch.ToString(CultureInfo.InvariantCulture));
             Set("vm", status.VmGeneration.ToString(CultureInfo.InvariantCulture));
             Set("heartbeat", status.MainThreadTickAtUtc == default
                 ? "No heartbeat"

@@ -64,14 +64,14 @@ internal static class CliApplication
 
     private static async Task<BrokerCliConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
-        var token = new AuthTokenStore().GetOrCreateToken();
+        var tokenStore = new AuthTokenStore();
         Exception? lastError = null;
         for (var attempt = 0; attempt < 30; attempt++)
         {
             var connection = new BrokerCliConnection();
             try
             {
-                await connection.ConnectAsync(token, cancellationToken);
+                await connection.ConnectAsync(tokenStore.TryReadExistingToken(), cancellationToken);
                 return connection;
             }
             catch (Exception ex)
@@ -234,7 +234,7 @@ internal static class CliApplication
     {
         InstallMetadataStore.RegisterCurrentExecutable();
         Console.WriteLine("Executable: " + (InstallMetadataStore.GetCurrentExecutable() ?? "unpublished/dotnet host"));
-        Console.WriteLine("Auth file: " + new AuthTokenStore().FilePath);
+        Console.WriteLine("Auth file: " + new AuthTokenStore().FilePath + " (only used when token authentication is enabled)");
         Console.WriteLine("Broker endpoint: http://127.0.0.1:2347");
         try
         {
@@ -281,7 +281,7 @@ UnityEvalTool Broker CLI
   unity connect <instance> -- <command...>
                                 Execute one Unity-side CLI command.
   unity <command...>            Auto-select by current directory and execute once.
-  unity doctor                  Diagnose executable, auth file, port and Broker health.
+  unity doctor                  Diagnose executable, optional auth file, port and Broker health.
   unity service <action>        install|uninstall|start|stop|restart|status.
   unity broker                  Run the foreground Broker host on 127.0.0.1:2347.
 

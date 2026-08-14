@@ -9,8 +9,10 @@ internal static class BrokerHost
 
     public static async Task RunAsync(string[] args)
     {
+        var security = BrokerSecurityOptions.FromEnvironment();
         var builder = WebApplication.CreateSlimBuilder(args);
         builder.WebHost.ConfigureKestrel(options => options.ListenLocalhost(BrokerConstants.Port));
+        builder.Services.AddSingleton(security);
         builder.Services.AddSingleton<AuthTokenStore>();
         builder.Services.AddSingleton<BrokerRegistry>();
         builder.Services.AddHostedService<BrokerMaintenanceService>();
@@ -21,8 +23,9 @@ internal static class BrokerHost
             .WithTools<UnityBrokerTools>();
 
         var app = builder.Build();
-        // Unity must read this token before it can open /unity, so create it eagerly.
-        app.Services.GetRequiredService<AuthTokenStore>().GetOrCreateToken();
+        // Authenticated clients must be able to read the shared token before opening a WebSocket.
+        if (security.RequireToken)
+            app.Services.GetRequiredService<AuthTokenStore>().GetOrCreateToken();
         app.UseHostFiltering();
         app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(10) });
         app.Use(async (context, next) =>
@@ -39,7 +42,7 @@ internal static class BrokerHost
                 return;
             }
 
-            if (context.Request.Path.StartsWithSegments("/mcp"))
+            if (security.RequireToken && context.Request.Path.StartsWithSegments("/mcp"))
             {
                 var tokenStore = context.RequestServices.GetRequiredService<AuthTokenStore>();
                 var authorization = context.Request.Headers.Authorization.ToString();
@@ -59,7 +62,7 @@ internal static class BrokerHost
         app.MapGet("/health", (BrokerRegistry registry) =>
             new HealthSnapshot("ready", BrokerConstants.ProtocolVersion,
                 $"http://{BrokerConstants.Host}:{BrokerConstants.Port}", StartedAtUtc,
-                registry.Revision, registry.GetSnapshot().ConnectedCount));
+                registry.Revision, registry.GetSnapshot().ConnectedCount, security.RequireToken));
         app.Map("/unity", UnityWebSocketEndpoint.HandleAsync);
         app.Map("/cli", CliWebSocketEndpoint.HandleAsync);
         app.MapMcp("/mcp");

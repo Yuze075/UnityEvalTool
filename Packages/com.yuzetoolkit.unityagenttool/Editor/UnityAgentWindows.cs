@@ -63,7 +63,6 @@ namespace YuzeToolkit.UnityAgent
     [InitializeOnLoad]
     internal static class UnityAgentEditorLifetime
     {
-        private const string ProjectSettingsAssetPath = "Assets/Resources/UnityAgentProjectSettings.json";
         private static bool _runtimeDataAvailable;
 
         static UnityAgentEditorLifetime()
@@ -74,11 +73,12 @@ namespace YuzeToolkit.UnityAgent
             UnityAgentRuntimeDataBridge.Configure(() => _runtimeDataAvailable);
             UnityAgentEvalSettingsBridge.ConfigureBrokerControl(
                 () => EditorBrokerBootstrap.IsEnabled,
-                EditorBrokerBootstrap.SetEnabled);
+                EditorBrokerBootstrap.SetEnabled,
+                CaptureEvalConnectionSnapshot);
             UnityAgentEvalSettingsBridge.ConfigureEditorActions(
                 EditorBrokerBootstrap.Reconnect,
                 OpenBrokerFolder,
-                SaveProjectSettings);
+                UnityAgentProjectSettingsProvider.Open);
             AssemblyReloadEvents.beforeAssemblyReload -= UnityAgentHost.DisposeDefault;
             AssemblyReloadEvents.beforeAssemblyReload += UnityAgentHost.DisposeDefault;
             EditorApplication.quitting -= UnityAgentHost.DisposeDefault;
@@ -98,14 +98,34 @@ namespace YuzeToolkit.UnityAgent
             EditorUtility.RevealInFinder(path);
         }
 
-        private static void SaveProjectSettings(string json)
+        private static UnityAgentEvalConnectionSnapshot CaptureEvalConnectionSnapshot()
         {
-            var path = Path.GetFullPath(Path.Combine(AgentPaths.ProjectRoot, ProjectSettingsAssetPath));
-            Directory.CreateDirectory(Path.GetDirectoryName(path) ??
-                                      throw new InvalidOperationException("Project Settings path has no directory."));
-            File.WriteAllText(path, json + "\n", new UTF8Encoding(false));
-            AssetDatabase.ImportAsset(ProjectSettingsAssetPath, ImportAssetOptions.ForceUpdate);
+            var client = UnityBrokerClient.Shared;
+            var status = client.LatestStatus;
+            var identity = client.Identity;
+            return new UnityAgentEvalConnectionSnapshot
+            {
+                IsRunning = client.IsRunning,
+                IsConnected = client.IsConnected,
+                Phase = status.Phase,
+                CanEval = status.CanEval,
+                BusyReason = status.BusyReason,
+                IsPlaying = status.IsPlaying,
+                IsPaused = status.IsPaused,
+                IsUpdating = status.IsUpdating,
+                CompilerErrorCount = status.CompilerErrorCount,
+                CompilerWarningCount = status.CompilerWarningCount,
+                CompilationCycleId = status.CompilationCycleId,
+                LastCompilationStartedAtUtc = status.LastCompilationStartedAtUtc,
+                LastCompilationFinishedAtUtc = status.LastCompilationFinishedAtUtc,
+                InstanceId = identity.InstanceId,
+                ConnectionEpoch = identity.ConnectionEpoch,
+                VmGeneration = status.VmGeneration,
+                MainThreadTick = status.MainThreadTick,
+                MainThreadTickAtUtc = status.MainThreadTickAtUtc
+            };
         }
+
     }
 
     /// <summary>

@@ -47,7 +47,7 @@ namespace YuzeToolkit.UnityAgent
             _store = new FileAgentStore(FileAgentStore.GetDefaultRootPath());
             _ownsStore = true;
             RegisterBuiltInTools();
-            _provider = new CompositeAgentModelProvider(_secretStore, _tools, _approvals);
+            _provider = new HttpAgentModelProvider(_secretStore);
             _ownsProvider = true;
             _approvals.Changed += MarkChanged;
         }
@@ -93,7 +93,7 @@ namespace YuzeToolkit.UnityAgent
         }
 
         /// <summary>
-        /// Registry used by both the built-in HTTP Agent loop and Codex dynamic tools.
+        /// Registry used by the built-in Unity Agent loop.
         /// Custom debug tools may be registered at runtime; duplicate names fail explicitly.
         /// </summary>
         public AgentToolRegistry Tools
@@ -1068,8 +1068,8 @@ namespace YuzeToolkit.UnityAgent
             if (profile == null) throw new ArgumentNullException(nameof(profile));
             using var operation = EnterOperation();
             using var linkedCancellation = CreateOperationCancellation(cancellationToken);
-            if (_provider is CompositeAgentModelProvider composite)
-                return await composite.DiscoverModelsAsync(profile, linkedCancellation.Token).ConfigureAwait(false);
+            if (_provider is HttpAgentModelProvider http)
+                return await http.DiscoverModelsAsync(profile, linkedCancellation.Token).ConfigureAwait(false);
             return await DiscoverCustomProviderModelsAsync(profile, linkedCancellation.Token).ConfigureAwait(false);
         }
 
@@ -1091,32 +1091,6 @@ namespace YuzeToolkit.UnityAgent
                 return AgentProviderCatalog.CuratedResult(profile,
                     AgentModelDiscoverySource.CuratedFallback, exception.Message);
             }
-        }
-
-        public async Task<AgentCodexAccountStatus> GetCodexAccountAsync(
-            AgentProviderProfile profile,
-            CancellationToken cancellationToken = default)
-        {
-            using var operation = EnterOperation();
-            using var linkedCancellation = CreateOperationCancellation(cancellationToken);
-            if (_provider is not CompositeAgentModelProvider composite)
-                throw new NotSupportedException("This UnityAgentHost uses a custom model provider without Codex account management.");
-            ValidateCodexProfile(profile);
-            return await composite.GetCodexAccountAsync(profile, linkedCancellation.Token).ConfigureAwait(false);
-        }
-
-        public async Task<AgentCodexLogin> StartCodexLoginAsync(
-            AgentProviderProfile profile,
-            bool deviceCode = false,
-            CancellationToken cancellationToken = default)
-        {
-            using var operation = EnterOperation();
-            using var linkedCancellation = CreateOperationCancellation(cancellationToken);
-            if (_provider is not CompositeAgentModelProvider composite)
-                throw new NotSupportedException("This UnityAgentHost uses a custom model provider without Codex account management.");
-            ValidateCodexProfile(profile);
-            return await composite.StartCodexLoginAsync(profile, deviceCode, linkedCancellation.Token)
-                .ConfigureAwait(false);
         }
 
         public bool ResolveApproval(string approvalId, bool approved)
@@ -1358,13 +1332,6 @@ namespace YuzeToolkit.UnityAgent
             return title.Length <= 42 ? title : title.Substring(0, 42) + "…";
         }
 
-        private static void ValidateCodexProfile(AgentProviderProfile profile)
-        {
-            if (profile == null) throw new ArgumentNullException(nameof(profile));
-            if (!string.Equals(profile.Protocol, AgentProtocolIds.CodexAppServer, StringComparison.Ordinal))
-                throw new ArgumentException("Selected Provider profile is not Codex App Server.", nameof(profile));
-        }
-
         private static void ValidateSettings(AgentSettingsDocument settings)
         {
             if (settings.ProviderProfiles == null || settings.ProviderProfiles.Count == 0)
@@ -1383,20 +1350,13 @@ namespace YuzeToolkit.UnityAgent
                 if (!AgentProtocolIds.All.Contains(profile.Protocol))
                     throw new ArgumentException($"Provider profile '{profile.Id}' uses unknown protocol '{profile.Protocol}'.", nameof(settings));
                 if (string.IsNullOrWhiteSpace(profile.BaseUrl))
-                    throw new ArgumentException($"Provider profile '{profile.Id}' requires a base URL or Codex executable.", nameof(settings));
+                    throw new ArgumentException($"Provider profile '{profile.Id}' requires a base URL.", nameof(settings));
                 if (profile.ContextWindowTokens < 8_192)
                     throw new ArgumentException(
                         $"Provider profile '{profile.Id}' requires a context window of at least 8,192 tokens.",
                         nameof(settings));
 
-                if (string.Equals(profile.Protocol, AgentProtocolIds.CodexAppServer, StringComparison.Ordinal))
-                {
-                    if (Uri.TryCreate(profile.BaseUrl, UriKind.Absolute, out var executableUri) &&
-                        !executableUri.IsFile)
-                        throw new ArgumentException(
-                            $"Codex profile '{profile.Id}' must name a local executable, not a network URL.", nameof(settings));
-                }
-                else if (!Uri.TryCreate(profile.BaseUrl, UriKind.Absolute, out var baseUri) ||
+                if (!Uri.TryCreate(profile.BaseUrl, UriKind.Absolute, out var baseUri) ||
                          (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
                 {
                     throw new ArgumentException(

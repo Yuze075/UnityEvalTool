@@ -10,7 +10,7 @@ AI MCP clients ──HTTP /mcp──┐
 native unity CLI ──WS /cli──┘                                      └────────── Unity B
 ```
 
-The Broker owns discovery, status snapshots, event-driven waits, selection leases,
+The Broker owns discovery, status snapshots, event-driven waits, selection leases, optional
 authentication, MCP protocol handling, CLI consoles, and request routing. Unity owns
 main-thread truth, compilation/reload observation, PuerTS VMs, helper tool registration,
 and CLI command parsing.
@@ -21,7 +21,7 @@ and CLI command parsing.
 |---|---|---|
 | Native Broker | Repository `Broker/src/UnityEvalTool.Broker` | Port 2347, registry, MCP tools, CLI, service management |
 | npm packaging | Repository `Broker/npm` | Platform selection, explicit user-service helpers, per-RID packages |
-| Unity transport | `Runtime/Broker` | Authenticated registration, heartbeat, routed requests, sessions |
+| Unity transport | `Runtime/Broker` | Registration, optional authentication, heartbeat, routed requests, sessions |
 | Editor lifecycle | `Editor/Broker` | Stable process identity, compile/reload state, Broker startup |
 | Eval engine | `Runtime/Core` and `Runtime/Tools` | PuerTS execution and generated helper modules |
 | CLI parser | `Runtime/CLI/EvalCliCommandService*` | Existing command grammar and printable results |
@@ -59,7 +59,8 @@ compilation keeps the old domain loaded and enters executable repair mode.
 
 ## Security
 
-Kestrel listens on loopback only. The Broker rejects non-loopback Host/Origin values.
-A random token stored in `~/.unityevaltool/auth.json` authenticates MCP, Unity, and CLI;
-Unix permissions are user read/write only. Port conflicts and protocol mismatches fail
-explicitly.
+Kestrel listens on loopback only. The Broker rejects non-loopback Host/Origin values. Token
+authentication is disabled by default. Setting `UNITYEVALTOOL_REQUIRE_TOKEN=true` in the
+Broker process environment enables it for MCP, Unity, and CLI together; the Broker then
+creates a random token in `~/.unityevaltool/auth.json` with user-only Unix permissions.
+Port conflicts, invalid security settings, and protocol mismatches fail explicitly.

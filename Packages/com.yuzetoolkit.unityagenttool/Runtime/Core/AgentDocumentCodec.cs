@@ -7,6 +7,8 @@ namespace YuzeToolkit.UnityAgent
 {
     internal static class AgentDocumentCodec
     {
+        private const string LegacyCodexAppServerProtocol = "codex-app-server";
+
         public static string SerializeSettings(AgentSettingsDocument settings) =>
             AgentJson.Stringify(ToJson(settings));
 
@@ -37,10 +39,21 @@ namespace YuzeToolkit.UnityAgent
                 MaximumAgentSteps = Math.Max(1, EvalData.GetInt(root, "maximumAgentSteps", 64))
             };
 
-            if (AgentPromptDefaults.IsPreviousEditorPrompt(settings.EditorSystemPrompt))
+            if (sourceSchemaVersion < AgentSettingsDocument.CurrentSchemaVersion)
+            {
+                // Schema V7 intentionally replaces both complete prompts. Earlier releases could
+                // persist one shared or partially updated prompt, so retaining any V6 text would
+                // leave the Tool quick-start contract inconsistent across machines.
                 settings.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
-            if (AgentPromptDefaults.IsPreviousRuntimePrompt(settings.RuntimeSystemPrompt))
                 settings.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
+            }
+            else
+            {
+                if (AgentPromptDefaults.IsPreviousEditorPrompt(settings.EditorSystemPrompt))
+                    settings.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
+                if (AgentPromptDefaults.IsPreviousRuntimePrompt(settings.RuntimeSystemPrompt))
+                    settings.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
+            }
 
             foreach (var value in AgentJson.GetObjectArray(root, "providerProfiles"))
                 settings.ProviderProfiles.Add(ReadProviderProfile(value));
@@ -201,10 +214,18 @@ namespace YuzeToolkit.UnityAgent
                 AgentsRoots = AgentJson.GetObjectArray(root, "agentsRoots").Select(ReadPathLocation).ToList(),
                 SkillRoots = AgentJson.GetObjectArray(root, "skillRoots").Select(ReadPathLocation).ToList()
             };
-            if (AgentPromptDefaults.IsPreviousEditorPrompt(result.EditorSystemPrompt))
+            if (version < AgentProjectSettingsDocument.CurrentSchemaVersion)
+            {
                 result.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
-            if (AgentPromptDefaults.IsPreviousRuntimePrompt(result.RuntimeSystemPrompt))
                 result.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
+            }
+            else
+            {
+                if (AgentPromptDefaults.IsPreviousEditorPrompt(result.EditorSystemPrompt))
+                    result.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
+                if (AgentPromptDefaults.IsPreviousRuntimePrompt(result.RuntimeSystemPrompt))
+                    result.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
+            }
             return result;
         }
 
@@ -262,6 +283,21 @@ namespace YuzeToolkit.UnityAgent
                     EvalData.GetInt(value, "contextWindowTokens", 128_000)),
                 StrictTools = EvalData.GetBool(value, "strictTools", true)
             };
+            if (string.Equals(protocol, LegacyCodexAppServerProtocol, StringComparison.Ordinal))
+            {
+                var previousModel = profile.Model;
+                var previousReasoningEffort = profile.ReasoningEffort;
+                var previousMaxOutputTokens = profile.MaxOutputTokens;
+                var previousContextWindowTokens = profile.ContextWindowTokens;
+                if (!AgentProviderCatalog.ApplyPreset(profile, "openai"))
+                    throw new InvalidOperationException("The built-in OpenAI Provider preset is missing.");
+                if (!string.IsNullOrWhiteSpace(previousModel)) profile.Model = previousModel;
+                if (!string.IsNullOrWhiteSpace(previousReasoningEffort))
+                    profile.ReasoningEffort = previousReasoningEffort;
+                profile.MaxOutputTokens = previousMaxOutputTokens;
+                profile.ContextWindowTokens = previousContextWindowTokens;
+                return profile;
+            }
             // V1 profiles had no preset id and were commonly materialized with an empty model.
             // Upgrade only that legacy shape to a directly usable curated default. Explicit V2
             // empty model values remain untouched so custom endpoints can still defer selection.
@@ -274,8 +310,6 @@ namespace YuzeToolkit.UnityAgent
 
         private static string InferProviderPresetId(string protocol, string baseUrl)
         {
-            if (string.Equals(protocol, AgentProtocolIds.CodexAppServer, StringComparison.Ordinal))
-                return "openai-codex";
             foreach (var preset in AgentProviderCatalog.Providers)
             {
                 if (string.Equals(preset.Protocol, protocol, StringComparison.Ordinal) &&

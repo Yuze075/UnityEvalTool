@@ -129,15 +129,19 @@ The Broker exposes a Streamable HTTP MCP endpoint at:
 http://127.0.0.1:2347/mcp
 ```
 
-The first Broker start creates `~/.unityevaltool/auth.json` with current-user-only
-permissions. Read its `token` and configure your MCP client to send:
+Token authentication is disabled by default for the local trusted environment, so the MCP
+client only needs the endpoint URL. To opt in, set `UNITYEVALTOOL_REQUIRE_TOKEN=true` in the
+Broker process environment before starting it. The Broker then creates
+`~/.unityevaltool/auth.json` with current-user-only permissions; read its `token` and
+configure the MCP client to send:
 
 ```text
 Authorization: Bearer <token>
 ```
 
-MCP client configuration formats differ. Use the endpoint as the server URL and add the
-authorization value as an HTTP header; do not commit the token to source control.
+MCP client configuration formats differ. Add the authorization value only when token
+authentication is enabled, and do not commit the token to source control. Unity and the
+native CLI read an existing auth file automatically in that mode.
 
 The server exposes three MCP tools, used in this order:
 
@@ -177,12 +181,14 @@ The default keys are `F8` for Unity Agent and `F10` for the Performance and Syst
 
 ## Security boundary
 
-The Broker binds only to `127.0.0.1:2347`, rejects non-loopback access, and authenticates
-Unity, CLI, and MCP traffic with the per-user token. Supported non-WebGL release Players
-that include UnityEvalTool intentionally register with the Broker and retain authenticated
-arbitrary-JavaScript evaluation; this behavior is not limited to Development Builds and
-does not depend on UnityAgentTool. Decide deliberately whether that capability belongs in
-your shipped product. See [Editor and Player registration](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES.md).
+The Broker binds only to `127.0.0.1:2347` and rejects non-loopback Host/Origin values. Token
+authentication is off by default and can be enabled explicitly with
+`UNITYEVALTOOL_REQUIRE_TOKEN=true`. Supported non-WebGL release Players that include
+UnityEvalTool intentionally register with the Broker and retain arbitrary-JavaScript
+evaluation; this behavior is not limited to Development Builds and does not depend on
+UnityAgentTool. Decide deliberately whether the default loopback trust boundary, or the
+optional token-authenticated mode, belongs in your shipped product. See
+[Editor and Player registration](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES.md).
 
 ## Service management and uninstall
 

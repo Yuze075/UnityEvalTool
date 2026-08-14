@@ -233,7 +233,7 @@ namespace YuzeToolkit
         private async Task ConnectAndRunAsync(long generation, BrokerEvalSessionRouter sessions,
             Action onConnected, CancellationToken cancellationToken)
         {
-            var token = ReadAuthToken();
+            var token = TryReadAuthToken();
             var socket = new ClientWebSocket();
             await socket.ConnectAsync(new Uri(BrokerProtocolUtility.Endpoint), cancellationToken);
             lock (_syncRoot)
@@ -422,12 +422,11 @@ namespace YuzeToolkit
             return Encoding.UTF8.GetString(stream.ToArray());
         }
 
-        private static string ReadAuthToken()
+        private static string TryReadAuthToken()
         {
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             var path = Path.Combine(home, ".unityevaltool", "auth.json");
-            if (!File.Exists(path))
-                throw new FileNotFoundException("UnityEvalTool Broker auth file was not found. Install or start the `unity` CLI first.", path);
+            if (!File.Exists(path)) return string.Empty;
             var root = EvalData.AsObject(LitJson.Parse(File.ReadAllText(path)))
                        ?? throw new InvalidDataException("UnityEvalTool Broker auth file is invalid.");
             var token = EvalData.GetString(root, "token");

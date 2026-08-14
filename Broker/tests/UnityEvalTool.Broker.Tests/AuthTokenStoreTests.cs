@@ -50,4 +50,20 @@ public sealed class AuthTokenStoreTests
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void ReadingOptionalMissingTokenDoesNotCreateAuthFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "unityevaltool-auth-test-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(root, "auth.json");
+        try
+        {
+            Assert.Null(new AuthTokenStore(path).TryReadExistingToken());
+            Assert.False(File.Exists(path));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
 }

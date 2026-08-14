@@ -78,6 +78,17 @@ internal sealed class AuthTokenStore
         }
     }
 
+    public string? TryReadExistingToken()
+    {
+        lock (_syncRoot)
+        {
+            if (!string.IsNullOrWhiteSpace(_token)) return _token;
+            if (!File.Exists(_filePath)) return null;
+            TryRestrictPermissions(_filePath);
+            return _token = ReadToken(_filePath);
+        }
+    }
+
     public bool IsValid(string? token)
     {
         if (string.IsNullOrWhiteSpace(token)) return false;

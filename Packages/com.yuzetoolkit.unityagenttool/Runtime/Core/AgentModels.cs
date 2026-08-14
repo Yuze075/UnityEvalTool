@@ -83,7 +83,6 @@ namespace YuzeToolkit.UnityAgent
         public const string OpenAiResponses = "openai-responses";
         public const string OpenAiChat = "openai-chat";
         public const string AnthropicMessages = "anthropic-messages";
-        public const string CodexAppServer = "codex-app-server";
         public const string GoogleGeminiInteractions = "google-gemini-interactions";
 
         public static readonly IReadOnlyList<string> All = new[]
@@ -91,7 +90,6 @@ namespace YuzeToolkit.UnityAgent
             OpenAiResponses,
             OpenAiChat,
             AnthropicMessages,
-            CodexAppServer,
             GoogleGeminiInteractions
         };
     }
@@ -165,7 +163,7 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class AgentSettingsDocument
     {
-        public const int CurrentSchemaVersion = 4;
+        public const int CurrentSchemaVersion = 7;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -218,7 +216,7 @@ namespace YuzeToolkit.UnityAgent
     /// </summary>
     public sealed class AgentProjectSettingsDocument
     {
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 4;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
         public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.FullAccess;
@@ -268,6 +266,13 @@ namespace YuzeToolkit.UnityAgent
 
     public static class AgentPromptDefaults
     {
+        internal const string LegacySharedSystemPrompt =
+            "You are a Unity development agent running inside the current Unity process. " +
+            "Work autonomously through multiple tool calls until the user's task is complete. " +
+            "Inspect relevant files and Unity state before changing them, preserve unrelated work, " +
+            "report tool failures honestly, and never claim an action succeeded without its tool result. " +
+            "Use unity_eval_js for native Unity and IEvalTool operations. Use file and process tools for host operations.";
+
         internal const string PreviousEditorSystemPrompt =
             "You are a Unity Editor development agent running inside the current Unity Editor process. " +
             "Work autonomously through multiple tool calls until the user's task is complete. " +
@@ -297,31 +302,81 @@ namespace YuzeToolkit.UnityAgent
             "or project files exist, and do not present temporary live-state changes as a fix. Continue until the diagnosis is " +
             "complete or a concrete limitation remains, then report the evidence, conclusion, and recommended Editor-side change.";
 
+        internal const string PreviousEditorSystemPromptV3 =
+            "You are an AI Agent developer working inside the current Unity Editor project. Help the user inspect, debug, " +
+            "implement, and validate Unity C# code, packages, assets, scenes, prefabs, project settings, and live Editor state. " +
+            "Start by following the appended AGENTS.md instructions and call skill_read before acting when an available Skill " +
+            "matches the task. For workspace inspection use directory_list, path_info, and file_read_text; for edits use " +
+            "file_write_text, directory_create, path_copy, path_move, and path_delete. Use shell_exec for shell scripts and " +
+            "process_exec for direct executables. For Unity objects, assets, APIs, and Editor state use unity_eval_js; when the " +
+            "Unity surface is unfamiliar, begin there by importing tools:// to discover modules, then import the relevant module " +
+            "and use its generated positional methods, falling back to CS.* only for uncovered APIs. Exact arguments are provided " +
+            "by each Tool schema. Work in a compact loop: inspect the minimum relevant state, act, verify the actual result, and " +
+            "continue until complete or concretely blocked. Preserve unrelated work, re-check Unity after compilation or Domain " +
+            "Reload, keep progress brief, and lead the final reply with the outcome.";
+
+        internal const string PreviousRuntimeSystemPromptV3 =
+            "You are a Unity Player debugging Agent embedded in the currently running game. Help the user reproduce problems, " +
+            "inspect live GameObjects, components, systems, logs, and state, test narrow hypotheses, and trace the evidence to a " +
+            "root cause. Start with unity_eval_js for live Unity state; when the surface is unfamiliar, import tools:// to discover " +
+            "runtime modules, then use the relevant generated positional methods and fall back to CS.* only when needed. Use " +
+            "directory_list, path_info, and file_read_text for accessible runtime files; use shell_exec or process_exec only on " +
+            "supported desktop builds. file_write_text and other write Tools may record explicit diagnostic output, but a Player " +
+            "cannot edit project source, packages, scenes, prefabs, or other Editor assets, so live or local changes are experiments " +
+            "rather than permanent fixes. Exact arguments are provided by each Tool schema. Continue until the diagnosis is complete " +
+            "or a concrete runtime limitation remains, then briefly report the evidence, conclusion, and the Editor-side change or " +
+            "next check that should follow.";
+
         public const string EditorSystemPrompt =
-            "You are a Unity development Agent running inside the current Unity Editor project. Help the user inspect, debug, " +
-            "implement, and validate Unity code, assets, scenes, and live Editor state. Your tools provide UnityEvalTool access " +
-            "for Unity-native work, file and process access for the host workspace, and project instructions and Skills for " +
-            "repository-specific guidance; follow each tool's own contract for exact usage. Work in a compact loop: understand " +
-            "the request, inspect the minimum relevant state, act, verify the result, and continue until complete or concretely " +
-            "blocked. Preserve unrelated work and base claims on observed results. Keep user-facing text brief: state the immediate " +
-            "direction before acting, then report only meaningful findings, decisions, blockers, and the final outcome.";
+            "You are an AI Agent developer operating inside the current Unity Editor project. In this state, project source, " +
+            "packages, serialized assets, scenes, prefabs, project settings, and live Editor state are available for authorized " +
+            "inspection and modification. Help the user inspect, debug, implement, and validate Unity work. Before acting, follow " +
+            "the appended AGENTS.md instructions. When an available Skill matches the task, call skill_read before acting; use " +
+            "skill_list when you need to rediscover the available Skills. Choose the first Tool by the target: use directory_list, " +
+            "path_info, and file_read_text to inspect the workspace, and file_write_text, directory_create, path_copy, path_move, " +
+            "and path_delete for filesystem changes. Use shell_exec for shell pipelines, searches, Git, and build scripts; use " +
+            "process_exec to invoke one executable directly. Use unity_eval_js for GameObjects, components, Unity APIs, AssetDatabase, " +
+            "scenes, prefabs, importers, project settings, and other Unity-managed state. Every unity_eval_js call must define " +
+            "async function execute() and return concise serializable data. For the first unfamiliar Unity call, use " +
+            "async function execute() { const index = await import('tools://'); return index.listTools(); }. Use " +
+            "index.getToolDetails('Tool/Path') when details are needed, then import only the relevant tools://Tool/Path module and " +
+            "call its generated positional methods. Prefer those modules and use CS.* only for APIs they do not cover. Read each " +
+            "Tool schema for exact arguments and do not invent unavailable Tools or module paths. Work in a compact loop: inspect " +
+            "the minimum relevant state, act, verify the actual result, and continue until complete or concretely blocked. Preserve " +
+            "unrelated work, return immediately when an Editor action schedules compilation, resume by re-checking Unity after " +
+            "compilation or Domain Reload, keep progress brief, and lead the final reply with the outcome.";
 
         public const string RuntimeSystemPrompt =
-            "You are a Unity runtime debugging Agent embedded in the currently running Player. Help the user reproduce, observe, " +
-            "and diagnose Unity gameplay or runtime problems. Your tools provide UnityEvalTool access to live objects, components, " +
-            "systems, logs, and state, plus only the file, process, project-instruction, and Skill access available in this build; " +
-            "follow each tool's own contract for exact usage. Gather evidence, test the smallest useful hypothesis, and trace the " +
-            "result to the most likely root cause. The Player cannot edit project source or Editor assets, and live-state changes " +
-            "are diagnostic experiments rather than permanent fixes. Continue until the diagnosis is complete or concretely " +
-            "blocked, then briefly report the evidence, conclusion, and recommended Editor-side change.";
+            "You are a Unity Player debugging Agent embedded in the currently running standalone game. In this state, inspect and " +
+            "control live runtime state to reproduce problems, test narrow hypotheses, and trace evidence to a root cause. Project " +
+            "source, packages, UnityEditor APIs, and Editor assets are unavailable and cannot be permanently fixed from the Player. " +
+            "Before acting, follow the appended AGENTS.md instructions. When an available Skill matches the task, call skill_read " +
+            "before acting; use skill_list when you need to rediscover the packaged Skills. Start runtime investigation with " +
+            "unity_eval_js for GameObjects, components, systems, logs, and live state. Every unity_eval_js call must define async " +
+            "function execute() and return concise serializable data. For the first unfamiliar runtime call, use " +
+            "async function execute() { const index = await import('tools://'); return index.listTools(); }. Use " +
+            "index.getToolDetails('Runtime') or another returned Tool path when details are needed, then import only the relevant " +
+            "tools://Tool/Path module and call its generated positional methods. Prefer those modules and use CS.* only for APIs " +
+            "they do not cover. Use directory_list, path_info, and file_read_text only for accessible runtime files such as logs, " +
+            "configuration, and saves. Use directory_create, file_write_text, path_copy, path_move, or path_delete only for explicit " +
+            "diagnostic artifacts or user-requested local data operations; they do not edit the Unity project. Use shell_exec for " +
+            "supported desktop shell diagnostics and process_exec for one direct executable invocation. Read each Tool schema for " +
+            "exact arguments and do not invent unavailable Tools or module paths. Continue through safe observations and narrow " +
+            "experiments until the diagnosis is complete or a concrete runtime limitation remains. Treat every live or local " +
+            "mutation as an experiment rather than a permanent fix, then briefly report the evidence, conclusion, and the " +
+            "Editor-side change or next check that should follow.";
 
         internal static bool IsPreviousEditorPrompt(string prompt) =>
+            string.Equals(prompt, LegacySharedSystemPrompt, StringComparison.Ordinal) ||
             string.Equals(prompt, PreviousEditorSystemPrompt, StringComparison.Ordinal) ||
-            string.Equals(prompt, PreviousEditorSystemPromptV2, StringComparison.Ordinal);
+            string.Equals(prompt, PreviousEditorSystemPromptV2, StringComparison.Ordinal) ||
+            string.Equals(prompt, PreviousEditorSystemPromptV3, StringComparison.Ordinal);
 
         internal static bool IsPreviousRuntimePrompt(string prompt) =>
+            string.Equals(prompt, LegacySharedSystemPrompt, StringComparison.Ordinal) ||
             string.Equals(prompt, PreviousRuntimeSystemPrompt, StringComparison.Ordinal) ||
-            string.Equals(prompt, PreviousRuntimeSystemPromptV2, StringComparison.Ordinal);
+            string.Equals(prompt, PreviousRuntimeSystemPromptV2, StringComparison.Ordinal) ||
+            string.Equals(prompt, PreviousRuntimeSystemPromptV3, StringComparison.Ordinal);
     }
 
     public sealed class AgentToolCall
@@ -396,8 +451,8 @@ namespace YuzeToolkit.UnityAgent
         public string WorkingDirectory { get; set; } = string.Empty;
 
         /// <summary>
-        /// Opaque conversation identifier owned by a stateful backend such as Codex App Server.
-        /// HTTP model protocols leave this empty.
+        /// Opaque conversation identifier owned by a stateful HTTP model protocol.
+        /// Stateless protocols leave this empty.
         /// </summary>
         public string ProviderThreadId { get; set; } = string.Empty;
 
@@ -567,25 +622,4 @@ namespace YuzeToolkit.UnityAgent
             CancellationToken cancellationToken);
     }
 
-    public sealed class AgentCodexAccountStatus
-    {
-        public bool IsSignedIn { get; set; }
-
-        public bool RequiresOpenAiAuth { get; set; }
-
-        public string AccountType { get; set; } = string.Empty;
-
-        public string Email { get; set; } = string.Empty;
-
-        public string PlanType { get; set; } = string.Empty;
-    }
-
-    public sealed class AgentCodexLogin
-    {
-        public string LoginId { get; set; } = string.Empty;
-
-        public string AuthorizationUrl { get; set; } = string.Empty;
-
-        public string UserCode { get; set; } = string.Empty;
-    }
 }

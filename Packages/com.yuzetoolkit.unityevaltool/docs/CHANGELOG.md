@@ -7,6 +7,8 @@ for the Unity package, computer-level Broker/CLI, npm packages, and Roslyn gener
 
 ## Unreleased
 
+- Make loopback-only Broker token authentication opt-in instead of a default prerequisite;
+  one explicit environment switch applies the token boundary to MCP, Unity, and CLI.
 - Add direct viewport image results, optional Test Framework discovery/run/cancel with
   reload-persistent bounded records, serialized code-usage search, and bounded cross-frame
   observation helpers.

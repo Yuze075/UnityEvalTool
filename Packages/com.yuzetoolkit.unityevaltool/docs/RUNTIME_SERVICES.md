@@ -24,10 +24,11 @@ project path, and publishes `Exiting` on application quit. The installed user se
 still responsible for hosting the Broker.
 
 This is an intentional production contract, not an Editor-only or Development Build
-fallback: supported release Players register and accept the same authenticated arbitrary
-JavaScript eval requests. The optional UnityAgentTool UI package is independent from
-this UnityEvalTool runtime client. Trust is bounded to the local user's loopback Broker and
-its user-only token; projects embedding this package must preserve that contract unless
+fallback: supported release Players register and accept the same arbitrary-JavaScript eval
+requests. The optional UnityAgentTool UI package is independent from this UnityEvalTool
+runtime client. Trust is bounded to the local user's loopback Broker by default; setting
+`UNITYEVALTOOL_REQUIRE_TOKEN=true` in the Broker process environment adds the shared
+user-only token. Projects embedding this package must preserve the selected contract unless
 they deliberately fork the product design.
 
 WebGL is not a supported Broker target because the local ClientWebSocket/current-user

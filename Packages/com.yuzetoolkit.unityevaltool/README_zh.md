@@ -48,13 +48,12 @@ Editor 会在 eval 之外独立报告导入、编译、编译失败、程序集�
 ## Player 生命周期与安全
 
 受支持的非 WebGL Player 会启动隐藏的 `DontDestroyOnLoad` Broker Client，并以可执行
-文件目录作为项目路径注册。Release Player 会有意保留与 Editor 相同的、经认证的
-任意 JavaScript eval 能力。它不受 Development Build 开关限制，也不依赖可选的
-UnityAgentTool Package。
+文件目录作为项目路径注册。Release Player 会有意保留与 Editor 相同的任意 JavaScript
+eval 能力。它不受 Development Build 开关限制，也不依赖可选的 UnityAgentTool Package。
 
-信任边界是当前用户的 loopback Broker 与按用户保存的认证 token。如果该能力不适合
-产品发行版，应把排除或修改 Package 作为明确的产品决策。WebGL 不是受支持的
-Broker 目标。
+默认信任边界是当前用户的 loopback Broker；token 认证通过
+`UNITYEVALTOOL_REQUIRE_TOKEN=true` 显式开启。如果该能力不适合产品发行版，应把排除或
+修改 Package 作为明确的产品决策。WebGL 不是受支持的 Broker 目标。
 
 生命周期细节与公开连接 API 见 [Editor 与 Player 注册](docs/RUNTIME_SERVICES_zh.md)。
 
@@ -103,11 +102,11 @@ Tool 树和函数契约，不依赖任何 Debug UI。根 Tool 可通过 `EvalToo
 |---|---|
 | `http://127.0.0.1:2347/health` | Broker 健康状态 |
 | `http://127.0.0.1:2347/mcp` | MCP Streamable HTTP |
-| `ws://127.0.0.1:2347/unity` | 经认证的 Unity 注册与中转 |
-| `ws://127.0.0.1:2347/cli` | 经认证的原生 CLI 控制台 |
+| `ws://127.0.0.1:2347/unity` | Unity 注册与中转 |
+| `ws://127.0.0.1:2347/cli` | 原生 CLI 控制台 |
 
-Broker 只绑定 loopback，使用当前用户 token 认证每一条连接，并在 `2347` 端口
-不可用时明确失败。
+Broker 只绑定 loopback，并在 `2347` 端口不可用时明确失败。token 认证默认关闭；可在
+Broker 进程环境中设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true`，为 MCP、Unity 与 CLI 一并开启。
 
 ## 从源码构建
 
