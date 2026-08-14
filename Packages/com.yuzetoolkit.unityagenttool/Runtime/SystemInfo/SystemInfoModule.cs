@@ -37,12 +37,12 @@ namespace YuzeToolkit
             try
             {
                 context.AddStyleSheet(styleSheet);
-                _layer = context.CreateLayer("unity-debug-tool-system-info-layer");
+                _layer = context.CreateLayer("unity-agent-system-info-layer");
                 SystemInfoUss.ApplyLayer(_layer);
                 _view = new SystemInfoView(template);
                 _view.AttachTo(_layer);
                 _workspaceRegistration = UnityAgentWorkspaceRegistry.RegisterSystemInfoSection(
-                    "unity-debug-tool-system-info", 0, () => CreateWorkspaceSection(template, styleSheet));
+                    "unity-agent-system-info", 10, () => CreateWorkspaceSection(template, styleSheet));
                 Refresh();
             }
             catch

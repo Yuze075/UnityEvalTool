@@ -46,9 +46,11 @@ namespace YuzeToolkit.UnityAgent
         {
             var instructions = await _instructions.LoadAsync(settings, runtime.Document.WorkingDirectory,
                 cancellationToken).ConfigureAwait(false);
-            // The system prompt is a package-wide setting. Conversations deliberately do not
-            // carry a hidden override because the workbench exposes this setting in one place.
-            var systemPrompt = settings.SystemPrompt + instructions.Prompt;
+            // Editor and Player have different capabilities and therefore use independent
+            // package-wide prompts. Conversations deliberately do not carry hidden overrides.
+            var systemPrompt = (AgentPaths.IsEditor
+                ? settings.EditorSystemPrompt
+                : settings.RuntimeSystemPrompt) + instructions.Prompt;
             for (long step = 0; ; step++)
             {
                 cancellationToken.ThrowIfCancellationRequested();

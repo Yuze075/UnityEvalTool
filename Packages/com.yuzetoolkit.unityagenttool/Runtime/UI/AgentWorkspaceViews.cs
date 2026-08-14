@@ -167,7 +167,7 @@ namespace YuzeToolkit.UnityAgent
             style.minHeight = 0;
             style.minWidth = 0;
             Add(AgentWorkspaceUi.Header("System Info",
-                "System details are shown first, followed by live performance metrics."));
+                "Live performance metrics are shown first, followed by system details."));
             var scroll = AgentUi.Scroll(ScrollViewMode.Vertical);
             scroll.style.flexGrow = 1;
             scroll.style.minHeight = 0;
@@ -206,7 +206,7 @@ namespace YuzeToolkit.UnityAgent
             }
             if (_liveSections.Count == 0)
                 _sections.Add(AgentWorkspaceUi.Empty(
-                    "System Info is supplied by UnityDebugTool. Add its SystemInfo and Performance modules to the runtime host."));
+                    "System Info is waiting for the AgentTool SystemInfo and Performance modules to initialize."));
         }
 
         private void ClearSections()
@@ -466,6 +466,8 @@ namespace YuzeToolkit.UnityAgent
         private readonly CommandLineStore _store;
         private readonly Dictionary<string, RuntimeCliRunner> _runners = new(StringComparer.Ordinal);
         private readonly List<CommandLineSessionDocument> _sessions;
+        private CommandLineSessionDocument _pendingDocument = CreateDocument();
+        private IVisualElementScheduledItem? _draftSaveItem;
         private CommandLineSessionDocument _selected;
         private bool _running;
 
@@ -476,15 +478,12 @@ namespace YuzeToolkit.UnityAgent
             style.flexGrow = 1;
             style.minWidth = 0;
             style.minHeight = 0;
-            _store = new CommandLineStore(AgentPaths.Resolve(host.Settings.HistoryLocation));
+            _store = new CommandLineStore();
             _sessions = _store.Load();
-            _selected = _sessions.FirstOrDefault(value => value.Id == _store.LoadSelectedId()) ??
-                        _sessions.OrderByDescending(value => value.UpdatedAtUtc).FirstOrDefault() ?? CreateDocument();
-            if (!_sessions.Contains(_selected))
-            {
-                _sessions.Add(_selected);
-                Persist();
-            }
+            _selected = _sessions.FirstOrDefault(value => !value.IsArchived && value.Id == _store.LoadSelectedId()) ??
+                        _sessions.Where(value => !value.IsArchived)
+                            .OrderByDescending(value => value.IsPinned)
+                            .ThenByDescending(value => value.UpdatedAtUtc).FirstOrDefault() ?? _pendingDocument;
 
             Add(AgentWorkspaceUi.Header("Command Line",
                 "Transcripts persist beside Agent history; each JavaScript VM exists only for this Unity process."));
@@ -512,6 +511,14 @@ namespace YuzeToolkit.UnityAgent
             _input = new AgentTextField(surface: false) { Placeholder = "Enter one UnityEvalTool command…" };
             _input.style.flexGrow = 1;
             _input.style.minWidth = 0;
+            _input.SetValueWithoutNotify(_selected.Draft);
+            _input.RegisterValueChangedCallback(evt =>
+            {
+                _selected.Draft = evt.newValue;
+                _draftSaveItem?.Pause();
+                if (_sessions.Contains(_selected))
+                    _draftSaveItem = schedule.Execute(SaveSelectedDraft).StartingIn(350);
+            });
             _input.RegisterCallback<KeyDownEvent>(evt =>
             {
                 if (evt.keyCode != KeyCode.Return || evt.shiftKey) return;
@@ -530,21 +537,15 @@ namespace YuzeToolkit.UnityAgent
 
         public void CreateSession()
         {
-            if (_sessions.Count == 1 && _selected.Entries.Count == 0 &&
-                string.Equals(_selected.Title, "New command line", StringComparison.Ordinal))
-            {
-                Persist();
-                RefreshAll();
-                return;
-            }
-            _selected = CreateDocument();
-            _sessions.Add(_selected);
-            Persist();
+            SaveSelectedDraft();
+            _selected = _pendingDocument;
+            _input.SetValueWithoutNotify(_selected.Draft);
             RefreshAll();
         }
 
         public void Dispose()
         {
+            SaveSelectedDraft();
             foreach (var runner in _runners.Values) runner.Dispose();
             _runners.Clear();
         }
@@ -556,11 +557,19 @@ namespace YuzeToolkit.UnityAgent
             _running = true;
             _run.SetEnabled(false);
             _input.SetEnabled(false);
-            _input.value = string.Empty;
+            _selected.Draft = string.Empty;
+            _input.SetValueWithoutNotify(string.Empty);
+            if (!_sessions.Contains(_selected))
+            {
+                _sessions.Add(_selected);
+                if (ReferenceEquals(_selected, _pendingDocument)) _pendingDocument = CreateDocument();
+            }
             var entry = new CommandLineEntry(DateTime.UtcNow, true, command, string.Empty, LogType.Log);
             _selected.Entries.Add(entry);
             if (_selected.Title == "New command line")
                 _selected.Title = command.Length <= 42 ? command : command.Substring(0, 39) + "...";
+            _selected.UpdatedAtUtc = DateTime.UtcNow;
+            Persist();
             RefreshHistory();
             try
             {
@@ -601,7 +610,10 @@ namespace YuzeToolkit.UnityAgent
         private void RefreshSidebar()
         {
             _sidebarList.Clear();
-            foreach (var session in _sessions.OrderByDescending(value => value.UpdatedAtUtc))
+            foreach (var session in _sessions.Where(value => !value.IsArchived)
+                         .OrderByDescending(value => value.IsPinned)
+                         .ThenBy(value => value.SortOrder)
+                         .ThenByDescending(value => value.UpdatedAtUtc))
             {
                 var item = new VisualElement();
                 item.style.minHeight = 36;
@@ -623,15 +635,34 @@ namespace YuzeToolkit.UnityAgent
                 label.style.overflow = Overflow.Hidden;
                 label.style.textOverflow = TextOverflow.Ellipsis;
                 item.Add(label);
-                item.Add(AgentUi.IconButton(AgentIconKind.Delete, "Delete this persisted Command Line transcript.",
-                    () => Delete(session), 24, AgentUi.Transparent, AgentUi.Muted));
+                item.Add(AgentUi.IconButton(AgentIconKind.Pin, session.IsPinned ? "Unpin" : "Pin",
+                    () => SetOrganization(session, !session.IsPinned, false), 24,
+                    AgentUi.Transparent, AgentUi.Muted));
+                item.Add(AgentUi.IconButton(AgentIconKind.Archive, "Archive",
+                    () => SetOrganization(session, session.IsPinned, true), 24,
+                    AgentUi.Transparent, AgentUi.Muted));
                 item.RegisterCallback<PointerDownEvent>(evt =>
                 {
                     if (evt.button != 0) return;
+                    SaveSelectedDraft();
                     _activate();
                     _selected = session;
+                    _input.SetValueWithoutNotify(session.Draft);
                     _store.SaveSelectedId(session.Id);
                     RefreshAll();
+                });
+                item.RegisterCallback<PointerUpEvent>(evt =>
+                {
+                    if (evt.button != 1) return;
+                    AgentPopupMenu.Show(item, new[]
+                    {
+                        new AgentMenuItem(session.IsPinned ? "Unpin" : "Pin",
+                            () => SetOrganization(session, !session.IsPinned, false)),
+                        new AgentMenuItem("Archive", () => SetOrganization(session, session.IsPinned, true)),
+                        new AgentMenuItem("Delete command line…", () => Delete(session),
+                            dangerous: true, separatorBefore: true)
+                    }, 230);
+                    evt.StopPropagation();
                 });
                 _sidebarList.Add(item);
             }
@@ -676,22 +707,40 @@ namespace YuzeToolkit.UnityAgent
 
         private void Delete(CommandLineSessionDocument session)
         {
-            if (_sessions.Count == 1)
-            {
-                session.Entries.Clear();
-                session.Title = "New command line";
-                session.UpdatedAtUtc = DateTime.UtcNow;
-                Persist();
-                RefreshAll();
-                return;
-            }
             _sessions.Remove(session);
             _store.Delete(session.Id);
             if (_runners.Remove(session.Id, out var runner)) runner.Dispose();
             if (ReferenceEquals(_selected, session))
-                _selected = _sessions.OrderByDescending(value => value.UpdatedAtUtc).First();
-            Persist();
+                _selected = _sessions.Where(value => !value.IsArchived)
+                    .OrderByDescending(value => value.IsPinned)
+                    .ThenByDescending(value => value.UpdatedAtUtc).FirstOrDefault() ?? _pendingDocument;
+            _input.SetValueWithoutNotify(_selected.Draft);
+            if (_sessions.Contains(_selected)) _store.SaveSelectedId(_selected.Id);
             RefreshAll();
+        }
+
+        private void SetOrganization(CommandLineSessionDocument session, bool pinned, bool archived)
+        {
+            session.IsPinned = pinned;
+            session.IsArchived = archived;
+            session.UpdatedAtUtc = DateTime.UtcNow;
+            _store.Save(session);
+            if (archived && ReferenceEquals(_selected, session))
+            {
+                _selected = _sessions.Where(value => !value.IsArchived && !ReferenceEquals(value, session))
+                    .OrderByDescending(value => value.IsPinned)
+                    .ThenByDescending(value => value.UpdatedAtUtc).FirstOrDefault() ?? _pendingDocument;
+                _input.SetValueWithoutNotify(_selected.Draft);
+                _store.SaveSelectedId(_sessions.Contains(_selected) ? _selected.Id : string.Empty);
+            }
+            RefreshAll();
+        }
+
+        private void SaveSelectedDraft()
+        {
+            _draftSaveItem?.Pause();
+            _selected.Draft = _input.value;
+            if (_sessions.Contains(_selected)) _store.Save(_selected);
         }
 
         private void Persist()
@@ -715,6 +764,10 @@ namespace YuzeToolkit.UnityAgent
         public string Title { get; set; } = "New command line";
         public DateTime CreatedAtUtc { get; set; }
         public DateTime UpdatedAtUtc { get; set; }
+        public bool IsPinned { get; set; }
+        public bool IsArchived { get; set; }
+        public int SortOrder { get; set; }
+        public string Draft { get; set; } = string.Empty;
         public List<CommandLineEntry> Entries { get; } = new();
     }
 
@@ -738,11 +791,27 @@ namespace YuzeToolkit.UnityAgent
 
     internal sealed class CommandLineStore
     {
-        private const int SchemaVersion = 1;
+        private const int SchemaVersion = 2;
         private readonly string _root;
 
-        public CommandLineStore(string historyRoot) =>
-            _root = Path.Combine(historyRoot, "CommandLineSessions");
+        public CommandLineStore()
+        {
+            _root = Path.Combine(AgentPaths.SettingsRoot, AgentPaths.CommandLineHistoryFolderName);
+            MigrateLegacyDirectory();
+        }
+
+        private void MigrateLegacyDirectory()
+        {
+            var legacy = Path.Combine(AgentPaths.LegacySettingsRoot,
+                AgentPaths.CommandLineHistoryFolderName);
+            if (!Directory.Exists(legacy) || AgentPaths.PathsEqual(legacy, _root)) return;
+            Directory.CreateDirectory(_root);
+            foreach (var source in Directory.EnumerateFiles(legacy, "*.json", SearchOption.TopDirectoryOnly))
+            {
+                var destination = Path.Combine(_root, Path.GetFileName(source));
+                if (!File.Exists(destination)) File.Copy(source, destination);
+            }
+        }
 
         public List<CommandLineSessionDocument> Load()
         {
@@ -760,7 +829,11 @@ namespace YuzeToolkit.UnityAgent
                     Id = AgentJson.GetString(root, "id"),
                     Title = AgentJson.GetString(root, "title", "New command line"),
                     CreatedAtUtc = AgentJson.GetDateTime(root, "createdAtUtc", DateTime.UtcNow),
-                    UpdatedAtUtc = AgentJson.GetDateTime(root, "updatedAtUtc", DateTime.UtcNow)
+                    UpdatedAtUtc = AgentJson.GetDateTime(root, "updatedAtUtc", DateTime.UtcNow),
+                    IsPinned = EvalData.GetBool(root, "isPinned"),
+                    IsArchived = EvalData.GetBool(root, "isArchived"),
+                    SortOrder = Math.Max(0, EvalData.GetInt(root, "sortOrder")),
+                    Draft = AgentJson.GetString(root, "draft")
                 };
                 if (!string.Equals(Path.GetFileNameWithoutExtension(path), document.Id, StringComparison.Ordinal))
                     throw new FormatException($"Command Line file name and document id do not match: {path}");
@@ -790,6 +863,10 @@ namespace YuzeToolkit.UnityAgent
                 ("title", document.Title),
                 ("createdAtUtc", AgentJson.Utc(document.CreatedAtUtc)),
                 ("updatedAtUtc", AgentJson.Utc(document.UpdatedAtUtc)),
+                ("isPinned", document.IsPinned),
+                ("isArchived", document.IsArchived),
+                ("sortOrder", document.SortOrder),
+                ("draft", document.Draft),
                 ("entries", entries)));
             WriteAtomic(Path.Combine(_root, document.Id + ".json"), json);
         }

@@ -25,7 +25,7 @@ still responsible for hosting the Broker.
 
 This is an intentional production contract, not an Editor-only or Development Build
 fallback: supported release Players register and accept the same authenticated arbitrary
-JavaScript eval requests. Removing the optional UnityDebugTool UI package does not remove
+JavaScript eval requests. The optional UnityAgentTool UI package is independent from
 this UnityEvalTool runtime client. Trust is bounded to the local user's loopback Broker and
 its user-only token; projects embedding this package must preserve that contract unless
 they deliberately fork the product design.
@@ -41,6 +41,6 @@ service model is unavailable there.
 - `UnityBrokerClient.Shared.GetSessionSnapshots("cli:")`
 - `UnityBrokerClient.Shared.Stop()` / `Start()` for an explicit reconnect
 
-DebugTool's Runtime Console consumes the shared Broker client for its Command Line,
-EvalTool, and Tools tabs. It does not own service discovery, process launch, or a
+UnityAgentTool consumes the shared Broker client for its Command Line and Eval settings
+pages. It does not own service discovery, process launch, or a
 separate listener.

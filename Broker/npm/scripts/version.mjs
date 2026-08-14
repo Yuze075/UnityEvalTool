@@ -8,9 +8,6 @@ export function resolveAndValidateVersion(brokerRoot) {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`version.json contains invalid SemVer '${version}'.`);
   }
-  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(metadata.debugPackageVersion ?? '')) {
-    throw new Error(`version.json contains invalid debugPackageVersion '${metadata.debugPackageVersion}'.`);
-  }
   if (!/^\d+\.\d+$/.test(metadata.protocolVersion ?? '')) {
     throw new Error(`version.json contains invalid protocolVersion '${metadata.protocolVersion}'.`);
   }
@@ -20,8 +17,6 @@ export function resolveAndValidateVersion(brokerRoot) {
 
   const unityManifest = JSON.parse(readFileSync(
     join(repositoryRoot, 'Packages/com.yuzetoolkit.unityevaltool/package.json'), 'utf8'));
-  const debugManifest = JSON.parse(readFileSync(
-    join(repositoryRoot, 'Packages/com.yuzetoolkit.unitydebugtool/package.json'), 'utf8'));
   const npmManifest = JSON.parse(readFileSync(join(brokerRoot, 'npm/root/package.json'), 'utf8'));
   const directoryProps = readFileSync(join(brokerRoot, 'Directory.Build.props'), 'utf8');
   const brokerProtocolSource = readFileSync(join(brokerRoot,
@@ -33,21 +28,6 @@ export function resolveAndValidateVersion(brokerRoot) {
 
   const mismatches = [];
   if (unityManifest.version !== version) mismatches.push(`Unity package=${unityManifest.version}`);
-  if (debugManifest.version !== metadata.debugPackageVersion) {
-    mismatches.push(`UnityDebugTool package=${debugManifest.version}; expected ${metadata.debugPackageVersion}`);
-  }
-  if (debugManifest.dependencies?.['com.yuzetoolkit.unityevaltool'] !== version) {
-    mismatches.push(`UnityDebugTool UnityEvalTool dependency=${debugManifest.dependencies?.['com.yuzetoolkit.unityevaltool']}`);
-  }
-  const requiredDebugDependencies = {
-    'com.unity.inputsystem': '1.0.0',
-    'com.unity.ugui': '1.0.0'
-  };
-  for (const [name, requiredVersion] of Object.entries(requiredDebugDependencies)) {
-    if (debugManifest.dependencies?.[name] !== requiredVersion) {
-      mismatches.push(`UnityDebugTool ${name} dependency=${debugManifest.dependencies?.[name]}; expected ${requiredVersion}`);
-    }
-  }
   if (npmManifest.version !== version) mismatches.push(`npm entry=${npmManifest.version}`);
   if (npmManifest.scripts?.postinstall || npmManifest.scripts?.preuninstall) {
     mismatches.push('npm install/uninstall lifecycle scripts must not be used');

@@ -154,7 +154,10 @@ namespace YuzeToolkit.UnityAgent
         private string _selectedSessionId = string.Empty;
         private string _shownSessionError = string.Empty;
         private string _modelCatalogDetail = string.Empty;
-        private bool _archiveCollapsed = true;
+        private string _newConversationDraft = string.Empty;
+        private string _composerSessionId = string.Empty;
+        private bool _loadingComposerDraft;
+        private IVisualElementScheduledItem? _draftSaveItem;
         private AgentWorkspacePage _workspacePage;
         private AgentCommandLineWorkspaceView? _commandLineView;
         private AgentDebugWorkspaceView? _debugPanelView;
@@ -263,7 +266,7 @@ namespace YuzeToolkit.UnityAgent
             _composer.style.minHeight = 24;
             _composer.style.maxHeight = 336;
             _composer.style.whiteSpace = WhiteSpace.Normal;
-            _composer.RegisterValueChangedCallback(_ => RefreshActionButton());
+            _composer.RegisterValueChangedCallback(_ => OnComposerChanged());
             _composer.RegisterCallback<KeyDownEvent>(evt =>
             {
                 if (evt.keyCode != KeyCode.Return || !evt.ctrlKey && !evt.commandKey) return;
@@ -397,7 +400,7 @@ namespace YuzeToolkit.UnityAgent
             sidebar.Add(brandRow);
 
             sidebar.Add(CreateWorkspaceNavigation("New conversation", AgentIconKind.Add,
-                () => { ShowWorkspace(AgentWorkspacePage.Conversation); RunUiTask(CreateSessionAsync); }));
+                BeginNewConversation));
             sidebar.Add(CreateWorkspaceNavigation("New command line", AgentIconKind.Sliders,
                 () => RunUiTask(CreateCommandLineSessionAsync)));
             sidebar.Add(CreateWorkspaceNavigation("Debug Panel", AgentIconKind.Provider,
@@ -469,6 +472,8 @@ namespace YuzeToolkit.UnityAgent
         {
             if (_disposed) return;
             _disposed = true;
+            SaveVisibleDraft();
+            _draftSaveItem?.Pause();
             _lifetime.Cancel();
             _lifetime.Dispose();
             _commandLineView?.Dispose();
@@ -487,6 +492,8 @@ namespace YuzeToolkit.UnityAgent
         private void ShowWorkspace(AgentWorkspacePage page)
         {
             if (_disposed) return;
+            if (_workspacePage == AgentWorkspacePage.Conversation && page != AgentWorkspacePage.Conversation)
+                SaveVisibleDraft();
             _workspacePage = page;
             _conversationPage.style.display = page == AgentWorkspacePage.Conversation
                 ? DisplayStyle.Flex : DisplayStyle.None;
@@ -534,20 +541,23 @@ namespace YuzeToolkit.UnityAgent
             await _host.EnsureInitializedAsync(_lifetime.Token);
             EnsureCommandLineView();
             var sessions = _host.GetSessions();
-            _selectedSessionId = sessions.Count == 0
-                ? (await _host.CreateSessionAsync(_lifetime.Token)).Id
-                : sessions.OrderBy(value => value.IsArchived)
-                    .ThenByDescending(value => value.IsPinned)
-                    .ThenByDescending(value => value.UpdatedAtUtc).First().Id;
+            _selectedSessionId = sessions.Where(value => !value.IsArchived)
+                .OrderByDescending(value => value.IsPinned)
+                .ThenByDescending(value => value.UpdatedAtUtc)
+                .Select(value => value.Id).FirstOrDefault() ?? string.Empty;
             _initialized = true;
             _lastRevision = -1;
             var current = CurrentSession();
             if (current != null) await DiscoverSessionModelsOnceAsync(current.ProviderProfileId);
         }
 
-        private async Task CreateSessionAsync()
+        private void BeginNewConversation()
         {
-            _selectedSessionId = (await _host.CreateSessionAsync(_lifetime.Token)).Id;
+            SaveVisibleDraft();
+            ShowWorkspace(AgentWorkspacePage.Conversation);
+            _selectedSessionId = string.Empty;
+            _shownSessionError = string.Empty;
+            LoadVisibleDraft(null);
             _lastRevision = -1;
         }
 
@@ -559,10 +569,11 @@ namespace YuzeToolkit.UnityAgent
                 throw new InvalidOperationException("Stop the active conversation before deleting it.");
             await _host.DeleteSessionAsync(sessionId, _lifetime.Token);
             var sessions = _host.GetSessions();
-            _selectedSessionId = sessions.Count > 0
-                ? sessions.OrderBy(value => value.IsArchived)
-                    .ThenByDescending(value => value.UpdatedAtUtc).First().Id
-                : (await _host.CreateSessionAsync(_lifetime.Token)).Id;
+            _selectedSessionId = sessions.Where(value => !value.IsArchived)
+                .OrderByDescending(value => value.IsPinned)
+                .ThenByDescending(value => value.UpdatedAtUtc)
+                .Select(value => value.Id).FirstOrDefault() ?? string.Empty;
+            LoadVisibleDraft(CurrentSession());
         }
 
         private Task ActAsync()
@@ -606,10 +617,19 @@ namespace YuzeToolkit.UnityAgent
         private async Task SendAsync()
         {
             var text = _composer.value.Trim();
-            if (string.IsNullOrEmpty(_selectedSessionId) || text.Length == 0) return;
+            if (text.Length == 0) return;
+            if (string.IsNullOrEmpty(_selectedSessionId))
+            {
+                var created = await _host.CreateSessionAsync(_lifetime.Token);
+                _selectedSessionId = created.Id;
+                _composerSessionId = created.Id;
+                _newConversationDraft = string.Empty;
+            }
             var sessionId = _selectedSessionId;
             await SaveConversationSelectionAsync(sessionId);
-            _composer.value = string.Empty;
+            _loadingComposerDraft = true;
+            _composer.SetValueWithoutNotify(string.Empty);
+            _loadingComposerDraft = false;
             await _host.SendMessageAsync(sessionId, text, _lifetime.Token);
         }
 
@@ -718,38 +738,36 @@ namespace YuzeToolkit.UnityAgent
         private void Refresh()
         {
             var sessions = _host.GetSessions();
-            if (sessions.Count > 0 && sessions.All(value => value.Id != _selectedSessionId))
-                _selectedSessionId = sessions[0].Id;
+            if (!string.IsNullOrEmpty(_selectedSessionId) && sessions.All(value => value.Id != _selectedSessionId))
+                _selectedSessionId = sessions.Where(value => !value.IsArchived)
+                    .OrderByDescending(value => value.IsPinned)
+                    .ThenByDescending(value => value.UpdatedAtUtc)
+                    .Select(value => value.Id).FirstOrDefault() ?? string.Empty;
             RefreshSessionList(sessions);
 
             var current = CurrentSession();
-            if (current == null)
-            {
-                _messageList.Clear();
-                _conversationTitle.text = "Conversation";
-                _status.text = "No conversation";
-                return;
-            }
-
-            _conversationTitle.text = string.IsNullOrWhiteSpace(current.Title) ? "Conversation" : current.Title;
+            LoadVisibleDraft(current);
+            _conversationTitle.text = current == null
+                ? "New conversation"
+                : string.IsNullOrWhiteSpace(current.Title) ? "Conversation" : current.Title;
 
             var settings = _host.Settings;
             var labels = settings.ProviderProfiles.Select(ProfileLabel).ToList();
             _profileIdsByLabel.Clear();
             foreach (var value in settings.ProviderProfiles) _profileIdsByLabel[ProfileLabel(value)] = value.Id;
             _provider.choices = labels;
-            var profile = settings.ProviderProfiles.FirstOrDefault(value => value.Id == current.ProviderProfileId)
+            var profile = settings.ProviderProfiles.FirstOrDefault(value => value.Id == current?.ProviderProfileId)
                           ?? settings.ProviderProfiles[0];
             _provider.SetValueWithoutNotify(ProfileLabel(profile));
             if (!_discoveryStartedProfiles.Contains(profile.Id))
                 RunUiTask(() => DiscoverSessionModelsOnceAsync(profile.Id));
-            var active = IsActive(current);
+            var active = current != null && IsActive(current);
             ApplyModelCatalog(profile,
                 _modelChoices.TryGetValue(profile.Id, out var discovered)
                     ? discovered
                     : AgentProviderCatalog.GetModels(profile.ProviderPresetId).Select(value => value.Id),
-                string.IsNullOrWhiteSpace(current.Model) ? profile.Model : current.Model);
-            _effort.SetValueWithoutNotify(string.IsNullOrWhiteSpace(current.ReasoningEffort)
+                string.IsNullOrWhiteSpace(current?.Model) ? profile.Model : current.Model);
+            _effort.SetValueWithoutNotify(string.IsNullOrWhiteSpace(current?.ReasoningEffort)
                 ? "default"
                 : current.ReasoningEffort);
             if (!_effort.choices.Contains(_effort.value))
@@ -758,16 +776,26 @@ namespace YuzeToolkit.UnityAgent
                 choices.Add(_effort.value);
                 _effort.choices = choices;
             }
-            _permission.SetValueWithoutNotify(current.PermissionMode.ToString());
+            _permission.SetValueWithoutNotify((current?.PermissionMode ?? settings.PermissionMode).ToString());
 
-            _status.text = $"{current.State}  ·  {current.Usage.TotalTokens:N0} tokens";
-            _status.style.color = current.State == AgentSessionState.Failed ? AgentUi.Error : AgentUi.Muted;
+            _status.text = current == null
+                ? "Draft · created on first send"
+                : $"{current.State}  ·  {current.Usage.TotalTokens:N0} tokens";
+            _status.style.color = current?.State == AgentSessionState.Failed ? AgentUi.Error : AgentUi.Muted;
             _provider.SetEnabled(!active);
             _model.SetEnabled(!active);
             _refreshModels.SetEnabled(!active);
             _effort.SetEnabled(!active);
             _permission.SetEnabled(!active);
             RefreshActionButton();
+
+            if (current == null)
+            {
+                _shownSessionError = string.Empty;
+                _messageList.Clear();
+                _messageList.Add(CreateEmptyState());
+                return;
+            }
 
             if (string.IsNullOrWhiteSpace(current.LastError))
                 _shownSessionError = string.Empty;
@@ -794,26 +822,14 @@ namespace YuzeToolkit.UnityAgent
         {
             _sessionList.Clear();
             var active = sessions.Where(value => !value.IsArchived).ToList();
-            AddSessionSection("PINNED", active.Where(value => value.IsPinned), "", false);
-
-            var groups = _host.Settings.ConversationGroups.OrderBy(value => value.SortOrder).ThenBy(value => value.Name).ToList();
-            var validGroupIds = new HashSet<string>(groups.Select(value => value.Id), StringComparer.Ordinal);
-            foreach (var group in groups)
-            {
-                var members = active.Where(value => !value.IsPinned && value.GroupId == group.Id);
-                AddSessionSection(group.Name.ToUpperInvariant(), members, group.Id, group.IsCollapsed);
-            }
-            AddSessionSection("CONVERSATIONS",
-                active.Where(value => !value.IsPinned && (string.IsNullOrWhiteSpace(value.GroupId) ||
-                                                          !validGroupIds.Contains(value.GroupId))), "", false);
-            AddSessionSection("ARCHIVED", sessions.Where(value => value.IsArchived), "__archive", _archiveCollapsed);
+            AddSessionSection("PINNED", active.Where(value => value.IsPinned));
+            AddSessionSection("CONVERSATIONS", active.Where(value => !value.IsPinned));
         }
 
-        private void AddSessionSection(string title, IEnumerable<AgentSessionDocument> source, string groupId, bool collapsed)
+        private void AddSessionSection(string title, IEnumerable<AgentSessionDocument> source)
         {
             var sessions = source.OrderBy(value => value.SortOrder).ThenByDescending(value => value.UpdatedAtUtc).ToList();
-            if (sessions.Count == 0 && groupId == "__archive") return;
-            if (sessions.Count == 0 && string.IsNullOrEmpty(groupId) && title != "CONVERSATIONS") return;
+            if (sessions.Count == 0 && title != "CONVERSATIONS") return;
             var header = new Label(title);
             AgentUi.ApplyTypography(header, AgentTypography.Caption);
             header.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -829,23 +845,9 @@ namespace YuzeToolkit.UnityAgent
             header.style.borderTopRightRadius = 5;
             header.style.borderBottomLeftRadius = 5;
             header.style.borderBottomRightRadius = 5;
-            header.userData = new AgentSessionDropTarget(groupId == "__archive" ? string.Empty : groupId,
-                groupId == "__archive", title == "PINNED", string.Empty, AgentSessionDropPlacement.After);
-            header.RegisterCallback<ClickEvent>(_ =>
-            {
-                if (string.IsNullOrEmpty(groupId)) return;
-                if (groupId == "__archive")
-                {
-                    _archiveCollapsed = !_archiveCollapsed;
-                    _lastRevision = -1;
-                    return;
-                }
-                RunUiTask(() => ToggleGroupCollapsedAsync(groupId));
-            });
             header.RegisterCallback<PointerEnterEvent>(_ => header.style.backgroundColor = AgentUi.Hover);
             header.RegisterCallback<PointerLeaveEvent>(_ => header.style.backgroundColor = AgentUi.Transparent);
             _sessionList.Add(header);
-            if (collapsed) return;
             foreach (var session in sessions) _sessionList.Add(CreateSessionItem(session));
         }
 
@@ -888,14 +890,11 @@ namespace YuzeToolkit.UnityAgent
             actions.style.opacity = 0.18f;
             item.Add(actions);
             var pin = AgentUi.IconButton(AgentIconKind.Pin, session.IsPinned ? "Unpin" : "Pin",
-                () => RunUiTask(() => UpdateOrganizationAsync(session, !session.IsPinned,
-                    session.IsArchived, session.GroupId)), 24, AgentUi.Transparent);
-            pin.SetEnabled(!session.IsArchived);
+                () => RunUiTask(() => UpdateOrganizationAsync(session, !session.IsPinned, false)),
+                24, AgentUi.Transparent);
             actions.Add(pin);
-            var archive = AgentUi.IconButton(session.IsArchived ? AgentIconKind.Restore : AgentIconKind.Archive,
-                session.IsArchived ? "Restore from archive" : "Archive",
-                () => RunUiTask(() => UpdateOrganizationAsync(session,
-                    session.IsArchived && session.IsPinned, !session.IsArchived, string.Empty)), 24,
+            var archive = AgentUi.IconButton(AgentIconKind.Archive, "Archive",
+                () => RunUiTask(() => UpdateOrganizationAsync(session, session.IsPinned, true)), 24,
                 AgentUi.Transparent);
             actions.Add(archive);
             var meta = new Label(SessionMeta(session));
@@ -907,7 +906,9 @@ namespace YuzeToolkit.UnityAgent
             {
                 if (evt.button != 0) return;
                 ShowWorkspace(AgentWorkspacePage.Conversation);
+                SaveVisibleDraft();
                 _selectedSessionId = session.Id;
+                LoadVisibleDraft(session);
                 _shownSessionError = string.Empty;
                 _lastRevision = -1;
             });
@@ -935,12 +936,6 @@ namespace YuzeToolkit.UnityAgent
                 {
                     if (!IsFocusedWithin(actions)) actions.style.opacity = 0.18f;
                 }));
-            item.userData = new AgentSessionDropTarget(
-                session.IsPinned || session.IsArchived ? string.Empty : session.GroupId,
-                session.IsArchived, session.IsPinned && !session.IsArchived,
-                session.Id, AgentSessionDropPlacement.Before);
-            item.AddManipulator(new AgentSessionDragManipulator(item, target =>
-                RunUiTask(() => MoveSessionAsync(session, target))));
             return item;
         }
 
@@ -960,26 +955,9 @@ namespace YuzeToolkit.UnityAgent
             var items = new List<AgentMenuItem>
             {
                 new(session.IsPinned ? "Unpin" : "Pin",
-                    () => RunUiTask(() => UpdateOrganizationAsync(session, !session.IsPinned,
-                        session.IsArchived, session.GroupId))),
-                new(session.IsArchived ? "Restore from archive" : "Archive",
-                    () => RunUiTask(() => UpdateOrganizationAsync(session,
-                        session.IsArchived && session.IsPinned, !session.IsArchived, string.Empty)))
+                    () => RunUiTask(() => UpdateOrganizationAsync(session, !session.IsPinned, false))),
+                new("Archive", () => RunUiTask(() => UpdateOrganizationAsync(session, session.IsPinned, true)))
             };
-            var groups = _host.Settings.ConversationGroups.OrderBy(value => value.SortOrder).ToList();
-            if (groups.Count > 0)
-            {
-                items.Add(new AgentMenuItem("Move to · Ungrouped",
-                    () => RunUiTask(() => UpdateOrganizationAsync(session, session.IsPinned,
-                        session.IsArchived, "")), string.IsNullOrEmpty(session.GroupId), separatorBefore: true));
-                foreach (var group in groups)
-                {
-                    var captured = group.Id;
-                    items.Add(new AgentMenuItem("Move to · " + group.Name,
-                        () => RunUiTask(() => UpdateOrganizationAsync(session, session.IsPinned,
-                            session.IsArchived, captured)), session.GroupId == captured));
-                }
-            }
             items.Add(new AgentMenuItem("Delete conversation…", () => _showConfirmation("Delete conversation?",
                     $"Delete “{session.Title}” and its persisted transcript? This cannot be undone.",
                     () => RunUiTask(() => DeleteSessionAsync(session.Id))), dangerous: true,
@@ -987,59 +965,60 @@ namespace YuzeToolkit.UnityAgent
             AgentPopupMenu.Show(anchor, items, 230);
         }
 
-        private async Task MoveSessionAsync(AgentSessionDocument session, AgentSessionDropTarget target)
+        private async Task UpdateOrganizationAsync(AgentSessionDocument session, bool pinned, bool archived)
         {
-            var oldGroupId = session.IsPinned || session.IsArchived ? string.Empty : session.GroupId;
-            var oldArchived = session.IsArchived;
-            var oldPinned = session.IsPinned && !session.IsArchived;
-            var sessions = _host.GetSessions().Where(value => value.IsArchived == target.Archived &&
-                (target.Archived || value.IsPinned == target.Pinned) &&
-                string.Equals(value.IsPinned || value.IsArchived ? string.Empty : value.GroupId,
-                    target.GroupId, StringComparison.Ordinal) && value.Id != session.Id)
-                .OrderBy(value => value.SortOrder).ThenByDescending(value => value.UpdatedAtUtc).ToList();
-            var targetIndex = target.SessionId.Length == 0
-                ? sessions.Count
-                : sessions.FindIndex(value => value.Id == target.SessionId);
-            if (targetIndex < 0) targetIndex = sessions.Count;
-            if (target.Placement == AgentSessionDropPlacement.After) targetIndex++;
-            sessions.Insert(Mathf.Clamp(targetIndex, 0, sessions.Count), session);
-            for (var index = 0; index < sessions.Count; index++)
-            {
-                var value = sessions[index];
-                await _host.UpdateSessionOrganizationAsync(value.Id,
-                    value.Id == session.Id ? target.Pinned : value.IsPinned,
-                    target.Archived, target.GroupId, index, _lifetime.Token);
-            }
-            if (oldArchived != target.Archived || oldPinned != target.Pinned ||
-                !string.Equals(oldGroupId, target.GroupId, StringComparison.Ordinal))
-            {
-                var oldBucket = _host.GetSessions().Where(value => value.Id != session.Id &&
-                        value.IsArchived == oldArchived && (oldArchived || value.IsPinned == oldPinned) &&
-                        string.Equals(value.IsPinned || value.IsArchived ? string.Empty : value.GroupId,
-                            oldGroupId, StringComparison.Ordinal))
-                    .OrderBy(value => value.SortOrder).ThenByDescending(value => value.UpdatedAtUtc).ToList();
-                for (var index = 0; index < oldBucket.Count; index++)
-                {
-                    var value = oldBucket[index];
-                    await _host.UpdateSessionOrganizationAsync(value.Id, value.IsPinned, value.IsArchived,
-                        value.GroupId, index, _lifetime.Token);
-                }
-            }
-        }
-
-        private Task UpdateOrganizationAsync(AgentSessionDocument session, bool pinned, bool archived, string groupId)
-        {
-            return _host.UpdateSessionOrganizationAsync(session.Id, pinned, archived, groupId,
+            await _host.UpdateSessionOrganizationAsync(session.Id, pinned, archived,
                 Math.Max(0, session.SortOrder), _lifetime.Token);
+            if (archived && string.Equals(_selectedSessionId, session.Id, StringComparison.Ordinal))
+            {
+                _selectedSessionId = _host.GetSessions().Where(value => !value.IsArchived)
+                    .OrderByDescending(value => value.IsPinned)
+                    .ThenByDescending(value => value.UpdatedAtUtc)
+                    .Select(value => value.Id).FirstOrDefault() ?? string.Empty;
+            }
+            _lastRevision = -1;
         }
 
-        private async Task ToggleGroupCollapsedAsync(string groupId)
+        private void OnComposerChanged()
         {
-            var settings = _host.Settings;
-            var group = settings.ConversationGroups.FirstOrDefault(value => value.Id == groupId);
-            if (group == null) return;
-            group.IsCollapsed = !group.IsCollapsed;
-            await _host.SaveSettingsAsync(settings, _lifetime.Token);
+            RefreshActionButton();
+            if (_loadingComposerDraft) return;
+            if (string.IsNullOrEmpty(_composerSessionId))
+            {
+                _newConversationDraft = _composer.value;
+                return;
+            }
+            var sessionId = _composerSessionId;
+            var draft = _composer.value;
+            _draftSaveItem?.Pause();
+            _draftSaveItem = schedule.Execute(() =>
+                RunUiTask(() => _host.UpdateSessionDraftAsync(sessionId, draft, _lifetime.Token)))
+                .StartingIn(350);
+        }
+
+        private void SaveVisibleDraft()
+        {
+            if (_loadingComposerDraft) return;
+            if (string.IsNullOrEmpty(_composerSessionId))
+            {
+                _newConversationDraft = _composer.value;
+                return;
+            }
+            var sessionId = _composerSessionId;
+            var draft = _composer.value;
+            _draftSaveItem?.Pause();
+            RunUiTask(() => _host.UpdateSessionDraftAsync(sessionId, draft, _lifetime.Token));
+        }
+
+        private void LoadVisibleDraft(AgentSessionDocument? session)
+        {
+            var targetId = session?.Id ?? string.Empty;
+            if (string.Equals(_composerSessionId, targetId, StringComparison.Ordinal)) return;
+            _loadingComposerDraft = true;
+            _composerSessionId = targetId;
+            _composer.SetValueWithoutNotify(session?.Draft ?? _newConversationDraft);
+            _loadingComposerDraft = false;
+            RefreshActionButton();
         }
 
         private void RefreshActionButton()
@@ -1381,11 +1360,15 @@ namespace YuzeToolkit.UnityAgent
         private readonly Label _codexAccount;
         private readonly AgentChoiceField _permission;
         private readonly AgentIntegerField _toolTimeout;
-        private readonly AgentTextField _systemPrompt;
+        private readonly AgentTextField _editorSystemPrompt;
+        private readonly AgentTextField _runtimeSystemPrompt;
         private readonly AgentPathListEditor _agentsRoots;
         private readonly AgentPathListEditor _skillRoots;
-        private readonly AgentPathLocationEditor _history;
-        private readonly VisualElement _groups;
+        private readonly AgentEvalConnectionSettingsView _evalConnection;
+        private readonly AgentEvalToolsSettingsView _evalTools;
+        private readonly VisualElement _archivedConversations;
+        private readonly VisualElement _archivedCommandLines;
+        private readonly CommandLineStore _commandLineStore = new();
         private readonly Label _status;
         private readonly CancellationTokenSource _lifetime = new();
         private AgentSettingsDocument _editing = AgentSettingsDocument.CreateDefault();
@@ -1453,8 +1436,8 @@ namespace YuzeToolkit.UnityAgent
             Add(workspace);
 
             var navigation = new VisualElement { name = "unity-agent-settings-navigation" };
-            navigation.style.width = 188;
-            navigation.style.minWidth = 188;
+            navigation.style.width = 240;
+            navigation.style.minWidth = 240;
             navigation.style.flexShrink = 0;
             navigation.style.paddingTop = 12;
             navigation.style.paddingRight = 8;
@@ -1467,8 +1450,8 @@ namespace YuzeToolkit.UnityAgent
             {
                 var compact = evt.newRect.width < 1024f;
                 workspace.style.flexDirection = FlexDirection.Row;
-                navigation.style.width = compact ? 56 : 188;
-                navigation.style.minWidth = compact ? 56 : 188;
+                navigation.style.width = compact ? 56 : 240;
+                navigation.style.minWidth = compact ? 56 : 240;
                 navigation.style.height = new Length(100, LengthUnit.Percent);
                 navigation.style.minHeight = 0;
                 navigation.style.flexDirection = FlexDirection.Column;
@@ -1619,12 +1602,19 @@ namespace YuzeToolkit.UnityAgent
             AgentTooltip.Attach(_toolTimeout,
                 "Used when a process, shell, or Unity eval tool call does not specify its own timeout.");
             defaults.Add(_toolTimeout);
-            _systemPrompt = AgentUi.Field("System prompt", string.Empty,
-                "Global Agent instructions. This is intentionally unavailable inside a conversation.");
-            _systemPrompt.multiline = true;
-            _systemPrompt.style.minHeight = 150;
-            _systemPrompt.style.whiteSpace = WhiteSpace.Normal;
-            defaults.Add(_systemPrompt);
+            defaults.Add(CreateSettingsGroupLabel("System prompts"));
+            _editorSystemPrompt = AgentUi.Field("Editor system prompt", string.Empty,
+                "Instructions used while the Agent runs inside Unity Editor.");
+            _editorSystemPrompt.multiline = true;
+            _editorSystemPrompt.style.minHeight = 150;
+            _editorSystemPrompt.style.whiteSpace = WhiteSpace.Normal;
+            defaults.Add(_editorSystemPrompt);
+            _runtimeSystemPrompt = AgentUi.Field("Runtime system prompt", string.Empty,
+                "Instructions used in a built Player where UnityEditor and project files may be unavailable.");
+            _runtimeSystemPrompt.multiline = true;
+            _runtimeSystemPrompt.style.minHeight = 150;
+            _runtimeSystemPrompt.style.whiteSpace = WhiteSpace.Normal;
+            defaults.Add(_runtimeSystemPrompt);
 
             var agentsCard = AgentUi.Card("AGENTS.md discovery", "Ordered highest priority first. Each root is portable across computers.");
             FlattenSettingsCard(agentsCard);
@@ -1638,21 +1628,7 @@ namespace YuzeToolkit.UnityAgent
             _skillRoots = new AgentPathListEditor("Skill roots", "Add Skill root", ShowPathError);
             skillsCard.Add(_skillRoots);
 
-            var historyCard = AgentUi.Card("Conversation history", "Current persisted transcript location. Changing it migrates existing history.");
-            FlattenSettingsCard(historyCard);
-            _scroll.Content.Add(historyCard);
-            _history = new AgentPathLocationEditor(false, ShowPathError);
-            historyCard.Add(_history);
-
-            var groupsCard = AgentUi.Card("Conversation groups", "Groups appear in the chat sidebar. Conversations can be dragged onto a group.");
-            FlattenSettingsCard(groupsCard);
-            _scroll.Content.Add(groupsCard);
-            _groups = new VisualElement();
-            groupsCard.Add(_groups);
-            groupsCard.Add(AgentUi.Button("New group", "Create a conversation group.", AddGroup, 120,
-                icon: AgentIconKind.Add));
-
-            var fileCard = AgentUi.Card("Settings file", "The same JSON file can be edited outside Unity and reloaded here.");
+            var fileCard = AgentUi.Card("Storage", "All non-secret user configuration has one fixed root. Histories use two fixed child folders.");
             FlattenSettingsCard(fileCard);
             _scroll.Content.Add(fileCard);
             var settingsPath = Path.Combine(AgentPaths.SettingsRoot, AgentPaths.SettingsFileName);
@@ -1661,43 +1637,44 @@ namespace YuzeToolkit.UnityAgent
             path.style.color = AgentUi.Muted;
             AgentTooltip.Attach(path, settingsPath);
             fileCard.Add(path);
+            fileCard.Add(new Label("Agent conversations: " +
+                                   Path.Combine(AgentPaths.SettingsRoot, AgentPaths.AgentConversationsFolderName)));
+            fileCard.Add(new Label("Command Line history: " +
+                                   Path.Combine(AgentPaths.SettingsRoot, AgentPaths.CommandLineHistoryFolderName)));
             fileCard.Add(AgentUi.Button("Reload from disk", "Discard unsaved UI edits and reload settings.json.",
                 () => _showConfirmation("Reload settings?", "Discard unsaved changes in this page and reload settings.json?",
                     () => RunUiTask(ReloadAsync)), 128));
 
-            var evalCard = AgentUi.Card("Eval Tool", "Control the Editor Broker and every registered root Tool from the unified settings workspace.");
-            FlattenSettingsCard(evalCard);
-            if (UnityAgentEvalSettingsBridge.IsBrokerControlAvailable)
-            {
-                var broker = new AgentToggle("Editor Broker enabled");
-                broker.SetValueWithoutNotify(UnityAgentEvalSettingsBridge.BrokerEnabled);
-                broker.RegisterValueChangedCallback(evt => UnityAgentEvalSettingsBridge.SetBrokerEnabled(evt.newValue));
-                evalCard.Add(broker);
-            }
-            else
-            {
-                var runtimeBroker = new Label("Editor Broker controls are unavailable in Player builds.");
-                runtimeBroker.style.color = AgentUi.Muted;
-                evalCard.Add(runtimeBroker);
-            }
-            evalCard.Add(CreateSettingsGroupLabel("Registered root Tools"));
-            foreach (var tool in EvalToolRegistry.ListTools(true).OrderBy(value => value.Path, StringComparer.Ordinal))
-            {
-                var capturedPath = tool.Path;
-                var toggle = new AgentToggle(tool.Path);
-                toggle.SetValueWithoutNotify(tool.Enabled);
-                AgentTooltip.Attach(toggle, string.IsNullOrWhiteSpace(tool.Description)
-                    ? tool.Path
-                    : tool.Description);
-                toggle.RegisterValueChangedCallback(evt =>
-                {
-                    var result = EvalToolRegistry.SetToolEnabled(capturedPath, evt.newValue);
-                    if (!EvalData.GetBool(result, "ok"))
-                        throw new InvalidOperationException(EvalData.GetString(result, "error") ??
-                                                            $"Unable to update Tool '{capturedPath}'.");
-                });
-                evalCard.Add(toggle);
-            }
+            var projectCard = AgentUi.Card("Project Settings",
+                "Store these provider-free defaults with the project so new machines and Player builds start consistently.");
+            FlattenSettingsCard(projectCard);
+            var saveProject = AgentUi.Button("Save current configuration to Project Settings",
+                "Overwrite the project default asset without Provider profiles or API keys.",
+                () => RunUiTask(SaveProjectSettingsAsync), 330, AgentUi.Accent,
+                AgentUi.AccentForeground, AgentIconKind.Settings);
+            saveProject.SetEnabled(UnityAgentEvalSettingsBridge.CanSaveProjectSettings);
+            projectCard.Add(saveProject);
+            var projectHint = new Label(UnityAgentEvalSettingsBridge.CanSaveProjectSettings
+                ? "Editor only · Providers and local secrets are never copied."
+                : "Unavailable in Player builds. Project Settings are read-only at runtime.");
+            projectHint.style.color = AgentUi.Muted;
+            projectHint.style.whiteSpace = WhiteSpace.Normal;
+            projectCard.Add(projectHint);
+
+            _evalConnection = new AgentEvalConnectionSettingsView();
+            _evalTools = new AgentEvalToolsSettingsView();
+
+            var archivedConversationCard = AgentUi.Card("Archived conversations",
+                "Archived Agent conversations stay out of the main sidebar. Restore or permanently delete them here.");
+            FlattenSettingsCard(archivedConversationCard);
+            _archivedConversations = new VisualElement();
+            archivedConversationCard.Add(_archivedConversations);
+
+            var archivedCommandCard = AgentUi.Card("Archived command lines",
+                "Archived Command Line transcripts are managed separately from Agent conversations.");
+            FlattenSettingsCard(archivedCommandCard);
+            _archivedCommandLines = new VisualElement();
+            archivedCommandCard.Add(_archivedCommandLines);
 
             VisualElement CreatePage(params VisualElement[] cards)
             {
@@ -1709,11 +1686,16 @@ namespace YuzeToolkit.UnityAgent
             }
             _scroll.Content.Clear();
             var providersPage = CreatePage(providerCard);
-            var defaultsPage = CreatePage(defaults);
-            var instructionsPage = CreatePage(agentsCard, skillsCard);
-            var historyPage = CreatePage(historyCard, groupsCard, fileCard);
-            var evalPage = CreatePage(evalCard);
-            var settingsPages = new[] { providersPage, defaultsPage, instructionsPage, historyPage, evalPage };
+            var configurationPage = CreatePage(defaults, agentsCard, skillsCard, fileCard, projectCard);
+            var evalConnectionPage = CreatePage(_evalConnection);
+            var evalToolsPage = CreatePage(_evalTools);
+            var archivedConversationsPage = CreatePage(archivedConversationCard);
+            var archivedCommandLinesPage = CreatePage(archivedCommandCard);
+            var settingsPages = new[]
+            {
+                providersPage, configurationPage, evalConnectionPage, evalToolsPage,
+                archivedConversationsPage, archivedCommandLinesPage
+            };
             foreach (var page in settingsPages) _scroll.Content.Add(page);
 
             var navigationButtons = new List<AgentButton>();
@@ -1735,11 +1717,12 @@ namespace YuzeToolkit.UnityAgent
             }
             for (var index = 1; index < settingsPages.Length; index++)
                 settingsPages[index].style.display = DisplayStyle.None;
-            AddNavigation("Providers", AgentIconKind.Provider, providersPage, true);
-            AddNavigation("Agent defaults", AgentIconKind.Sliders, defaultsPage);
-            AddNavigation("Instructions", AgentIconKind.Folder, instructionsPage);
-            AddNavigation("History", AgentIconKind.History, historyPage);
-            AddNavigation("Eval Tool", AgentIconKind.Provider, evalPage);
+            AddNavigation("Model providers", AgentIconKind.Provider, providersPage, true);
+            AddNavigation("Configuration", AgentIconKind.Sliders, configurationPage);
+            AddNavigation("Eval connection", AgentIconKind.Folder, evalConnectionPage);
+            AddNavigation("Eval Tools", AgentIconKind.Provider, evalToolsPage);
+            AddNavigation("Archived conversations", AgentIconKind.Archive, archivedConversationsPage);
+            AddNavigation("Archived command lines", AgentIconKind.History, archivedCommandLinesPage);
 
             RunUiTask(InitializeAsync);
         }
@@ -1787,7 +1770,14 @@ namespace YuzeToolkit.UnityAgent
         {
             if (_disposed || !_initialized) return;
             // Settings edits are deliberately not overwritten by background Host revisions.
-            _lastRevision = _host.Revision;
+            var revision = _host.Revision;
+            if (revision != _lastRevision)
+            {
+                _lastRevision = revision;
+                RefreshArchives();
+            }
+            _evalConnection.Tick();
+            _evalTools.Tick();
         }
 
         public void Dispose()
@@ -1796,6 +1786,7 @@ namespace YuzeToolkit.UnityAgent
             _disposed = true;
             _lifetime.Cancel();
             _lifetime.Dispose();
+            _evalTools.Dispose();
         }
 
         private async Task InitializeAsync()
@@ -1807,11 +1798,11 @@ namespace YuzeToolkit.UnityAgent
             LoadSelectedProfile();
             _permission.SetValueWithoutNotify(_editing.PermissionMode.ToString());
             _toolTimeout.SetValueWithoutNotify(_editing.DefaultToolTimeoutSeconds);
-            _systemPrompt.SetValueWithoutNotify(_editing.SystemPrompt);
+            _editorSystemPrompt.SetValueWithoutNotify(_editing.EditorSystemPrompt);
+            _runtimeSystemPrompt.SetValueWithoutNotify(_editing.RuntimeSystemPrompt);
             _agentsRoots.SetItems(_editing.AgentsRoots);
             _skillRoots.SetItems(_editing.SkillRoots);
-            _history.SetValue(_editing.HistoryLocation);
-            RefreshGroups();
+            RefreshArchives();
             _initialized = true;
             _lastRevision = _host.Revision;
             _status.text = "Ready";
@@ -1836,12 +1827,14 @@ namespace YuzeToolkit.UnityAgent
                 ? permission
                 : AgentPermissionMode.FullAccess;
             _editing.DefaultToolTimeoutSeconds = Math.Max(1, _toolTimeout.value);
-            _editing.SystemPrompt = string.IsNullOrWhiteSpace(_systemPrompt.value)
-                ? AgentPromptDefaults.SystemPrompt
-                : _systemPrompt.value;
+            _editing.EditorSystemPrompt = string.IsNullOrWhiteSpace(_editorSystemPrompt.value)
+                ? AgentPromptDefaults.EditorSystemPrompt
+                : _editorSystemPrompt.value;
+            _editing.RuntimeSystemPrompt = string.IsNullOrWhiteSpace(_runtimeSystemPrompt.value)
+                ? AgentPromptDefaults.RuntimeSystemPrompt
+                : _runtimeSystemPrompt.value;
             _editing.AgentsRoots = _agentsRoots.GetItems();
             _editing.SkillRoots = _skillRoots.GetItems();
-            _editing.HistoryLocation = _history.GetValue();
             _editing.DefaultProviderProfileId = _selectedProfileId;
             await _host.SaveSettingsAsync(_editing, _lifetime.Token);
             _editing = _host.Settings;
@@ -1899,11 +1892,11 @@ namespace YuzeToolkit.UnityAgent
             LoadSelectedProfile();
             _permission.SetValueWithoutNotify(_editing.PermissionMode.ToString());
             _toolTimeout.SetValueWithoutNotify(_editing.DefaultToolTimeoutSeconds);
-            _systemPrompt.SetValueWithoutNotify(_editing.SystemPrompt);
+            _editorSystemPrompt.SetValueWithoutNotify(_editing.EditorSystemPrompt);
+            _runtimeSystemPrompt.SetValueWithoutNotify(_editing.RuntimeSystemPrompt);
             _agentsRoots.SetItems(_editing.AgentsRoots);
             _skillRoots.SetItems(_editing.SkillRoots);
-            _history.SetValue(_editing.HistoryLocation);
-            RefreshGroups();
+            RefreshArchives();
             _status.text = "Reloaded from disk";
         }
 
@@ -2231,91 +2224,91 @@ namespace YuzeToolkit.UnityAgent
                 : "Enter code " + login.UserCode + " in the opened page, then Refresh.";
         }
 
-        private void AddGroup()
+        private async Task SaveProjectSettingsAsync()
         {
-            _editing.ConversationGroups.Add(new AgentConversationGroup
-            {
-                Name = "New group",
-                SortOrder = _editing.ConversationGroups.Count
-            });
-            RefreshGroups();
+            await SaveAsync();
+            UnityAgentEvalSettingsBridge.SaveProjectSettings(_host.Settings);
+            _status.text = "Project Settings saved  ·  " + DateTime.Now.ToString("HH:mm:ss");
         }
 
-        private void RefreshGroups()
+        private void RefreshArchives()
         {
-            _groups.Clear();
-            foreach (var group in _editing.ConversationGroups.OrderBy(value => value.SortOrder).ToList())
-            {
-                var row = AgentUi.WrapRow();
-                row.style.marginBottom = 6;
-                var name = AgentUi.Field(string.Empty, group.Name, "Group name");
-                name.style.flexGrow = 1;
-                name.RegisterValueChangedCallback(evt => group.Name = evt.newValue);
-                row.Add(name);
-                var collapsed = new AgentToggle("Collapsed") { value = group.IsCollapsed };
-                collapsed.RegisterValueChangedCallback(evt => group.IsCollapsed = evt.newValue);
-                row.Add(collapsed);
-                row.Add(AgentUi.IconButton(AgentIconKind.ChevronUp, "Move group up", () => MoveGroup(group, -1), 30));
-                row.Add(AgentUi.IconButton(AgentIconKind.ChevronDown, "Move group down", () => MoveGroup(group, 1), 30));
-                row.Add(AgentUi.IconButton(AgentIconKind.Delete, "Delete group", () => RemoveGroup(group), 30, AgentUi.Danger));
-                _groups.Add(row);
-            }
-            if (_editing.ConversationGroups.Count == 0)
-            {
-                var empty = new Label("No groups. Conversations remain in the ungrouped section.");
-                empty.style.color = AgentUi.Muted;
-                empty.style.marginBottom = 8;
-                _groups.Add(empty);
-            }
+            _archivedConversations.Clear();
+            var conversations = _host.GetSessions().Where(value => value.IsArchived)
+                .OrderByDescending(value => value.UpdatedAtUtc).ToList();
+            if (conversations.Count == 0)
+                _archivedConversations.Add(ArchiveEmpty("No archived Agent conversations."));
+            foreach (var session in conversations)
+                _archivedConversations.Add(CreateArchivedConversationRow(session));
+
+            _archivedCommandLines.Clear();
+            var commands = _commandLineStore.Load().Where(value => value.IsArchived)
+                .OrderByDescending(value => value.UpdatedAtUtc).ToList();
+            if (commands.Count == 0)
+                _archivedCommandLines.Add(ArchiveEmpty("No archived Command Line transcripts."));
+            foreach (var session in commands)
+                _archivedCommandLines.Add(CreateArchivedCommandLineRow(session));
         }
 
-        private void MoveGroup(AgentConversationGroup group, int delta)
+        private VisualElement CreateArchivedConversationRow(AgentSessionDocument session)
         {
-            var list = _editing.ConversationGroups.OrderBy(value => value.SortOrder).ToList();
-            var index = list.IndexOf(group);
-            var target = Mathf.Clamp(index + delta, 0, list.Count - 1);
-            if (target == index) return;
-            list.RemoveAt(index);
-            list.Insert(target, group);
-            for (var i = 0; i < list.Count; i++) list[i].SortOrder = i;
-            _editing.ConversationGroups = list;
-            RefreshGroups();
-        }
-
-        private void RemoveGroup(AgentConversationGroup group)
-        {
-            _showConfirmation("Delete group?", $"Delete group “{group.Name}”? Conversations will be moved to Ungrouped.",
-                () => RunUiTask(() => RemoveGroupAsync(group)));
-        }
-
-        private async Task RemoveGroupAsync(AgentConversationGroup group)
-        {
-            var previous = _host.Settings;
-            var changed = _host.Settings;
-            var members = _host.GetSessions().Where(value => value.GroupId == group.Id)
-                .Select(value => new AgentSessionOrganizationSnapshot(value)).ToList();
-            changed.ConversationGroups.RemoveAll(value => value.Id == group.Id);
-            try
-            {
-                await _host.SaveSettingsAsync(changed, _lifetime.Token);
-                _editing = _host.Settings;
-                RefreshGroups();
-            }
-            catch
-            {
-                try
+            var row = AgentUi.Inset();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            var title = new Label(session.Title) { style = { flexGrow = 1, minWidth = 0 } };
+            title.style.overflow = Overflow.Hidden;
+            title.style.textOverflow = TextOverflow.Ellipsis;
+            row.Add(title);
+            row.Add(AgentUi.Button("Restore", "Move this conversation back to the main sidebar.",
+                () => RunUiTask(async () =>
                 {
-                    await _host.SaveSettingsAsync(previous, CancellationToken.None);
-                    foreach (var member in members)
-                        await _host.UpdateSessionOrganizationAsync(member.Id, member.IsPinned, member.IsArchived,
-                            member.GroupId, member.SortOrder, CancellationToken.None);
-                }
-                catch
+                    await _host.UpdateSessionOrganizationAsync(session.Id, session.IsPinned, false,
+                        Math.Max(0, session.SortOrder), _lifetime.Token);
+                    RefreshArchives();
+                }), 82));
+            row.Add(AgentUi.Button("Delete", "Permanently delete this archived conversation.",
+                () => _showConfirmation("Delete archived conversation?",
+                    $"Delete “{session.Title}” and its persisted transcript? This cannot be undone.",
+                    () => RunUiTask(async () =>
+                    {
+                        await _host.DeleteSessionAsync(session.Id, _lifetime.Token);
+                        RefreshArchives();
+                    })), 82, AgentUi.Danger));
+            return row;
+        }
+
+        private VisualElement CreateArchivedCommandLineRow(CommandLineSessionDocument session)
+        {
+            var row = AgentUi.Inset();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            var title = new Label(session.Title) { style = { flexGrow = 1, minWidth = 0 } };
+            title.style.overflow = Overflow.Hidden;
+            title.style.textOverflow = TextOverflow.Ellipsis;
+            row.Add(title);
+            row.Add(AgentUi.Button("Restore", "Move this Command Line transcript back to the main sidebar.",
+                () =>
                 {
-                    // Preserve and rethrow the original failure; Host persistence is authoritative.
-                }
-                throw;
-            }
+                    session.IsArchived = false;
+                    _commandLineStore.Save(session);
+                    RefreshArchives();
+                }, 82));
+            row.Add(AgentUi.Button("Delete", "Permanently delete this archived Command Line transcript.",
+                () => _showConfirmation("Delete archived command line?",
+                    $"Delete “{session.Title}” and its persisted transcript? This cannot be undone.", () =>
+                    {
+                        _commandLineStore.Delete(session.Id);
+                        RefreshArchives();
+                    }), 82, AgentUi.Danger));
+            return row;
+        }
+
+        private static Label ArchiveEmpty(string message)
+        {
+            var label = new Label(message);
+            label.style.color = AgentUi.Muted;
+            label.style.marginTop = 8;
+            return label;
         }
 
         private void ShowPathError(string message) => _showError("Invalid path", message);
@@ -2705,157 +2698,6 @@ namespace YuzeToolkit.UnityAgent
         }
     }
 
-    internal sealed class AgentSessionDropTarget
-    {
-        public AgentSessionDropTarget(
-            string groupId,
-            bool archived,
-            bool pinned,
-            string sessionId,
-            AgentSessionDropPlacement placement)
-        {
-            GroupId = groupId;
-            Archived = archived;
-            Pinned = pinned;
-            SessionId = sessionId;
-            Placement = placement;
-        }
-
-        public string GroupId { get; }
-        public bool Archived { get; }
-        public bool Pinned { get; }
-        public string SessionId { get; }
-        public AgentSessionDropPlacement Placement { get; }
-    }
-
-    internal sealed class AgentSessionOrganizationSnapshot
-    {
-        public AgentSessionOrganizationSnapshot(AgentSessionDocument session)
-        {
-            Id = session.Id;
-            IsPinned = session.IsPinned;
-            IsArchived = session.IsArchived;
-            GroupId = session.GroupId;
-            SortOrder = Math.Max(0, session.SortOrder);
-        }
-
-        public string Id { get; }
-        public bool IsPinned { get; }
-        public bool IsArchived { get; }
-        public string GroupId { get; }
-        public int SortOrder { get; }
-    }
-
-    internal enum AgentSessionDropPlacement
-    {
-        Before,
-        After
-    }
-
-    internal sealed class AgentSessionDragManipulator : PointerManipulator
-    {
-        private readonly Action<AgentSessionDropTarget> _dropped;
-        private bool _active;
-        private bool _dragging;
-        private int _pointerId;
-        private Vector2 _start;
-
-        public AgentSessionDragManipulator(VisualElement targetElement, Action<AgentSessionDropTarget> dropped)
-        {
-            target = targetElement;
-            _dropped = dropped;
-        }
-
-        protected override void RegisterCallbacksOnTarget()
-        {
-            target.RegisterCallback<PointerDownEvent>(Down, TrickleDown.TrickleDown);
-            target.RegisterCallback<PointerMoveEvent>(Move);
-            target.RegisterCallback<PointerUpEvent>(Up);
-            target.RegisterCallback<PointerCancelEvent>(Cancel);
-        }
-
-        protected override void UnregisterCallbacksFromTarget()
-        {
-            target.UnregisterCallback<PointerDownEvent>(Down, TrickleDown.TrickleDown);
-            target.UnregisterCallback<PointerMoveEvent>(Move);
-            target.UnregisterCallback<PointerUpEvent>(Up);
-            target.UnregisterCallback<PointerCancelEvent>(Cancel);
-        }
-
-        private void Down(PointerDownEvent evt)
-        {
-            if (evt.button != 0 || IsInteractive(evt.target as VisualElement)) return;
-            _active = true;
-            _dragging = false;
-            _pointerId = evt.pointerId;
-            _start = evt.position;
-            target.CapturePointer(evt.pointerId);
-        }
-
-        private bool IsInteractive(VisualElement? element)
-        {
-            while (element != null && element != target)
-            {
-                if (element is AgentButton || element is AgentTextField || element is AgentChoiceField ||
-                    element is AgentToggle || element is AgentIntegerField)
-                    return true;
-                element = element.parent;
-            }
-            return false;
-        }
-
-        private void Move(PointerMoveEvent evt)
-        {
-            if (!_active || evt.pointerId != _pointerId) return;
-            if (!_dragging && ((Vector2)evt.position - _start).sqrMagnitude < 25f) return;
-            _dragging = true;
-            target.style.opacity = 0.55f;
-        }
-
-        private void Up(PointerUpEvent evt)
-        {
-            if (!_active || evt.pointerId != _pointerId) return;
-            if (_dragging && target.panel != null)
-            {
-                var picked = target.panel.Pick(evt.position);
-                while (picked != null)
-                {
-                    if (picked.userData is AgentSessionDropTarget drop)
-                    {
-                        if (drop.SessionId.Length > 0)
-                        {
-                            var placement = evt.position.y > picked.worldBound.center.y
-                                ? AgentSessionDropPlacement.After
-                                : AgentSessionDropPlacement.Before;
-                            _dropped(new AgentSessionDropTarget(drop.GroupId, drop.Archived, drop.Pinned,
-                                drop.SessionId, placement));
-                        }
-                        else
-                        {
-                            _dropped(drop);
-                        }
-                        break;
-                    }
-                    picked = picked.parent;
-                }
-            }
-            Finish();
-        }
-
-        private void Cancel(PointerCancelEvent evt)
-        {
-            if (evt.pointerId == _pointerId) Finish();
-        }
-
-        private void Finish()
-        {
-            if (target.HasPointerCapture(_pointerId)) target.ReleasePointer(_pointerId);
-            target.style.opacity = 1f;
-            _active = false;
-            _dragging = false;
-        }
-    }
-
     internal enum AgentTypography
     {
         Caption,
@@ -3149,6 +2991,23 @@ namespace YuzeToolkit.UnityAgent
             root.style.borderBottomWidth = 0;
             root.style.borderLeftWidth = 0;
             foreach (var child in root.Children()) ResetScrollVisuals(child);
+        }
+
+        public static VisualElement PageHeading(string title, string subtitle)
+        {
+            var root = new VisualElement();
+            root.style.minWidth = 0;
+            root.style.marginBottom = 14;
+            var heading = new Label(title);
+            ApplyTypography(heading, AgentTypography.PageTitle);
+            root.Add(heading);
+            var help = new Label(subtitle);
+            ApplyTypography(help, AgentTypography.Caption, false);
+            help.style.color = Muted;
+            help.style.whiteSpace = WhiteSpace.Normal;
+            help.style.marginTop = 4;
+            root.Add(help);
+            return root;
         }
 
         public static VisualElement Card(string title, string subtitle)

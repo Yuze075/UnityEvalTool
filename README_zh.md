@@ -11,8 +11,8 @@ UnityEvalTool 让 AI Agent 和终端用户检查、操作本机的 Unity Editor 
 包则让每个 Unity 进程向 Broker 注册。编译、Domain Reload、进程替换和临时断线
 都会被明确报告，不再被 Unity Editor 内部的网络监听器遮蔽。
 
-仓库还包含可选的 UnityDebugTool Package，它在同一套 Tool 模型上增加游戏内
-Debug 面板和 Runtime Console。
+仓库还包含可选的 UnityAgentTool Package，它统一拥有 Editor/Runtime Agent 工作台、
+DebugPanel、Command Line、日志与系统监控。
 
 ## 需要安装的组件
 
@@ -20,7 +20,7 @@ Debug 面板和 Runtime Console。
 |---|---|---|
 | `com.yuzetoolkit.unityevaltool` | Unity 侧 Broker Client、状态报告、PuerTS eval session、CLI 命令和 helper module | 是 |
 | `@yuzetoolkit/unityevaltool` | 原生 Broker、MCP Server、`unity` CLI 和当前用户后台服务 | 是 |
-| `com.yuzetoolkit.unitydebugtool` | Runtime Debug 窗口、性能/系统 HUD、日志控制台、命令行和 Tool 目录 | 否 |
+| `com.yuzetoolkit.unityagenttool` | 统一 Agent 工作台、Runtime DebugPanel、性能/系统 HUD、日志、命令行和 Tool 目录 | 否 |
 
 Broker/CLI 支持 macOS、Linux 和 Windows 的 x64 与 arm64。Unity Package 需要
 Unity 2022.3 或更高版本。安装 Broker 需要 Node.js 18 或更高版本与 npm。WebGL 不是
@@ -152,27 +152,26 @@ handle 过期、失效或 Unity 进程被替换时才重新连接。修改型 `e
 连接中断，不得自动重试，因为其结果可能不确定。详见[进阶使用](Packages/com.yuzetoolkit.unityevaltool/docs/ADVANCED_USAGE_zh.md)
 和 [Broker 协议](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_zh.md)。
 
-## 可选的 Runtime Debug UI
+## 可选的 Agent 与 Runtime Debug UI
 
-安装 UnityEvalTool 后，使用 **Add package from git URL** 添加 UnityDebugTool：
+安装 UnityEvalTool 后，使用 **Add package from git URL** 添加 UnityAgentTool：
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityagenttool#v2.0.2
 ```
 
-然后把该 Package 中的 `Runtime/Core/Prefabs/DebugPanel.prefab` 放入 Scene 或常驻
-Prefab。面板不会自动创建。模块、默认快捷键、Prefab 规则和 API 详见
-[UnityDebugTool Package README](Packages/com.yuzetoolkit.unitydebugtool/README_zh.md)。
+然后把该 Package 中的 `Runtime/Panel/Prefabs/DebugPanel.prefab` 放入 Scene 或常驻
+Prefab。面板不会自动创建。模块、持久化模型、默认快捷键和 API 详见
+[UnityAgentTool Package README](Packages/com.yuzetoolkit.unityagenttool/README_zh.md)。
 
-默认快捷键为：`F8` 打开 Runtime Console，`F9` 打开 Debug Windows，`F10` 打开
-Performance 与 System Information HUD。
+默认快捷键为：`F8` 打开 Unity Agent，`F10` 打开 Performance 与 System Information HUD。
 
 ## 安全边界
 
 Broker 只绑定 `127.0.0.1:2347`，拒绝非 loopback 访问，并使用当前用户 token 认证
 Unity、CLI 与 MCP 流量。包含 UnityEvalTool 的、受支持的非 WebGL Release Player 会有意
 向 Broker 注册，并保留经认证的任意 JavaScript eval 能力；它不仅限于 Development Build，
-也不依赖 UnityDebugTool。请明确决定发行的产品中是否应包含该能力。详见
+也不依赖 UnityAgentTool。请明确决定发行的产品中是否应包含该能力。详见
 [Editor 与 Player 注册](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES_zh.md)。
 
 ## 服务管理与卸载
@@ -215,7 +214,7 @@ node npm/scripts/pack-root.mjs
 ## 文档
 
 - [UnityEvalTool Package](Packages/com.yuzetoolkit.unityevaltool/README_zh.md)
-- [UnityDebugTool Package](Packages/com.yuzetoolkit.unitydebugtool/README_zh.md)
+- [UnityAgentTool Package](Packages/com.yuzetoolkit.unityagenttool/README_zh.md)
 - [进阶使用](Packages/com.yuzetoolkit.unityevaltool/docs/ADVANCED_USAGE_zh.md)
 - [Helper module 参考](Packages/com.yuzetoolkit.unityevaltool/docs/HELPER_MODULES_zh.md)
 - [Editor 与 Player 注册](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES_zh.md)

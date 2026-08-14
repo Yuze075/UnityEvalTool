@@ -28,7 +28,7 @@ namespace YuzeToolkit
         internal static void AddStyleSheet(VisualElement root, StyleSheet styleSheet)
         {
             if (styleSheet == null)
-                throw new MissingReferenceException("UnityDebugTool stylesheet reference is missing.");
+                throw new MissingReferenceException("UnityAgentTool stylesheet reference is missing.");
 
             if (!root.styleSheets.Contains(styleSheet))
                 root.styleSheets.Add(styleSheet);

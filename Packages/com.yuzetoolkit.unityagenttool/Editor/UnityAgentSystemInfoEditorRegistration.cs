@@ -5,20 +5,20 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using YuzeToolkit.UnityAgent;
 
-namespace YuzeToolkit.UnityDebugTool.Editor
+namespace YuzeToolkit.UnityAgent
 {
     [InitializeOnLoad]
-    internal static class UnityDebugToolEditorWorkspaceRegistration
+    internal static class UnityAgentSystemInfoEditorRegistration
     {
         private const string SystemInfoRoot =
-            "Packages/com.yuzetoolkit.unitydebugtool/Runtime/SystemInfo/UI/SystemInfo";
+            "Packages/com.yuzetoolkit.unityagenttool/Runtime/SystemInfo/UI/SystemInfo";
         private const string PerformanceRoot =
-            "Packages/com.yuzetoolkit.unitydebugtool/Runtime/Performance/UI/PerformanceMonitor";
+            "Packages/com.yuzetoolkit.unityagenttool/Runtime/Performance/UI/PerformanceMonitor";
 
         private static IDisposable? _systemInfoRegistration;
         private static IDisposable? _performanceRegistration;
 
-        static UnityDebugToolEditorWorkspaceRegistration()
+        static UnityAgentSystemInfoEditorRegistration()
         {
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
             EditorApplication.delayCall += RegisterEditModeSections;
@@ -47,12 +47,12 @@ namespace YuzeToolkit.UnityDebugTool.Editor
             var performanceStyle = LoadRequired<StyleSheet>(PerformanceRoot + ".uss");
 
             _systemInfoRegistration = UnityAgentWorkspaceRegistry.RegisterSystemInfoSection(
-                "unity-debug-tool-system-info", 0,
+                "unity-agent-system-info", 10,
                 () => SystemInfoModule.CreateWorkspaceSection(systemTemplate, systemStyle));
             try
             {
                 _performanceRegistration = UnityAgentWorkspaceRegistry.RegisterSystemInfoSection(
-                    "unity-debug-tool-performance", 10,
+                    "unity-agent-performance", 0,
                     () => PerformanceMonitorModule.CreateWorkspaceSection(performanceTemplate, performanceStyle));
             }
             catch
@@ -67,7 +67,7 @@ namespace YuzeToolkit.UnityDebugTool.Editor
             var asset = AssetDatabase.LoadAssetAtPath<T>(path);
             return asset != null
                 ? asset
-                : throw new MissingReferenceException($"Required UnityDebugTool asset was not found: {path}");
+                : throw new MissingReferenceException($"Required UnityAgentTool asset was not found: {path}");
         }
 
         private static void DisposeRegistrations()

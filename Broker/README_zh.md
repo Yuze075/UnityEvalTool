@@ -30,8 +30,8 @@
 
 ## 校验已提交版本
 
-[`version.json`](../version.json) 是 UnityEvalTool/Broker/npm 版本、独立管理的 UnityDebugTool
-Package 版本和协议版本的唯一来源。打包脚本会拒绝 Package manifest、Broker 属性、
+[`version.json`](../version.json) 是 UnityEvalTool/Broker/npm 版本和协议版本的唯一来源。
+打包脚本会拒绝 Package manifest、Broker 属性、
 Runtime 常量、协议常量或 npm optional dependency 之间的不一致。
 
 在仓库根目录执行：

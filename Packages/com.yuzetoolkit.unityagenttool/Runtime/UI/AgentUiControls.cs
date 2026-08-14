@@ -1295,12 +1295,12 @@ namespace YuzeToolkit.UnityAgent
 
         private static VisualElement FindPopupRoot(VisualElement anchor, VisualElement panelRoot)
         {
-            // Runtime Console owns its clipping/window contract. Keep menus inside that window instead of
-            // attaching them to the fullscreen panel where they can fall behind or outside the console.
             for (var current = anchor; current != null && current != panelRoot; current = current.parent)
             {
-                if (current.ClassListContains("yuzu-runtime-console"))
-                    return current;
+                // EditorWindow panels contain internal chrome outside the user's content coordinates.
+                // The workbench is the shared visible viewport in both Editor and Player, so owned
+                // popups stay readable and clamp against the same logical rectangle as their anchors.
+                if (current is UnityAgentWorkbenchView) return current;
             }
             return panelRoot;
         }
@@ -1331,7 +1331,7 @@ namespace YuzeToolkit.UnityAgent
 
         private static void Show(VisualElement target, string text, Vector2 worldPosition)
         {
-            var root = target.panel?.visualTree;
+            var root = ResolveRoot(target);
             if (root == null) return;
             var popup = root.Q<VisualElement>(LayerName);
             if (popup == null)
@@ -1363,7 +1363,7 @@ namespace YuzeToolkit.UnityAgent
 
         private static void Position(VisualElement target, Vector2 worldPosition)
         {
-            var root = target.panel?.visualTree;
+            var root = ResolveRoot(target);
             var popup = root?.Q<VisualElement>(LayerName);
             if (root == null || popup == null || popup.style.display == DisplayStyle.None) return;
             var local = root.WorldToLocal(worldPosition);
@@ -1377,7 +1377,7 @@ namespace YuzeToolkit.UnityAgent
 
         private static void Hide(VisualElement target)
         {
-            var popup = target.panel?.visualTree.Q<VisualElement>(LayerName);
+            var popup = ResolveRoot(target)?.Q<VisualElement>(LayerName);
             if (popup != null) popup.style.display = DisplayStyle.None;
         }
 
@@ -1385,6 +1385,15 @@ namespace YuzeToolkit.UnityAgent
         {
             var popup = root.Q<VisualElement>(LayerName);
             if (popup != null) popup.style.display = DisplayStyle.None;
+        }
+
+        private static VisualElement? ResolveRoot(VisualElement target)
+        {
+            var panelRoot = target.panel?.visualTree;
+            if (panelRoot == null) return null;
+            for (var current = target; current != null && current != panelRoot; current = current.parent)
+                if (current is UnityAgentWorkbenchView) return current;
+            return panelRoot;
         }
     }
 }

@@ -156,8 +156,6 @@ namespace YuzeToolkit.UnityAgent
                     var repairedSessions = new List<AgentSessionDocument>();
                     var profileIds = new HashSet<string>(settings.ProviderProfiles.Select(profile => profile.Id),
                         StringComparer.Ordinal);
-                    var groupIds = new HashSet<string>(settings.ConversationGroups.Select(group => group.Id),
-                        StringComparer.Ordinal);
                     var projectRoot = AgentPaths.ProjectRoot;
                     foreach (var document in sessions)
                     {
@@ -179,11 +177,6 @@ namespace YuzeToolkit.UnityAgent
                             document.Model = profile.Model;
                             document.ReasoningEffort = profile.ReasoningEffort;
                             document.ProviderThreadId = string.Empty;
-                            repaired = true;
-                        }
-                        if (!string.IsNullOrEmpty(document.GroupId) && !groupIds.Contains(document.GroupId))
-                        {
-                            document.GroupId = string.Empty;
                             repaired = true;
                         }
                         if (document.SortOrder < 0)
@@ -396,6 +389,7 @@ namespace YuzeToolkit.UnityAgent
                         Role = AgentMessageRole.User,
                         Text = text.Trim()
                     });
+                    runtime.Document.Draft = string.Empty;
                     if (runtime.Document.Messages.Count == 1)
                         runtime.Document.Title = CreateTitle(text);
                     runtime.Document.State = AgentSessionState.Running;
@@ -638,7 +632,6 @@ namespace YuzeToolkit.UnityAgent
             string sessionId,
             bool isPinned,
             bool isArchived,
-            string groupId,
             int sortOrder,
             CancellationToken cancellationToken = default)
         {
@@ -647,17 +640,9 @@ namespace YuzeToolkit.UnityAgent
             var token = linkedCancellation.Token;
             await EnsureInitializedCoreAsync(token).ConfigureAwait(false);
             if (sortOrder < 0) throw new ArgumentOutOfRangeException(nameof(sortOrder));
-            groupId ??= string.Empty;
             await _settingsMutationGate.WaitAsync(token).ConfigureAwait(false);
             try
             {
-                lock (_syncRoot)
-                {
-                    if (!string.IsNullOrEmpty(groupId) &&
-                        _settings.ConversationGroups.All(group =>
-                            !string.Equals(group.Id, groupId, StringComparison.Ordinal)))
-                        throw new KeyNotFoundException($"Conversation group '{groupId}' does not exist.");
-                }
                 var runtime = GetRuntime(sessionId);
                 if (!await runtime.TurnGate.WaitAsync(0, token).ConfigureAwait(false))
                     throw new InvalidOperationException(
@@ -670,7 +655,6 @@ namespace YuzeToolkit.UnityAgent
                             throw new InvalidOperationException("This conversation is being deleted.");
                         runtime.Document.IsPinned = isPinned;
                         runtime.Document.IsArchived = isArchived;
-                        runtime.Document.GroupId = groupId;
                         runtime.Document.SortOrder = sortOrder;
                         runtime.Document.UpdatedAtUtc = DateTime.UtcNow;
                     }
@@ -681,6 +665,38 @@ namespace YuzeToolkit.UnityAgent
                 {
                     runtime.TurnGate.Release();
                 }
+            }
+            finally
+            {
+                _settingsMutationGate.Release();
+            }
+        }
+
+        public async Task UpdateSessionDraftAsync(
+            string sessionId,
+            string draft,
+            CancellationToken cancellationToken = default)
+        {
+            if (draft == null) throw new ArgumentNullException(nameof(draft));
+            if (draft.Length > 1_000_000)
+                throw new ArgumentException("Conversation draft cannot exceed 1,000,000 characters.", nameof(draft));
+            using var operation = EnterOperation();
+            using var linkedCancellation = CreateOperationCancellation(cancellationToken);
+            var token = linkedCancellation.Token;
+            await EnsureInitializedCoreAsync(token).ConfigureAwait(false);
+            var runtime = GetRuntime(sessionId);
+            await _settingsMutationGate.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                lock (runtime.SyncRoot)
+                {
+                    if (runtime.IsDeleting)
+                        throw new InvalidOperationException("This conversation is being deleted.");
+                    if (string.Equals(runtime.Document.Draft, draft, StringComparison.Ordinal)) return;
+                    runtime.Document.Draft = draft;
+                }
+                await SaveRuntimeAsync(runtime, token).ConfigureAwait(false);
+                MarkChanged();
             }
             finally
             {
@@ -716,8 +732,6 @@ namespace YuzeToolkit.UnityAgent
                 await _store.SaveSettingsAsync(normalized, token).ConfigureAwait(false);
                 var validProfiles = new HashSet<string>(normalized.ProviderProfiles.Select(profile => profile.Id),
                     StringComparer.Ordinal);
-                var validGroups = new HashSet<string>(normalized.ConversationGroups.Select(group => group.Id),
-                    StringComparer.Ordinal);
                 var defaultProfile = normalized.ProviderProfiles.First(profile =>
                     profile.Id == normalized.DefaultProviderProfileId);
                 var changedSessions = new List<AgentSessionRuntime>();
@@ -735,12 +749,6 @@ namespace YuzeToolkit.UnityAgent
                                 runtime.Document.Model = defaultProfile.Model;
                                 runtime.Document.ReasoningEffort = defaultProfile.ReasoningEffort;
                                 runtime.Document.ProviderThreadId = string.Empty;
-                                changed = true;
-                            }
-                            if (!string.IsNullOrEmpty(runtime.Document.GroupId) &&
-                                !validGroups.Contains(runtime.Document.GroupId))
-                            {
-                                runtime.Document.GroupId = string.Empty;
                                 changed = true;
                             }
                             if (!string.IsNullOrEmpty(runtime.Document.SystemPrompt))
@@ -804,8 +812,6 @@ namespace YuzeToolkit.UnityAgent
                 var resetProviderThreads = SettingsAffectConversationContext(previous, normalized);
                 var validProfiles = new HashSet<string>(normalized.ProviderProfiles.Select(profile => profile.Id),
                     StringComparer.Ordinal);
-                var validGroups = new HashSet<string>(normalized.ConversationGroups.Select(group => group.Id),
-                    StringComparer.Ordinal);
                 var defaultProfile = normalized.ProviderProfiles.First(profile =>
                     profile.Id == normalized.DefaultProviderProfileId);
                 var changedSessions = new List<AgentSessionRuntime>();
@@ -823,12 +829,6 @@ namespace YuzeToolkit.UnityAgent
                                 runtime.Document.Model = defaultProfile.Model;
                                 runtime.Document.ReasoningEffort = defaultProfile.ReasoningEffort;
                                 runtime.Document.ProviderThreadId = string.Empty;
-                                changed = true;
-                            }
-                            if (!string.IsNullOrEmpty(runtime.Document.GroupId) &&
-                                !validGroups.Contains(runtime.Document.GroupId))
-                            {
-                                runtime.Document.GroupId = string.Empty;
                                 changed = true;
                             }
                             if (!string.IsNullOrEmpty(runtime.Document.SystemPrompt))
@@ -878,8 +878,6 @@ namespace YuzeToolkit.UnityAgent
             var storedSessions = await _store.LoadSessionsAsync(cancellationToken).ConfigureAwait(false);
             var profileIds = new HashSet<string>(settings.ProviderProfiles.Select(profile => profile.Id),
                 StringComparer.Ordinal);
-            var groupIds = new HashSet<string>(settings.ConversationGroups.Select(group => group.Id),
-                StringComparer.Ordinal);
             var defaultProfile = settings.ProviderProfiles.First(profile =>
                 profile.Id == settings.DefaultProviderProfileId);
             var addedSessions = new List<(string Id, AgentSessionRuntime Runtime)>();
@@ -910,11 +908,6 @@ namespace YuzeToolkit.UnityAgent
                         document.Model = defaultProfile.Model;
                         document.ReasoningEffort = defaultProfile.ReasoningEffort;
                         document.ProviderThreadId = string.Empty;
-                        repaired = true;
-                    }
-                    if (!string.IsNullOrEmpty(document.GroupId) && !groupIds.Contains(document.GroupId))
-                    {
-                        document.GroupId = string.Empty;
                         repaired = true;
                     }
                     if (document.SortOrder < 0)
@@ -1320,27 +1313,10 @@ namespace YuzeToolkit.UnityAgent
 
             ValidatePathLocations(settings.AgentsRoots, "AGENTS.md", nameof(settings));
             ValidatePathLocations(settings.SkillRoots, "Skill", nameof(settings));
-            if (settings.HistoryLocation == null)
-                throw new ArgumentException("Conversation history location cannot be null.", nameof(settings));
-            AgentPaths.Validate(settings.HistoryLocation, nameof(settings));
-
-            if (settings.ConversationGroups == null)
-                throw new ArgumentException("Conversation groups collection cannot be null.", nameof(settings));
-            var groupIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var group in settings.ConversationGroups)
-            {
-                if (group == null)
-                    throw new ArgumentException("Conversation groups cannot contain null values.", nameof(settings));
-                if (string.IsNullOrWhiteSpace(group.Id))
-                    throw new ArgumentException("Every conversation group requires an id.", nameof(settings));
-                if (!groupIds.Add(group.Id))
-                    throw new ArgumentException($"Duplicate conversation group id '{group.Id}'.", nameof(settings));
-                if (string.IsNullOrWhiteSpace(group.Name))
-                    throw new ArgumentException($"Conversation group '{group.Id}' requires a name.", nameof(settings));
-                if (group.SortOrder < 0)
-                    throw new ArgumentException(
-                        $"Conversation group '{group.Id}' cannot have a negative sort order.", nameof(settings));
-            }
+            if (string.IsNullOrWhiteSpace(settings.EditorSystemPrompt))
+                throw new ArgumentException("Editor system prompt is required.", nameof(settings));
+            if (string.IsNullOrWhiteSpace(settings.RuntimeSystemPrompt))
+                throw new ArgumentException("Runtime system prompt is required.", nameof(settings));
         }
 
         private static void ValidatePathLocations(
@@ -1365,7 +1341,9 @@ namespace YuzeToolkit.UnityAgent
             AgentSettingsDocument previous,
             AgentSettingsDocument current)
         {
-            if (!string.Equals(previous.SystemPrompt, current.SystemPrompt, StringComparison.Ordinal)) return true;
+            if (!string.Equals(previous.EditorSystemPrompt, current.EditorSystemPrompt, StringComparison.Ordinal) ||
+                !string.Equals(previous.RuntimeSystemPrompt, current.RuntimeSystemPrompt, StringComparison.Ordinal))
+                return true;
             if (!PathLocationsEqual(previous.AgentsRoots, current.AgentsRoots) ||
                 !PathLocationsEqual(previous.SkillRoots, current.SkillRoots)) return true;
 

@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -120,7 +121,7 @@ namespace YuzeToolkit.UnityAgent
 
         /// <summary>
         /// When true, this instruction root is copied into Player StreamingAssets. Editor discovery
-        /// always follows the ordered list regardless of this flag. HistoryLocation ignores it.
+        /// always follows the ordered list regardless of this flag.
         /// </summary>
         public bool IncludeInPlayerBuild { get; set; }
 
@@ -140,29 +141,26 @@ namespace YuzeToolkit.UnityAgent
             IncludeInPlayerBuild = true
         };
 
-        public static AgentPathLocation DefaultHistoryLocation() => new()
+        public static AgentPathLocation PersistentAgentsRoot() => new()
         {
-            Id = "conversation-history",
+            Id = "persistent-agents",
             BasePath = AgentPathBase.PersistentData,
-            RelativePath = ".unityagenttool",
+            RelativePath = string.Empty,
+            IncludeInPlayerBuild = false
+        };
+
+        public static AgentPathLocation PersistentSkillsRoot() => new()
+        {
+            Id = "persistent-skills",
+            BasePath = AgentPathBase.PersistentData,
+            RelativePath = ".agents/skills",
             IncludeInPlayerBuild = false
         };
     }
 
-    public sealed class AgentConversationGroup
-    {
-        public string Id { get; set; } = Guid.NewGuid().ToString("N");
-
-        public string Name { get; set; } = "New group";
-
-        public int SortOrder { get; set; }
-
-        public bool IsCollapsed { get; set; }
-    }
-
     public sealed class AgentSettingsDocument
     {
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -170,7 +168,9 @@ namespace YuzeToolkit.UnityAgent
 
         public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.FullAccess;
 
-        public string SystemPrompt { get; set; } = AgentPromptDefaults.SystemPrompt;
+        public string EditorSystemPrompt { get; set; } = AgentPromptDefaults.EditorSystemPrompt;
+
+        public string RuntimeSystemPrompt { get; set; } = AgentPromptDefaults.RuntimeSystemPrompt;
 
         public int DefaultToolTimeoutSeconds { get; set; } = 120;
 
@@ -182,11 +182,6 @@ namespace YuzeToolkit.UnityAgent
         /// <summary>Ordered, highest-priority-first directories containing Skills.</summary>
         public List<AgentPathLocation> SkillRoots { get; set; } = new();
 
-        /// <summary>Current directory that owns the Sessions folder.</summary>
-        public AgentPathLocation HistoryLocation { get; set; } = AgentPathLocation.DefaultHistoryLocation();
-
-        public List<AgentConversationGroup> ConversationGroups { get; set; } = new();
-
         public static AgentSettingsDocument CreateDefault()
         {
             var profile = new AgentProviderProfile();
@@ -196,21 +191,85 @@ namespace YuzeToolkit.UnityAgent
             {
                 DefaultProviderProfileId = profile.Id,
                 ProviderProfiles = new List<AgentProviderProfile> { profile },
-                AgentsRoots = new List<AgentPathLocation> { AgentPathLocation.ProjectAgentsRoot() },
-                SkillRoots = new List<AgentPathLocation> { AgentPathLocation.ProjectSkillsRoot() },
-                HistoryLocation = AgentPathLocation.DefaultHistoryLocation()
+                AgentsRoots = new List<AgentPathLocation>
+                {
+                    AgentPathLocation.ProjectAgentsRoot(),
+                    AgentPathLocation.PersistentAgentsRoot()
+                },
+                SkillRoots = new List<AgentPathLocation>
+                {
+                    AgentPathLocation.ProjectSkillsRoot(),
+                    AgentPathLocation.PersistentSkillsRoot()
+                }
             };
         }
     }
 
+    /// <summary>
+    /// Provider-free defaults stored with the Unity project and included in Player builds.
+    /// Machine credentials and Provider endpoints are intentionally absent.
+    /// </summary>
+    public sealed class AgentProjectSettingsDocument
+    {
+        public const int CurrentSchemaVersion = 1;
+
+        public int SchemaVersion { get; set; } = CurrentSchemaVersion;
+        public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.FullAccess;
+        public string EditorSystemPrompt { get; set; } = AgentPromptDefaults.EditorSystemPrompt;
+        public string RuntimeSystemPrompt { get; set; } = AgentPromptDefaults.RuntimeSystemPrompt;
+        public int DefaultToolTimeoutSeconds { get; set; } = 120;
+        public List<AgentPathLocation> AgentsRoots { get; set; } = new()
+        {
+            AgentPathLocation.ProjectAgentsRoot(), AgentPathLocation.PersistentAgentsRoot()
+        };
+        public List<AgentPathLocation> SkillRoots { get; set; } = new()
+        {
+            AgentPathLocation.ProjectSkillsRoot(), AgentPathLocation.PersistentSkillsRoot()
+        };
+
+        public static AgentProjectSettingsDocument FromSettings(AgentSettingsDocument settings) => new()
+        {
+            PermissionMode = settings.PermissionMode,
+            EditorSystemPrompt = settings.EditorSystemPrompt,
+            RuntimeSystemPrompt = settings.RuntimeSystemPrompt,
+            DefaultToolTimeoutSeconds = settings.DefaultToolTimeoutSeconds,
+            AgentsRoots = settings.AgentsRoots.Select(ClonePath).ToList(),
+            SkillRoots = settings.SkillRoots.Select(ClonePath).ToList()
+        };
+
+        public void ApplyTo(AgentSettingsDocument settings)
+        {
+            settings.PermissionMode = PermissionMode;
+            settings.EditorSystemPrompt = EditorSystemPrompt;
+            settings.RuntimeSystemPrompt = RuntimeSystemPrompt;
+            settings.DefaultToolTimeoutSeconds = Math.Max(1, DefaultToolTimeoutSeconds);
+            settings.AgentsRoots = AgentsRoots.Select(ClonePath).ToList();
+            settings.SkillRoots = SkillRoots.Select(ClonePath).ToList();
+        }
+
+        private static AgentPathLocation ClonePath(AgentPathLocation value) => new()
+        {
+            Id = value.Id,
+            BasePath = value.BasePath,
+            RelativePath = value.RelativePath,
+            IncludeInPlayerBuild = value.IncludeInPlayerBuild
+        };
+    }
+
     public static class AgentPromptDefaults
     {
-        public const string SystemPrompt =
-            "You are a Unity development agent running inside the current Unity process. " +
+        public const string EditorSystemPrompt =
+            "You are a Unity Editor development agent running inside the current Unity Editor process. " +
             "Work autonomously through multiple tool calls until the user's task is complete. " +
             "Inspect relevant files and Unity state before changing them, preserve unrelated work, " +
             "report tool failures honestly, and never claim an action succeeded without its tool result. " +
             "Use unity_eval_js for native Unity and IEvalTool operations. Use file and process tools for host operations.";
+
+        public const string RuntimeSystemPrompt =
+            "You are a runtime Unity game agent embedded in the currently running Player. " +
+            "Operate only through tools available in this build, prioritize observing and controlling live game state, " +
+            "do not assume UnityEditor APIs or project source files exist, and report unavailable operations explicitly. " +
+            "Continue through multiple safe tool calls until the user's runtime task is complete.";
     }
 
     public sealed class AgentToolCall
@@ -260,7 +319,7 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class AgentSessionDocument
     {
-        public const int CurrentSchemaVersion = 3;
+        public const int CurrentSchemaVersion = 4;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -314,9 +373,10 @@ namespace YuzeToolkit.UnityAgent
 
         public bool IsArchived { get; set; }
 
-        public string GroupId { get; set; } = string.Empty;
-
         public int SortOrder { get; set; }
+
+        /// <summary>Independent unsent composer text for this persisted conversation.</summary>
+        public string Draft { get; set; } = string.Empty;
     }
 
     public sealed class AgentToolDescriptor

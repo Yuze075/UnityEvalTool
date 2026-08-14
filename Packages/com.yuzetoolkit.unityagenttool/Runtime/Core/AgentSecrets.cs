@@ -31,8 +31,20 @@ namespace YuzeToolkit.UnityAgent
         private readonly string _filePath;
 
         public AgentSecretStore()
-            : this(Path.Combine(AgentPaths.SettingsRoot, AgentPaths.SecretsFileName))
+            : this(ResolveDefaultSecretPath())
         {
+        }
+
+        private static string ResolveDefaultSecretPath()
+        {
+            var current = Path.Combine(AgentPaths.SettingsRoot, AgentPaths.SecretsFileName);
+            var legacy = Path.Combine(AgentPaths.LegacySettingsRoot, AgentPaths.SecretsFileName);
+            if (!File.Exists(current) && File.Exists(legacy))
+            {
+                Directory.CreateDirectory(AgentPaths.SettingsRoot);
+                File.Copy(legacy, current);
+            }
+            return current;
         }
 
         public AgentSecretStore(string filePath)

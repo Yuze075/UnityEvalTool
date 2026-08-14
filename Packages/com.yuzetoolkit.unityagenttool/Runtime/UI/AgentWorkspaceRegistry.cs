@@ -6,7 +6,7 @@ using UnityEngine.UIElements;
 
 namespace YuzeToolkit.UnityAgent
 {
-    /// <summary>A live section contributed to the workbench System Info page by a downstream package.</summary>
+    /// <summary>A live section hosted by the workbench System Info page.</summary>
     public interface IUnityAgentWorkspaceSection : IDisposable
     {
         VisualElement Root { get; }
@@ -14,8 +14,7 @@ namespace YuzeToolkit.UnityAgent
     }
 
     /// <summary>
-    /// Downstream-only composition point. UnityDebugTool contributes its protected System Info and
-    /// Performance views here without introducing an Agent -> Debug dependency.
+    /// Composition point for the protected System Info and Performance views owned by AgentTool.
     /// </summary>
     public static class UnityAgentWorkspaceRegistry
     {
@@ -92,8 +91,16 @@ namespace YuzeToolkit.UnityAgent
     {
         private static Func<bool>? _getBrokerEnabled;
         private static Action<bool>? _setBrokerEnabled;
+        private static Action? _reconnect;
+        private static Action? _openBrokerFolder;
+        private static Action<string>? _saveProjectSettings;
 
         public static bool IsBrokerControlAvailable => _getBrokerEnabled != null && _setBrokerEnabled != null;
+        public static bool CanReconnect => _reconnect != null;
+        public static bool CanOpenBrokerFolder => _openBrokerFolder != null;
+        public static bool CanSaveProjectSettings => _saveProjectSettings != null;
+        public static bool IncludeEditorOnlyTools => IsBrokerControlAvailable;
+        public static string RuntimeStateLabel => AgentPaths.IsEditor ? "Editor" : "Player";
         public static bool BrokerEnabled => _getBrokerEnabled?.Invoke() ?? false;
 
         public static void SetBrokerEnabled(bool enabled)
@@ -107,6 +114,31 @@ namespace YuzeToolkit.UnityAgent
         {
             _getBrokerEnabled = getEnabled ?? throw new ArgumentNullException(nameof(getEnabled));
             _setBrokerEnabled = setEnabled ?? throw new ArgumentNullException(nameof(setEnabled));
+        }
+
+        public static void ConfigureEditorActions(
+            Action reconnect,
+            Action openBrokerFolder,
+            Action<string> saveProjectSettings)
+        {
+            _reconnect = reconnect ?? throw new ArgumentNullException(nameof(reconnect));
+            _openBrokerFolder = openBrokerFolder ?? throw new ArgumentNullException(nameof(openBrokerFolder));
+            _saveProjectSettings = saveProjectSettings ?? throw new ArgumentNullException(nameof(saveProjectSettings));
+        }
+
+        public static void Reconnect() =>
+            (_reconnect ?? throw new InvalidOperationException("Reconnect is only available in the Unity Editor."))();
+
+        public static void OpenBrokerFolder() =>
+            (_openBrokerFolder ?? throw new InvalidOperationException(
+                "The Broker folder is only available in the Unity Editor."))();
+
+        public static void SaveProjectSettings(AgentSettingsDocument settings)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            (_saveProjectSettings ?? throw new InvalidOperationException(
+                "Project Settings can only be written in the Unity Editor."))(
+                UnityAgentProjectSettings.Serialize(settings));
         }
     }
 }

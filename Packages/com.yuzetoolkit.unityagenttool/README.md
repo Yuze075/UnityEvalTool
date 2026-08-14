@@ -11,47 +11,46 @@ DebugWindow builder API, Agent conversations, Command Line sessions and Unity lo
 The Editor menu **YuzeToolkit > Unity Agent** and the runtime `UnityAgentPanelModule` both create the
 same `UnityAgentWorkbenchView`. Its main sidebar has exactly five primary actions:
 
-1. **New conversation** creates an Agent conversation.
-2. **New command line** creates a persistent Command Line transcript; its process-local VM starts lazily.
+1. **New conversation** opens an unpersisted draft; its document is created only on first send.
+2. **New command line** opens an unpersisted draft; its transcript and process-local VM start on first run.
 3. **Debug Panel** displays every `DebugWindowModule.RegisterWindow(...)` registration as a tab.
 4. **Log** captures Unity logs with search, type filters, repeat grouping, clear, auto-scroll,
    Stack Trace level, Editor source navigation and local log-file access.
-5. **System Info** displays sections contributed by downstream packages.
+5. **System Info** displays the package-owned system information sections with their preserved styling.
 
-Agent and Command Line sessions are listed in separate sidebar groups. Settings is a separate,
-full-workspace page. Providers, Agent defaults, instructions, history and Eval Tool are real pages;
-navigation switches page roots instead of scrolling one long document. At widths below 1024 px the
-settings navigation becomes a 56 px icon rail.
+Agent and Command Line sessions are listed separately, keep independent input drafts, and support
+pinning, archiving and deletion. Archived items leave the main workspace and are restored or deleted
+from two separate Settings pages. Settings has six real pages: providers, combined configuration,
+Eval connection, Eval Tools, archived conversations and archived command lines.
 
 ## Persistence
 
-Settings remain at `Application.persistentDataPath/.unityagenttool/settings.json`. The configured
-history root contains:
+All non-secret machine settings live at `Application.persistentDataPath/settings.json` with fixed folders:
 
 ```text
-Sessions/                 Agent conversation documents
-CommandLineSessions/      Command Line documents and selected-session state
+AgentConversations/       Agent conversation documents
+CommandLineHistory/       Command Line documents and selected-session state
 ```
 
-Command Line input and output survive Unity restarts. JavaScript `EvalSession` instances never do:
-each selected transcript lazily creates a fresh VM in the current Unity process.
+Command Line input, output and drafts survive Unity restarts. JavaScript `EvalSession` instances do not.
+Provider secrets stay in the machine-local `secrets.json`. Provider-free defaults in
+`Assets/Resources/UnityAgentProjectSettings.json` are included in Player builds and seed a missing or
+invalid machine settings file.
 
 ## Runtime Host
 
-`DebugPanel` owns one full-screen `UIDocument` and drives `IDebugPanelModule` lifetimes and toggle
+`DebugPanel`, now fully owned by this package, owns one full-screen `UIDocument` and drives `IDebugPanelModule` lifetimes and toggle
 keys. `UnityAgentPanelModule` is the unified F8 workspace. Its header drags the whole window; the
 upper-right handle resizes width and height freely inside the panel bounds. Collapse hides the full
 content and resize hit area, releases focus, and remains independent from System Info visibility.
-Geometry is persisted with `PlayerPrefs`.
-
-UnityDebugTool supplies the normal composition prefab and the protected System Info / Performance
-views. The package dependency direction is:
+The window is bottom-left anchored and its geometry is persisted with `PlayerPrefs`. This package also
+supplies the normal composition prefab and the protected System Info / Performance views. The dependency direction is:
 
 ```text
-UnityDebugTool -> UnityAgentTool -> UnityEvalTool
+UnityAgentTool -> UnityEvalTool
 ```
 
-Agent never references Debug.
+The separate UnityDebugTool package no longer exists.
 
 ## DebugWindow API
 

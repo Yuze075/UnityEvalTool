@@ -27,7 +27,12 @@ namespace YuzeToolkit.UnityAgent
                 SchemaVersion = sourceSchemaVersion,
                 DefaultProviderProfileId = AgentJson.GetString(root, "defaultProviderProfileId"),
                 PermissionMode = AgentJson.GetEnum(root, "permissionMode", AgentPermissionMode.FullAccess),
-                SystemPrompt = AgentJson.GetString(root, "systemPrompt", AgentPromptDefaults.SystemPrompt),
+                EditorSystemPrompt = AgentJson.GetString(root, "editorSystemPrompt",
+                    AgentJson.GetString(root, "systemPrompt", AgentPromptDefaults.EditorSystemPrompt)),
+                RuntimeSystemPrompt = AgentJson.GetString(root, "runtimeSystemPrompt",
+                    sourceSchemaVersion < 3
+                        ? AgentJson.GetString(root, "systemPrompt", AgentPromptDefaults.RuntimeSystemPrompt)
+                        : AgentPromptDefaults.RuntimeSystemPrompt),
                 DefaultToolTimeoutSeconds = Math.Max(1, EvalData.GetInt(root, "defaultToolTimeoutSeconds", 120))
             };
 
@@ -56,11 +61,11 @@ namespace YuzeToolkit.UnityAgent
                 ReadLegacyContentRoots(root, settings, includeAgents: false);
             }
 
-            settings.HistoryLocation = AgentJson.GetOptionalObject(root, "historyLocation") is { } history
-                ? ReadPathLocation(history)
-                : AgentPathLocation.DefaultHistoryLocation();
-            foreach (var value in AgentJson.GetObjectArray(root, "conversationGroups"))
-                settings.ConversationGroups.Add(ReadConversationGroup(value));
+            if (sourceSchemaVersion < 3)
+            {
+                EnsureDefaultRoot(settings.AgentsRoots, AgentPathLocation.PersistentAgentsRoot());
+                EnsureDefaultRoot(settings.SkillRoots, AgentPathLocation.PersistentSkillsRoot());
+            }
 
             if (settings.ProviderProfiles.Count == 0)
             {
@@ -116,8 +121,8 @@ namespace YuzeToolkit.UnityAgent
                 LastError = AgentJson.GetString(root, "lastError"),
                 IsPinned = EvalData.GetBool(root, "isPinned"),
                 IsArchived = EvalData.GetBool(root, "isArchived"),
-                GroupId = AgentJson.GetString(root, "groupId"),
-                SortOrder = EvalData.GetInt(root, "sortOrder")
+                SortOrder = EvalData.GetInt(root, "sortOrder"),
+                Draft = AgentJson.GetString(root, "draft")
             };
 
             foreach (var value in AgentJson.GetObjectArray(root, "messages"))
@@ -151,19 +156,54 @@ namespace YuzeToolkit.UnityAgent
         public static AgentSettingsDocument Clone(AgentSettingsDocument settings) =>
             DeserializeSettings(SerializeSettings(settings));
 
+        public static string SerializeProjectSettings(AgentProjectSettingsDocument settings) =>
+            AgentJson.Stringify(AgentJson.Object(
+                ("schemaVersion", AgentProjectSettingsDocument.CurrentSchemaVersion),
+                ("permissionMode", settings.PermissionMode.ToString()),
+                ("editorSystemPrompt", settings.EditorSystemPrompt),
+                ("runtimeSystemPrompt", settings.RuntimeSystemPrompt),
+                ("defaultToolTimeoutSeconds", settings.DefaultToolTimeoutSeconds),
+                ("agentsRoots", settings.AgentsRoots.Select(ToJson).Cast<object?>().ToList()),
+                ("skillRoots", settings.SkillRoots.Select(ToJson).Cast<object?>().ToList())));
+
+        public static AgentProjectSettingsDocument DeserializeProjectSettings(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                throw new FormatException("Unity Agent Project Settings JSON is empty.");
+            var root = AgentJson.ParseObject(json);
+            var version = AgentJson.GetSchemaVersion(root);
+            if (version > AgentProjectSettingsDocument.CurrentSchemaVersion)
+                throw new FormatException(
+                    $"Project Settings schema version {version} is newer than the supported version " +
+                    $"{AgentProjectSettingsDocument.CurrentSchemaVersion}.");
+            var result = new AgentProjectSettingsDocument
+            {
+                SchemaVersion = AgentProjectSettingsDocument.CurrentSchemaVersion,
+                PermissionMode = AgentJson.GetEnum(root, "permissionMode", AgentPermissionMode.FullAccess),
+                EditorSystemPrompt = AgentJson.GetString(root, "editorSystemPrompt",
+                    AgentPromptDefaults.EditorSystemPrompt),
+                RuntimeSystemPrompt = AgentJson.GetString(root, "runtimeSystemPrompt",
+                    AgentPromptDefaults.RuntimeSystemPrompt),
+                DefaultToolTimeoutSeconds = Math.Max(1,
+                    EvalData.GetInt(root, "defaultToolTimeoutSeconds", 120)),
+                AgentsRoots = AgentJson.GetObjectArray(root, "agentsRoots").Select(ReadPathLocation).ToList(),
+                SkillRoots = AgentJson.GetObjectArray(root, "skillRoots").Select(ReadPathLocation).ToList()
+            };
+            return result;
+        }
+
         private static Dictionary<string, object?> ToJson(AgentSettingsDocument settings)
         {
             return AgentJson.Object(
                 ("schemaVersion", AgentSettingsDocument.CurrentSchemaVersion),
                 ("defaultProviderProfileId", settings.DefaultProviderProfileId),
                 ("permissionMode", settings.PermissionMode.ToString()),
-                ("systemPrompt", settings.SystemPrompt),
+                ("editorSystemPrompt", settings.EditorSystemPrompt),
+                ("runtimeSystemPrompt", settings.RuntimeSystemPrompt),
                 ("defaultToolTimeoutSeconds", settings.DefaultToolTimeoutSeconds),
                 ("providerProfiles", settings.ProviderProfiles.Select(ToJson).Cast<object?>().ToList()),
                 ("agentsRoots", settings.AgentsRoots.Select(ToJson).Cast<object?>().ToList()),
-                ("skillRoots", settings.SkillRoots.Select(ToJson).Cast<object?>().ToList()),
-                ("historyLocation", ToJson(settings.HistoryLocation)),
-                ("conversationGroups", settings.ConversationGroups.Select(ToJson).Cast<object?>().ToList()));
+                ("skillRoots", settings.SkillRoots.Select(ToJson).Cast<object?>().ToList()));
         }
 
         private static Dictionary<string, object?> ToJson(AgentProviderProfile profile)
@@ -248,26 +288,6 @@ namespace YuzeToolkit.UnityAgent
             return location;
         }
 
-        private static Dictionary<string, object?> ToJson(AgentConversationGroup group)
-        {
-            return AgentJson.Object(
-                ("id", group.Id),
-                ("name", group.Name),
-                ("sortOrder", group.SortOrder),
-                ("isCollapsed", group.IsCollapsed));
-        }
-
-        private static AgentConversationGroup ReadConversationGroup(Dictionary<string, object?> value)
-        {
-            return new AgentConversationGroup
-            {
-                Id = AgentJson.GetString(value, "id", Guid.NewGuid().ToString("N")),
-                Name = AgentJson.GetString(value, "name", "New group"),
-                SortOrder = EvalData.GetInt(value, "sortOrder"),
-                IsCollapsed = EvalData.GetBool(value, "isCollapsed")
-            };
-        }
-
         private static Dictionary<string, object?> ToJson(AgentSessionDocument session)
         {
             return AgentJson.Object(
@@ -295,8 +315,8 @@ namespace YuzeToolkit.UnityAgent
                 ("pendingApproval", session.PendingApproval == null ? null : ToJson(session.PendingApproval)),
                 ("isPinned", session.IsPinned),
                 ("isArchived", session.IsArchived),
-                ("groupId", session.GroupId),
-                ("sortOrder", session.SortOrder));
+                ("sortOrder", session.SortOrder),
+                ("draft", session.Draft));
         }
 
         private static Dictionary<string, object?> ToJson(AgentMessage message)
@@ -412,6 +432,15 @@ namespace YuzeToolkit.UnityAgent
         {
             if (string.IsNullOrWhiteSpace(root)) return child;
             return System.IO.Path.Combine(root, child);
+        }
+
+        private static void EnsureDefaultRoot(List<AgentPathLocation> roots, AgentPathLocation required)
+        {
+            if (roots.Any(value => value.BasePath == required.BasePath &&
+                                   string.Equals(value.RelativePath.Replace('\\', '/').TrimEnd('/'),
+                                       required.RelativePath.Replace('\\', '/').TrimEnd('/'),
+                                       StringComparison.Ordinal))) return;
+            roots.Add(required);
         }
     }
 }

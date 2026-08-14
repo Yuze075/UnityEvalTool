@@ -12,8 +12,8 @@ Player processes. A native, computer-level Broker provides the MCP endpoint and 
 Broker. Compilation, Domain Reload, process replacement, and temporary disconnection are
 reported explicitly instead of being hidden behind an in-Editor network listener.
 
-The repository also contains the optional UnityDebugTool package, which adds an in-game
-debug panel and runtime console on top of the same tool model.
+The repository also contains the optional UnityAgentTool package, which owns the shared
+Editor/Runtime Agent workbench, DebugPanel, Command Line, logs, and system monitors.
 
 ## What you install
 
@@ -21,7 +21,7 @@ debug panel and runtime console on top of the same tool model.
 |---|---|---|
 | `com.yuzetoolkit.unityevaltool` | Unity-side Broker client, status reporting, PuerTS eval sessions, CLI commands, and helper modules | Yes |
 | `@yuzetoolkit/unityevaltool` | Native Broker, MCP server, `unity` CLI, and current-user background service | Yes |
-| `com.yuzetoolkit.unitydebugtool` | Runtime debug windows, performance/system HUDs, log console, command line, and tool catalog | No |
+| `com.yuzetoolkit.unityagenttool` | Shared Agent workbench, runtime DebugPanel, performance/system HUDs, log console, command line, and tool catalog | No |
 
 Supported Broker/CLI platforms are macOS, Linux, and Windows on x64 and arm64. The Unity
 packages require Unity 2022.3 or newer. Installing the Broker requires Node.js 18 or newer
@@ -160,21 +160,20 @@ Never automatically retry a mutating `eval` whose connection was interrupted aft
 dispatch; its result can be outcome-unknown. See [Advanced usage](Packages/com.yuzetoolkit.unityevaltool/docs/ADVANCED_USAGE.md)
 and the [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md).
 
-## Optional runtime debug UI
+## Optional Agent and runtime debug UI
 
-Install UnityDebugTool after UnityEvalTool with **Add package from git URL**:
+Install UnityAgentTool after UnityEvalTool with **Add package from git URL**:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unitydebugtool#v2.0.2
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityagenttool#v2.0.2
 ```
 
-Then place `Runtime/Core/Prefabs/DebugPanel.prefab` from that package in a scene or a
-persistent prefab. The panel is not created automatically. Its modules, default keys,
-prefab rules, and APIs are documented in the
-[UnityDebugTool package README](Packages/com.yuzetoolkit.unitydebugtool/README.md).
+Then place `Runtime/Panel/Prefabs/DebugPanel.prefab` from that package in a scene or a
+persistent prefab. The panel is not created automatically. Its modules, storage model,
+default keys and APIs are documented in the
+[UnityAgentTool package README](Packages/com.yuzetoolkit.unityagenttool/README.md).
 
-The default keys are `F8` for Runtime Console, `F9` for Debug Windows, and `F10` for the
-Performance and System Information HUDs.
+The default keys are `F8` for Unity Agent and `F10` for the Performance and System Information HUDs.
 
 ## Security boundary
 
@@ -182,7 +181,7 @@ The Broker binds only to `127.0.0.1:2347`, rejects non-loopback access, and auth
 Unity, CLI, and MCP traffic with the per-user token. Supported non-WebGL release Players
 that include UnityEvalTool intentionally register with the Broker and retain authenticated
 arbitrary-JavaScript evaluation; this behavior is not limited to Development Builds and
-does not depend on UnityDebugTool. Decide deliberately whether that capability belongs in
+does not depend on UnityAgentTool. Decide deliberately whether that capability belongs in
 your shipped product. See [Editor and Player registration](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES.md).
 
 ## Service management and uninstall
@@ -227,7 +226,7 @@ published is intentionally left to each maintainer's own registry and automation
 ## Documentation
 
 - [UnityEvalTool package](Packages/com.yuzetoolkit.unityevaltool/README.md)
-- [UnityDebugTool package](Packages/com.yuzetoolkit.unitydebugtool/README.md)
+- [UnityAgentTool package](Packages/com.yuzetoolkit.unityagenttool/README.md)
 - [Advanced usage](Packages/com.yuzetoolkit.unityevaltool/docs/ADVANCED_USAGE.md)
 - [Helper module reference](Packages/com.yuzetoolkit.unityevaltool/docs/HELPER_MODULES.md)
 - [Editor and Player registration](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES.md)

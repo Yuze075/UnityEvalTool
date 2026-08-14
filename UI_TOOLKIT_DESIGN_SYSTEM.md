@@ -1,8 +1,8 @@
 # UnityEvalTool UI Toolkit Design System
 
-Status: mandatory implementation contract for UnityAgentTool, UnityDebugTool DebugPanel/DebugWindows, and Runtime Console.
+Status: mandatory implementation contract for UnityAgentTool, its DebugPanel/DebugWindows, and Runtime workbench.
 
-This document is written before the next visual implementation pass. It replaces ad-hoc visual decisions with a source-pinned contract derived from mature open-source AI interfaces. It does not authorize changes to UnityDebugTool SystemInfo or PerformanceMonitor, whose existing presentation remains unchanged.
+This document replaces ad-hoc visual decisions with a source-pinned contract derived from mature open-source AI interfaces. SystemInfo and PerformanceMonitor are owned by UnityAgentTool but retain their existing presentation.
 
 ## 1. Source policy
 

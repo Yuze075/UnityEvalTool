@@ -13,9 +13,11 @@ namespace YuzeToolkit.UnityAgent
     /// </summary>
     public static class AgentPaths
     {
-        public const string SettingsDirectoryName = ".unityagenttool";
+        public const string LegacySettingsDirectoryName = ".unityagenttool";
         public const string SettingsFileName = "settings.json";
         public const string SecretsFileName = "secrets.json";
+        public const string AgentConversationsFolderName = "AgentConversations";
+        public const string CommandLineHistoryFolderName = "CommandLineHistory";
         private static readonly object SnapshotLock = new();
         private static UnityPathSnapshot? _snapshot;
 
@@ -25,8 +27,10 @@ namespace YuzeToolkit.UnityAgent
 
         public static RuntimePlatform RuntimePlatform => Snapshot.RuntimePlatform;
 
-        public static string SettingsRoot =>
-            Path.GetFullPath(Path.Combine(Snapshot.PersistentData, SettingsDirectoryName));
+        public static string SettingsRoot => Path.GetFullPath(Snapshot.PersistentData);
+
+        internal static string LegacySettingsRoot =>
+            Path.GetFullPath(Path.Combine(Snapshot.PersistentData, LegacySettingsDirectoryName));
 
         /// <summary>
         /// Capture Unity-owned path properties once on Unity's main thread. All later path

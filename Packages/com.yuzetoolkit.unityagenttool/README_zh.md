@@ -11,43 +11,43 @@ DebugWindow Builder、Agent 对话、Command Line 会话和 Unity 日志查看�
 Editor 菜单 **YuzeToolkit > Unity Agent** 与运行时 `UnityAgentPanelModule` 都创建同一个
 `UnityAgentWorkbenchView`。主侧栏固定包含五个主要操作：
 
-1. **New conversation**：创建 Agent 对话。
-2. **New command line**：创建持久化命令行记录，并在首次执行时按需创建当前进程的 VM。
+1. **New conversation**：打开未落盘的新对话草稿；首次发送时才创建对话文档。
+2. **New command line**：打开未落盘的命令行草稿；首次执行时才创建记录和当前进程的 VM。
 3. **Debug Panel**：每个 `DebugWindowModule.RegisterWindow(...)` 注册对应一个页签。
 4. **Log**：提供搜索、日志类型过滤、同类合并、清空、自动滚动、Stack Trace 级别、
    Editor 源文件跳转和本地日志文件入口。
-5. **System Info**：显示下游包贡献的系统信息区块。
+5. **System Info**：以原有视觉显示本包内置的系统信息区块。
 
-Agent 与 Command Line 会话在侧栏中分组显示。Settings 是独立的全工作区页面；Providers、
-Agent defaults、Instructions、History 与 Eval Tool 都是真实页面，而不是滚动锚点。宽度低于
-1024 px 时，设置导航收窄为 56 px 图标栏。
+Agent 与 Command Line 会话在侧栏中分组显示，各自保存独立输入草稿，并支持 Pin、归档与删除。
+归档项不会出现在主界面，只能在 Settings 的两个独立归档页面恢复或永久删除。Settings 是独立的
+全工作区页面，固定包含模型提供、组合配置、Eval 连接、Eval Tools 和两个归档管理页面。
 
 ## 持久化
 
-设置继续存放在 `Application.persistentDataPath/.unityagenttool/settings.json`。配置的历史根目录包含：
+所有机器级非密钥设置固定存放在 `Application.persistentDataPath/settings.json`：
 
 ```text
-Sessions/                 Agent 对话文档
-CommandLineSessions/      命令行文档与当前选择状态
+AgentConversations/       Agent 对话文档
+CommandLineHistory/       命令行文档与当前选择状态
 ```
 
-命令行输入与输出会跨 Unity 重启保存；JavaScript `EvalSession` 不恢复。选择一个历史会话后，
-只会在当前 Unity 进程中按需创建全新的 VM。
+命令行输入、输出和草稿会跨 Unity 重启保存；JavaScript `EvalSession` 不恢复。Provider 密钥只写入
+本机 `secrets.json`，不会进入项目默认配置。`Assets/Resources/UnityAgentProjectSettings.json`
+保存可打入 Player 的无 Provider 默认值；本机设置缺失或无法解析时回到这套默认值。
 
 ## Runtime 宿主
 
-`DebugPanel` 管理唯一的全屏 `UIDocument`、`IDebugPanelModule` 生命周期与快捷键。
+`DebugPanel` 管理唯一的全屏 `UIDocument`、`IDebugPanelModule` 生命周期与快捷键，全部实现已归入本包。
 `UnityAgentPanelModule` 是 F8 统一工作台：标题栏拖动整个窗口，右上角手柄可以在面板边界内任意调整
 宽高。折叠会真正隐藏全部内容与缩放命中区、释放焦点，并且不影响 System Info 的独立显隐。
-窗口几何通过 `PlayerPrefs` 保存。
-
-UnityDebugTool 提供标准组合 Prefab，以及保留原视觉的 System Info / Performance。依赖方向为：
+窗口以左下角为锚点，几何通过 `PlayerPrefs` 保存。本包同时提供标准组合 Prefab，以及保留原视觉的
+System Info / Performance。依赖方向为：
 
 ```text
-UnityDebugTool -> UnityAgentTool -> UnityEvalTool
+UnityAgentTool -> UnityEvalTool
 ```
 
-Agent 不反向引用 Debug。
+独立 UnityDebugTool Package 已删除。
 
 ## DebugWindow API
 

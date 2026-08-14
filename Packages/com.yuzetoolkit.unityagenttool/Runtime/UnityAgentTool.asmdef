@@ -4,6 +4,7 @@
   "references": [
     "UnityEvalTool",
     "UnityEvalTool.CLI",
+    "UnityEvalTool.Broker",
     "Unity.InputSystem",
     "UnityEngine.UI"
   ],

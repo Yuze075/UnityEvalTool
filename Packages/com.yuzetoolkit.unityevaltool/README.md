@@ -56,7 +56,7 @@ last successfully loaded assemblies available as repair mode.
 Supported non-WebGL Players start a hidden `DontDestroyOnLoad` Broker client and register
 using the executable directory as their project path. Release Players intentionally retain
 the same authenticated arbitrary-JavaScript eval surface as the Editor. This is not gated
-by Development Build and is independent of the optional UnityDebugTool package.
+by Development Build and is independent of the optional UnityAgentTool package.
 
 The trust boundary is the current user's loopback Broker and per-user authentication token.
 If that capability is not appropriate for a shipped product, exclude or alter the package

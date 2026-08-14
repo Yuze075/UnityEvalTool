@@ -40,7 +40,7 @@ namespace YuzeToolkit
             _window = new VisualElement { name = "unity-agent-runtime-window" };
             _window.style.position = Position.Absolute;
             _window.style.left = PlayerPrefs.GetFloat("UnityAgent.Runtime.Left", 24f);
-            _window.style.top = PlayerPrefs.GetFloat("UnityAgent.Runtime.Top", 24f);
+            _window.style.bottom = PlayerPrefs.GetFloat("UnityAgent.Runtime.Bottom", 24f);
             _window.style.width = PlayerPrefs.GetFloat("UnityAgent.Runtime.Width", initialSize.x);
             _window.style.height = PlayerPrefs.GetFloat("UnityAgent.Runtime.Height", initialSize.y);
             _window.style.minWidth = minimumSize.x;
@@ -90,7 +90,7 @@ namespace YuzeToolkit
             _resizeGrip.AddManipulator(new UpperRightResizeManipulator(
                 _window, _layer, minimumSize, PersistGeometry));
             _layer.RegisterCallback<GeometryChangedEvent>(_ => ClampToLayer());
-            _window.schedule.Execute(() => ClampToLayer());
+            _window.schedule.Execute(_ => ClampToLayer());
         }
 
         public void SetVisible(bool visible)
@@ -154,11 +154,13 @@ namespace YuzeToolkit
             var height = Mathf.Clamp(requestedHeight ?? Resolved(_window.resolvedStyle.height,
                 _collapsed ? 44f : initialSize.y), minHeight, bounds.height);
             var left = Mathf.Clamp(_window.layout.x, 0, Mathf.Max(0, bounds.width - width));
-            var top = Mathf.Clamp(_window.layout.y, 0, Mathf.Max(0, bounds.height - height));
+            var bottom = Mathf.Clamp(bounds.height - (_window.layout.y + height), 0,
+                Mathf.Max(0, bounds.height - height));
             _window.style.width = width;
             _window.style.height = height;
             _window.style.left = left;
-            _window.style.top = top;
+            _window.style.top = StyleKeyword.Auto;
+            _window.style.bottom = bottom;
             if (!_collapsed) _expandedHeight = height;
         }
 
@@ -166,7 +168,9 @@ namespace YuzeToolkit
         {
             if (_window == null || _collapsed) return;
             PlayerPrefs.SetFloat("UnityAgent.Runtime.Left", _window.layout.x);
-            PlayerPrefs.SetFloat("UnityAgent.Runtime.Top", _window.layout.y);
+            var layerHeight = _layer?.contentRect.height ?? 0;
+            PlayerPrefs.SetFloat("UnityAgent.Runtime.Bottom",
+                Mathf.Max(0, layerHeight - (_window.layout.y + _window.resolvedStyle.height)));
             PlayerPrefs.SetFloat("UnityAgent.Runtime.Width", _window.resolvedStyle.width);
             PlayerPrefs.SetFloat("UnityAgent.Runtime.Height", _window.resolvedStyle.height);
         }
@@ -224,7 +228,8 @@ namespace YuzeToolkit
                 if (evt.button != 0) return;
                 _active = true;
                 _pointer = evt.position;
-                _position = new Vector2(_window.layout.x, _window.layout.y);
+                _position = new Vector2(_window.layout.x,
+                    _layer.contentRect.height - (_window.layout.y + _window.resolvedStyle.height));
                 target.CapturePointer(evt.pointerId);
                 evt.StopPropagation();
             }
@@ -236,7 +241,7 @@ namespace YuzeToolkit
                 var bounds = _layer.contentRect;
                 _window.style.left = Mathf.Clamp(_position.x + delta.x, 0,
                     Mathf.Max(0, bounds.width - _window.resolvedStyle.width));
-                _window.style.top = Mathf.Clamp(_position.y + delta.y, 0,
+                _window.style.bottom = Mathf.Clamp(_position.y - delta.y, 0,
                     Mathf.Max(0, bounds.height - _window.resolvedStyle.height));
                 evt.StopPropagation();
             }
@@ -259,7 +264,7 @@ namespace YuzeToolkit
             private readonly System.Action _completed;
             private Vector2 _pointer;
             private Vector2 _size;
-            private float _top;
+            private float _bottom;
             private bool _active;
 
             public UpperRightResizeManipulator(VisualElement window, VisualElement layer, Vector2 minimum,
@@ -291,7 +296,7 @@ namespace YuzeToolkit
                 _active = true;
                 _pointer = evt.position;
                 _size = new Vector2(_window.resolvedStyle.width, _window.resolvedStyle.height);
-                _top = _window.layout.y;
+                _bottom = _layer.contentRect.height - (_window.layout.y + _window.resolvedStyle.height);
                 target.CapturePointer(evt.pointerId);
                 evt.StopPropagation();
             }
@@ -301,14 +306,13 @@ namespace YuzeToolkit
                 if (!_active || !target.HasPointerCapture(evt.pointerId)) return;
                 var delta = (Vector2)evt.position - _pointer;
                 var bounds = _layer.contentRect;
-                var bottom = _top + _size.y;
                 var width = Mathf.Clamp(_size.x + delta.x,
                     Mathf.Min(_minimum.x, bounds.width), bounds.width - _window.layout.x);
-                var top = Mathf.Clamp(_top + delta.y, 0,
-                    bottom - Mathf.Min(_minimum.y, bounds.height));
+                var maximumHeight = Mathf.Max(44f, bounds.height - _bottom);
+                var height = Mathf.Clamp(_size.y - delta.y,
+                    Mathf.Min(_minimum.y, maximumHeight), maximumHeight);
                 _window.style.width = width;
-                _window.style.top = top;
-                _window.style.height = Mathf.Min(bottom - top, bounds.height - top);
+                _window.style.height = height;
                 evt.StopPropagation();
             }
 

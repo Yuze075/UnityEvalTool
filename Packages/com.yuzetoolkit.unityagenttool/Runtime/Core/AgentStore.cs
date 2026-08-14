@@ -24,14 +24,13 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class FileAgentStore : IAgentStore, IDisposable
     {
-        private const string SessionsFolderName = "Sessions";
         private const string LegacyMigrationMarkerName = ".legacy-store-migrated-v1";
         private const int MaximumDocumentCharacters = 64_000_000;
         private readonly string _settingsRootPath;
         private readonly bool _usesDefaultSettingsRoot;
+        private readonly AgentProjectSettingsDocument _projectDefaults;
         private readonly SemaphoreSlim _ioGate = new(1, 1);
-        private string _historyRootPath;
-        private string _sessionsPath;
+        private readonly string _sessionsPath;
         private bool _settingsLoaded;
 
         public FileAgentStore(string rootPath)
@@ -39,15 +38,15 @@ namespace YuzeToolkit.UnityAgent
             if (string.IsNullOrWhiteSpace(rootPath)) throw new ArgumentException("Storage root is required.", nameof(rootPath));
             _settingsRootPath = Path.GetFullPath(rootPath);
             _usesDefaultSettingsRoot = AgentPaths.PathsEqual(_settingsRootPath, GetDefaultRootPath());
-            _historyRootPath = _settingsRootPath;
-            _sessionsPath = Path.Combine(_historyRootPath, SessionsFolderName);
+            _projectDefaults = UnityAgentProjectSettings.Load();
+            _sessionsPath = Path.Combine(_settingsRootPath, AgentPaths.AgentConversationsFolderName);
         }
 
         /// <summary>The fixed directory containing settings.json.</summary>
         public string RootPath => _settingsRootPath;
 
-        /// <summary>The current resolved history directory containing the Sessions folder.</summary>
-        public string HistoryRootPath => _historyRootPath;
+        /// <summary>The fixed directory containing Agent conversation documents.</summary>
+        public string HistoryRootPath => _sessionsPath;
 
         public static string GetDefaultRootPath() => AgentPaths.SettingsRoot;
 
@@ -148,32 +147,42 @@ namespace YuzeToolkit.UnityAgent
                     AgentSettingsDocument settings;
                     if (File.Exists(path) || File.Exists(path + ".bak"))
                     {
-                        var requiresUpgrade = StoredSettingsRequireUpgrade(path, cancellationToken);
-                        var restoreMissingPrimary = !File.Exists(path) && File.Exists(path + ".bak");
-                        settings = ReadDocument(path, AgentDocumentCodec.DeserializeSettings, cancellationToken);
-                        if (requiresUpgrade || restoreMissingPrimary)
+                        try
+                        {
+                            var requiresUpgrade = StoredSettingsRequireUpgrade(path, cancellationToken);
+                            var restoreMissingPrimary = !File.Exists(path) && File.Exists(path + ".bak");
+                            settings = ReadDocument(path, AgentDocumentCodec.DeserializeSettings, cancellationToken);
+                            if (requiresUpgrade || restoreMissingPrimary)
+                                WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
+                        }
+                        catch (Exception exception) when (IsRecoverableDocumentError(exception))
+                        {
+                            settings = CreateMachineDefaults();
                             WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
+                        }
                     }
                     else if (!string.IsNullOrEmpty(legacySettingsPath) &&
                              (File.Exists(legacySettingsPath) || File.Exists(legacySettingsPath + ".bak")))
                     {
-                        settings = ReadDocument(legacySettingsPath, AgentDocumentCodec.DeserializeSettings,
-                            cancellationToken);
+                        try
+                        {
+                            settings = ReadDocument(legacySettingsPath, AgentDocumentCodec.DeserializeSettings,
+                                cancellationToken);
+                        }
+                        catch (Exception exception) when (IsRecoverableDocumentError(exception))
+                        {
+                            settings = CreateMachineDefaults();
+                        }
                         WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
                     }
                     else
                     {
-                        settings = AgentSettingsDocument.CreateDefault();
-                        if (!_usesDefaultSettingsRoot)
-                        {
-                            settings.HistoryLocation = AgentPaths.FromLegacyPath(
-                                "conversation-history", _settingsRootPath);
-                        }
+                        settings = CreateMachineDefaults();
                         // Materialize defaults immediately so users may edit the complete configuration file.
                         WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
                     }
 
-                    ApplyLoadedHistoryPath(settings, legacyRoot, cancellationToken);
+                    ApplyLoadedHistoryPath(legacyRoot, cancellationToken);
                     return settings;
                 }, cancellationToken).ConfigureAwait(false);
             }
@@ -186,7 +195,6 @@ namespace YuzeToolkit.UnityAgent
         public async Task SaveSettingsAsync(AgentSettingsDocument settings, CancellationToken cancellationToken)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
-            var newHistoryRoot = AgentPaths.Resolve(settings.HistoryLocation);
             var json = AgentDocumentCodec.SerializeSettings(settings);
             await _ioGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
@@ -194,13 +202,8 @@ namespace YuzeToolkit.UnityAgent
                 await Task.Run(() =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var newSessionsPath = Path.Combine(newHistoryRoot, SessionsFolderName);
-                    if (!AgentPaths.PathsEqual(_sessionsPath, newSessionsPath))
-                        CopySessionDocuments(_sessionsPath, newSessionsPath, cancellationToken);
                     WriteAtomic(Path.Combine(_settingsRootPath, AgentPaths.SettingsFileName), json,
                         cancellationToken);
-                    _historyRootPath = newHistoryRoot;
-                    _sessionsPath = newSessionsPath;
                 }, cancellationToken).ConfigureAwait(false);
             }
             finally
@@ -411,18 +414,8 @@ namespace YuzeToolkit.UnityAgent
             sessionsById.Add(documentId, primaryPath);
         }
 
-        private void ApplyLoadedHistoryPath(
-            AgentSettingsDocument settings,
-            string legacyRoot,
-            CancellationToken cancellationToken)
+        private void ApplyLoadedHistoryPath(string legacyRoot, CancellationToken cancellationToken)
         {
-            var newHistoryRoot = AgentPaths.Resolve(settings.HistoryLocation);
-            var newSessionsPath = Path.Combine(newHistoryRoot, SessionsFolderName);
-            if (_settingsLoaded && !AgentPaths.PathsEqual(_sessionsPath, newSessionsPath))
-                CopySessionDocuments(_sessionsPath, newSessionsPath, cancellationToken);
-
-            _historyRootPath = newHistoryRoot;
-            _sessionsPath = newSessionsPath;
             if (!_settingsLoaded && _usesDefaultSettingsRoot)
                 MigrateLegacySessionsOnce(legacyRoot, cancellationToken);
             _settingsLoaded = true;
@@ -432,17 +425,30 @@ namespace YuzeToolkit.UnityAgent
         {
             var marker = Path.Combine(_settingsRootPath, LegacyMigrationMarkerName);
             if (File.Exists(marker)) return;
-            if (!string.IsNullOrEmpty(legacyRoot) && Directory.Exists(legacyRoot) &&
-                !AgentPaths.PathsEqual(legacyRoot, _historyRootPath))
+            var legacyCandidates = new[]
             {
-                CopySessionDocuments(Path.Combine(legacyRoot, SessionsFolderName), _sessionsPath,
-                    cancellationToken);
-            }
+                Path.Combine(AgentPaths.LegacySettingsRoot, AgentPaths.AgentConversationsFolderName),
+                Path.Combine(AgentPaths.LegacySettingsRoot, "Sessions"),
+                string.IsNullOrEmpty(legacyRoot) ? string.Empty : Path.Combine(legacyRoot, "Sessions"),
+                Path.Combine(_settingsRootPath, "Sessions")
+            };
+            foreach (var source in legacyCandidates.Where(value => !string.IsNullOrEmpty(value)))
+                CopySessionDocuments(source, _sessionsPath, cancellationToken);
             WriteAtomic(marker, "UnityAgentTool legacy store migration completed.\n", cancellationToken);
+        }
+
+        private AgentSettingsDocument CreateMachineDefaults()
+        {
+            var settings = AgentSettingsDocument.CreateDefault();
+            _projectDefaults.ApplyTo(settings);
+            return settings;
         }
 
         private static string GetLegacyRootPath()
         {
+            var recent = AgentPaths.LegacySettingsRoot;
+            if (File.Exists(Path.Combine(recent, AgentPaths.SettingsFileName)) ||
+                File.Exists(Path.Combine(recent, AgentPaths.SettingsFileName) + ".bak")) return recent;
             return Path.GetFullPath(AgentPaths.IsEditor
                 ? Path.Combine(AgentPaths.ProjectRoot, "Library", "UnityAgentTool")
                 : Path.Combine(AgentPaths.GetBasePath(AgentPathBase.PersistentData), "UnityAgentTool"));
@@ -520,8 +526,8 @@ namespace YuzeToolkit.UnityAgent
                 if (AgentJson.GetSchemaVersion(root) < AgentSettingsDocument.CurrentSchemaVersion ||
                     !root.ContainsKey("agentsRoots") ||
                     !root.ContainsKey("skillRoots") ||
-                    !root.ContainsKey("historyLocation") ||
-                    !root.ContainsKey("conversationGroups")) return true;
+                    !root.ContainsKey("editorSystemPrompt") ||
+                    !root.ContainsKey("runtimeSystemPrompt")) return true;
                 return AgentJson.GetObjectArray(root, "providerProfiles")
                     .Any(profile => !profile.ContainsKey("providerPresetId") ||
                                     string.IsNullOrWhiteSpace(

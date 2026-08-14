@@ -31,7 +31,7 @@ Supported targets are:
 ## Validate committed versions
 
 [`version.json`](../version.json) is the source of truth for the UnityEvalTool/Broker/npm
-version, the independently versioned UnityDebugTool package, and the protocol version. The
+version and protocol version. The
 packaging scripts reject mismatches across package manifests, Broker properties, runtime
 constants, protocol constants, and npm optional dependencies.
 

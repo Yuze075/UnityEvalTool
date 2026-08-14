@@ -50,7 +50,7 @@ Editor 会在 eval 之外独立报告导入、编译、编译失败、程序集�
 受支持的非 WebGL Player 会启动隐藏的 `DontDestroyOnLoad` Broker Client，并以可执行
 文件目录作为项目路径注册。Release Player 会有意保留与 Editor 相同的、经认证的
 任意 JavaScript eval 能力。它不受 Development Build 开关限制，也不依赖可选的
-UnityDebugTool Package。
+UnityAgentTool Package。
 
 信任边界是当前用户的 loopback Broker 与按用户保存的认证 token。如果该能力不适合
 产品发行版，应把排除或修改 Package 作为明确的产品决策。WebGL 不是受支持的

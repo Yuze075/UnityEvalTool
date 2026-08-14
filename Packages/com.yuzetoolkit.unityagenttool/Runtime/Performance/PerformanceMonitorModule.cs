@@ -36,12 +36,12 @@ namespace YuzeToolkit
             context.AddStyleSheet(styleSheet);
             try
             {
-                _layer = context.CreateLayer("unity-debug-tool-performance-layer");
+                _layer = context.CreateLayer("unity-agent-performance-layer");
                 PerformanceMonitorUss.ApplyLayer(_layer);
                 _view = new PerformanceMonitorView(template);
                 _view.AttachTo(_layer);
                 _workspaceRegistration = UnityAgentWorkspaceRegistry.RegisterSystemInfoSection(
-                    "unity-debug-tool-performance", 10, () => CreateWorkspaceSection(template, styleSheet));
+                    "unity-agent-performance", 0, () => CreateWorkspaceSection(template, styleSheet));
             }
             catch
             {

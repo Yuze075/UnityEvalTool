@@ -1,4 +1,7 @@
 #nullable enable
+using System;
+using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -11,7 +14,6 @@ namespace YuzeToolkit.UnityAgent
         private IVisualElementScheduledItem? _tickItem;
         private static UnityAgentWorkbenchPage _requestedPage = UnityAgentWorkbenchPage.Chat;
 
-        [MenuItem("YuzeToolkit/Unity Agent/Open")]
         [MenuItem("YuzeToolkit/Unity Agent/Chat")]
         public static void OpenChat()
         {
@@ -55,15 +57,38 @@ namespace YuzeToolkit.UnityAgent
     [InitializeOnLoad]
     internal static class UnityAgentEditorLifetime
     {
+        private const string ProjectSettingsAssetPath = "Assets/Resources/UnityAgentProjectSettings.json";
+
         static UnityAgentEditorLifetime()
         {
             UnityAgentEvalSettingsBridge.ConfigureBrokerControl(
                 () => EditorBrokerBootstrap.IsEnabled,
                 EditorBrokerBootstrap.SetEnabled);
+            UnityAgentEvalSettingsBridge.ConfigureEditorActions(
+                EditorBrokerBootstrap.Reconnect,
+                OpenBrokerFolder,
+                SaveProjectSettings);
             AssemblyReloadEvents.beforeAssemblyReload -= UnityAgentHost.DisposeDefault;
             AssemblyReloadEvents.beforeAssemblyReload += UnityAgentHost.DisposeDefault;
             EditorApplication.quitting -= UnityAgentHost.DisposeDefault;
             EditorApplication.quitting += UnityAgentHost.DisposeDefault;
+        }
+
+        private static void OpenBrokerFolder()
+        {
+            var path = Path.Combine(System.Environment.GetFolderPath(
+                System.Environment.SpecialFolder.UserProfile), ".unityevaltool");
+            Directory.CreateDirectory(path);
+            EditorUtility.RevealInFinder(path);
+        }
+
+        private static void SaveProjectSettings(string json)
+        {
+            var path = Path.GetFullPath(Path.Combine(AgentPaths.ProjectRoot, ProjectSettingsAssetPath));
+            Directory.CreateDirectory(Path.GetDirectoryName(path) ??
+                                      throw new InvalidOperationException("Project Settings path has no directory."));
+            File.WriteAllText(path, json + "\n", new UTF8Encoding(false));
+            AssetDatabase.ImportAsset(ProjectSettingsAssetPath, ImportAssetOptions.ForceUpdate);
         }
     }
 }
