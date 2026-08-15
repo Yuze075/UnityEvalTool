@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,7 +21,26 @@ namespace YuzeToolkit.UnityAgent
                 : Path.Combine(string.IsNullOrWhiteSpace(context.WorkingDirectory)
                     ? AgentPaths.ProjectRoot
                     : context.WorkingDirectory, value);
-            return Path.GetFullPath(combined);
+            var resolved = Path.GetFullPath(combined);
+            if (!AgentToolPolicy.RestrictsFileSystem(context.PermissionMode)) return resolved;
+
+            var roots = context.Surface == AgentToolSurface.Editor
+                ? new[] { AgentPaths.ProjectRoot }
+                : new[]
+                {
+                    AgentPaths.GetBasePath(AgentPathBase.PersistentData),
+                    AgentPaths.GetBasePath(AgentPathBase.TemporaryCache)
+                };
+            foreach (var root in roots)
+            {
+                if (!IsSame(resolved, root) && !IsDescendant(resolved, root)) continue;
+                if (TraversesReparsePoint(root, resolved))
+                    throw new UnauthorizedAccessException(
+                        $"Agent path crosses a symbolic link or reparse point: {resolved}");
+                return resolved;
+            }
+            throw new UnauthorizedAccessException(
+                $"Agent path is outside the allowed {context.Surface} roots for {context.PermissionMode}: {resolved}");
         }
 
         public static bool IsSame(string first, string second) =>
@@ -38,6 +58,19 @@ namespace YuzeToolkit.UnityAgent
 
         public static bool IsReparsePoint(string path) =>
             (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+
+        public static void EnsureSafeDeletionTarget(AgentToolContext context, string path)
+        {
+            var root = Path.GetPathRoot(path);
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrWhiteSpace(root) && IsSame(path, root) ||
+                IsSame(path, AgentPaths.ProjectRoot) ||
+                !string.IsNullOrWhiteSpace(userProfile) && IsSame(path, userProfile) ||
+                !string.IsNullOrWhiteSpace(context.WorkingDirectory) && IsSame(path, context.WorkingDirectory))
+            {
+                throw new UnauthorizedAccessException($"Agent refuses to delete a protected root path: {path}");
+            }
+        }
 
         public static Dictionary<string, object?> Describe(string path)
         {
@@ -73,6 +106,29 @@ namespace YuzeToolkit.UnityAgent
             while (length > rootLength && IsDirectorySeparator(fullPath[length - 1])) length--;
             return length == fullPath.Length ? fullPath : fullPath.Substring(0, length);
         }
+
+        private static bool TraversesReparsePoint(string root, string target)
+        {
+            var normalizedRoot = NormalizeForComparison(root);
+            var normalizedTarget = NormalizeForComparison(target);
+            if (Exists(normalizedRoot) && IsReparsePoint(normalizedRoot)) return true;
+            if (IsSame(normalizedRoot, normalizedTarget)) return false;
+            var relative = normalizedTarget.Substring(normalizedRoot.Length)
+                .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var current = normalizedRoot;
+            foreach (var part in relative.Split(new[]
+                     {
+                         Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar
+                     }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                current = Path.Combine(current, part);
+                if (!Exists(current)) break;
+                if (IsReparsePoint(current)) return true;
+            }
+            return false;
+        }
+
+        private static bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
 
         private static bool EndsInDirectorySeparator(string path) =>
             path.Length > 0 && IsDirectorySeparator(path[path.Length - 1]);
@@ -120,11 +176,15 @@ namespace YuzeToolkit.UnityAgent
     {
         private const int DefaultMaxCharacters = 200_000;
         private const int MaximumMaxCharacters = 1_000_000;
+        private const long MaximumHashedBytes = 64_000_000;
 
         public ReadFileAgentTool() : base(new AgentToolDescriptor(
             "file_read_text",
-            "Read a UTF-8 or BOM-identified text file without loading the complete file into memory.",
+            "Read a UTF-8 or BOM-identified text file and return a SHA-256 for guarded patching when the file is at most 64 MB.",
             AgentToolAccess.ReadOnly,
+            AgentToolRisk.ReadOnly,
+            AgentToolSurface.All,
+            true,
             AgentToolArguments.ObjectSchema(AgentJson.Object(
                     ("path", AgentToolArguments.StringProperty("File path.")),
                     ("offset", AgentToolArguments.IntegerProperty("Character offset to start reading from.")),
@@ -168,6 +228,8 @@ namespace YuzeToolkit.UnityAgent
                 }
 
                 var actualOffset = Math.Min((long)offset, scannedCharacters);
+                var fileLength = new FileInfo(path).Length;
+                var hash = fileLength <= MaximumHashedBytes ? ComputeSha256(path, token) : null;
                 return AgentToolResult.Success(AgentJson.Stringify(AgentJson.Object(
                     ("path", path),
                     ("offset", actualOffset),
@@ -175,8 +237,22 @@ namespace YuzeToolkit.UnityAgent
                     ("scannedCharacters", scannedCharacters),
                     ("totalCharacters", truncated ? null : (object?)scannedCharacters),
                     ("truncated", truncated),
+                    ("sha256", hash),
+                    ("sha256UnavailableReason", hash == null
+                        ? $"File exceeds the {MaximumHashedBytes:N0}-byte hashing limit."
+                        : string.Empty),
                     ("content", content.ToString()))));
             }, cancellationToken);
+        }
+
+        internal static string ComputeSha256(string path, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var sha256 = SHA256.Create();
+            var hash = sha256.ComputeHash(stream);
+            cancellationToken.ThrowIfCancellationRequested();
+            return string.Concat(hash.Select(value => value.ToString("x2")));
         }
     }
 
@@ -188,6 +264,9 @@ namespace YuzeToolkit.UnityAgent
             "directory_list",
             "List files and folders in a directory. Recursive listing does not traverse symbolic-link directories.",
             AgentToolAccess.ReadOnly,
+            AgentToolRisk.ReadOnly,
+            AgentToolSurface.All,
+            true,
             AgentToolArguments.ObjectSchema(AgentJson.Object(
                     ("path", AgentToolArguments.StringProperty("Directory path.")),
                     ("recursive", AgentToolArguments.BooleanProperty("Recursively enumerate descendants.")),
@@ -252,6 +331,9 @@ namespace YuzeToolkit.UnityAgent
             "path_info",
             "Get file or directory metadata without modifying it.",
             AgentToolAccess.ReadOnly,
+            AgentToolRisk.ReadOnly,
+            AgentToolSurface.All,
+            true,
             AgentToolArguments.ObjectSchema(PathProperties(), "path")))
         {
         }
@@ -272,6 +354,9 @@ namespace YuzeToolkit.UnityAgent
             "file_write_text",
             "Create, overwrite or append a UTF-8 text file. Parent directories can be created automatically.",
             AgentToolAccess.Write,
+            AgentToolRisk.WorkspaceWrite,
+            AgentToolSurface.All,
+            false,
             AgentToolArguments.ObjectSchema(AgentJson.Object(
                     ("path", AgentToolArguments.StringProperty("File path.")),
                     ("content", AgentToolArguments.StringProperty("Complete text content to write.")),
@@ -302,12 +387,247 @@ namespace YuzeToolkit.UnityAgent
         }
     }
 
+    internal sealed class ApplyPatchAgentTool : FileSystemAgentToolBase
+    {
+        private const int MaximumEdits = 128;
+        private const int MaximumDiffCharacters = 12_000;
+        private const long MaximumPatchBytes = 16_000_000;
+
+        public ApplyPatchAgentTool() : base(new AgentToolDescriptor(
+            "file_apply_patch",
+            "Apply exact text replacements to an existing UTF-8 file. The SHA-256 precondition prevents overwriting concurrent changes.",
+            AgentToolAccess.Write,
+            AgentToolRisk.WorkspaceWrite,
+            AgentToolSurface.All,
+            false,
+            AgentToolArguments.ObjectSchema(AgentJson.Object(
+                    ("path", AgentToolArguments.StringProperty("Existing UTF-8 file path.")),
+                    ("expectedSha256", AgentToolArguments.StringProperty(
+                        "Lowercase SHA-256 returned by file_read_text.")),
+                    ("edits", AgentJson.Object(
+                        ("type", "array"),
+                        ("minItems", 1),
+                        ("maxItems", MaximumEdits),
+                        ("description", "Ordered exact text replacements."),
+                        ("items", AgentToolArguments.ObjectSchema(AgentJson.Object(
+                                ("oldText", AgentToolArguments.StringProperty("Exact non-empty text to replace.")),
+                                ("newText", AgentToolArguments.StringProperty("Replacement text.")),
+                                ("expectedOccurrences", AgentToolArguments.IntegerProperty(
+                                    "Required non-overlapping occurrence count before this edit.", 1))),
+                            "oldText", "newText"))))),
+                "path", "expectedSha256", "edits")))
+        {
+        }
+
+        public override Task<AgentToolResult> ExecuteAsync(
+            AgentToolContext context,
+            Dictionary<string, object?> arguments,
+            CancellationToken cancellationToken)
+        {
+            var path = AgentPath.Resolve(context, AgentToolArguments.RequiredString(arguments, "path"));
+            var expectedHash = AgentToolArguments.RequiredString(arguments, "expectedSha256").Trim().ToLowerInvariant();
+            var edits = AgentToolArguments.RequiredObjects(arguments, "edits");
+            if (edits.Count > MaximumEdits)
+                throw new ArgumentException($"Patch cannot contain more than {MaximumEdits} edits.");
+            if (expectedHash.Length != 64 || expectedHash.Any(character =>
+                    character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+                throw new ArgumentException("expectedSha256 must be a lowercase 64-character SHA-256 value.");
+
+            return Run(token => Apply(path, expectedHash, edits, token), cancellationToken);
+        }
+
+        internal static AgentToolResult Apply(
+            string path,
+            string expectedHash,
+            IReadOnlyList<Dictionary<string, object?>> edits,
+            CancellationToken cancellationToken)
+        {
+            if (!File.Exists(path)) return AgentToolResult.Error($"File does not exist: {path}");
+            byte[] bytes;
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                if (stream.Length > MaximumPatchBytes)
+                    return AgentToolResult.Error(
+                        $"Patch file exceeds the {MaximumPatchBytes:N0}-byte limit: {path}");
+                using var snapshot = new MemoryStream((int)stream.Length);
+                var buffer = new byte[8192];
+                int read;
+                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    snapshot.Write(buffer, 0, read);
+                    if (snapshot.Length > MaximumPatchBytes)
+                        return AgentToolResult.Error(
+                            $"Patch file exceeds the {MaximumPatchBytes:N0}-byte limit: {path}");
+                }
+                bytes = snapshot.ToArray();
+            }
+            var actualHash = ComputeSha256(bytes);
+            if (!string.Equals(actualHash, expectedHash, StringComparison.Ordinal))
+                return AgentToolResult.Error(
+                    $"File changed since it was read. Expected SHA-256 {expectedHash}, actual {actualHash}.");
+
+            var hadUtf8Bom = bytes.Length >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf;
+            string before;
+            try
+            {
+                var offset = hadUtf8Bom ? 3 : 0;
+                before = new UTF8Encoding(false, true).GetString(bytes, offset, bytes.Length - offset);
+            }
+            catch (DecoderFallbackException)
+            {
+                return AgentToolResult.Error($"File is not valid UTF-8 and was not changed: {path}");
+            }
+            var after = before;
+            var applied = new List<object?>(edits.Count);
+            for (var index = 0; index < edits.Count; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var edit = edits[index];
+                var oldText = AgentToolArguments.RequiredText(edit, "oldText");
+                var newText = AgentToolArguments.RequiredText(edit, "newText");
+                var expectedOccurrences = AgentToolArguments.OptionalInt(edit, "expectedOccurrences", 1);
+                if (oldText.Length == 0)
+                    return AgentToolResult.Error($"Patch edit {index} has an empty oldText.");
+                if (expectedOccurrences < 1)
+                    return AgentToolResult.Error($"Patch edit {index} expectedOccurrences must be positive.");
+                var occurrences = CountOccurrences(after, oldText);
+                if (occurrences != expectedOccurrences)
+                {
+                    return AgentToolResult.Error(
+                        $"Patch edit {index} expected {expectedOccurrences} occurrence(s), found {occurrences}; file was not changed.");
+                }
+                after = after.Replace(oldText, newText);
+                applied.Add(AgentJson.Object(
+                    ("index", index),
+                    ("occurrences", occurrences),
+                    ("oldCharacters", oldText.Length),
+                    ("newCharacters", newText.Length)));
+            }
+
+            if (string.Equals(before, after, StringComparison.Ordinal))
+                return AgentToolResult.Error("Patch produced no file content change.");
+            WriteAtomic(path, after, new UTF8Encoding(hadUtf8Bom), cancellationToken);
+            var resultHash = ReadFileAgentTool.ComputeSha256(path, cancellationToken);
+            return AgentToolResult.Success(AgentJson.Stringify(AgentJson.Object(
+                ("path", path),
+                ("beforeSha256", actualHash),
+                ("afterSha256", resultHash),
+                ("edits", applied),
+                ("diff", CreateBoundedDiff(path, before, after)))));
+        }
+
+        private static int CountOccurrences(string text, string value)
+        {
+            var count = 0;
+            var offset = 0;
+            while (offset <= text.Length - value.Length)
+            {
+                var found = text.IndexOf(value, offset, StringComparison.Ordinal);
+                if (found < 0) break;
+                count++;
+                offset = found + value.Length;
+            }
+            return count;
+        }
+
+        private static string ComputeSha256(byte[] bytes)
+        {
+            using var sha256 = SHA256.Create();
+            return string.Concat(sha256.ComputeHash(bytes).Select(value => value.ToString("x2")));
+        }
+
+        private static void WriteAtomic(
+            string path,
+            string content,
+            Encoding encoding,
+            CancellationToken cancellationToken)
+        {
+            var parent = Path.GetDirectoryName(path) ??
+                         throw new InvalidOperationException("Patch path has no parent directory.");
+            var temporary = Path.Combine(parent, "." + Path.GetFileName(path) + ".unityagent-" +
+                                                  Guid.NewGuid().ToString("N") + ".tmp");
+            var backup = temporary + ".bak";
+            try
+            {
+                File.WriteAllText(temporary, content, encoding);
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    File.Replace(temporary, path, backup);
+                }
+                catch (PlatformNotSupportedException)
+                {
+                    ReplaceWithoutFileReplace(path, temporary, backup);
+                }
+                if (File.Exists(backup)) File.Delete(backup);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
+        }
+
+        private static void ReplaceWithoutFileReplace(string path, string temporary, string backup)
+        {
+            File.Move(path, backup);
+            try
+            {
+                File.Move(temporary, path);
+            }
+            catch
+            {
+                if (!File.Exists(path) && File.Exists(backup)) File.Move(backup, path);
+                throw;
+            }
+        }
+
+        private static string CreateBoundedDiff(string path, string before, string after)
+        {
+            var prefix = 0;
+            var maximumPrefix = Math.Min(before.Length, after.Length);
+            while (prefix < maximumPrefix && before[prefix] == after[prefix]) prefix++;
+            var beforeSuffix = before.Length;
+            var afterSuffix = after.Length;
+            while (beforeSuffix > prefix && afterSuffix > prefix &&
+                   before[beforeSuffix - 1] == after[afterSuffix - 1])
+            {
+                beforeSuffix--;
+                afterSuffix--;
+            }
+            var contextStart = prefix == 0 ? 0 : before.LastIndexOf('\n', prefix - 1);
+            if (contextStart < 0) contextStart = 0;
+            var beforeEnd = before.IndexOf('\n', beforeSuffix);
+            if (beforeEnd < 0) beforeEnd = before.Length;
+            var afterEnd = after.IndexOf('\n', afterSuffix);
+            if (afterEnd < 0) afterEnd = after.Length;
+            var beforeChunk = before.Substring(contextStart, beforeEnd - contextStart);
+            var afterChunk = after.Substring(contextStart, afterEnd - contextStart);
+            var diff = new StringBuilder()
+                .Append("--- ").AppendLine(path)
+                .Append("+++ ").AppendLine(path)
+                .AppendLine("@@ changed region @@");
+            foreach (var line in NormalizeLines(beforeChunk)) diff.Append('-').AppendLine(line);
+            foreach (var line in NormalizeLines(afterChunk)) diff.Append('+').AppendLine(line);
+            var value = diff.ToString();
+            return value.Length <= MaximumDiffCharacters
+                ? value
+                : value.Substring(0, MaximumDiffCharacters) + "\n... diff truncated ...";
+        }
+
+        private static IEnumerable<string> NormalizeLines(string value) =>
+            value.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+    }
+
     internal sealed class CreateDirectoryAgentTool : FileSystemAgentToolBase
     {
         public CreateDirectoryAgentTool() : base(new AgentToolDescriptor(
             "directory_create",
             "Create a directory, including missing parents.",
             AgentToolAccess.Write,
+            AgentToolRisk.WorkspaceWrite,
+            AgentToolSurface.All,
+            false,
             AgentToolArguments.ObjectSchema(PathProperties(), "path")))
         {
         }
@@ -332,6 +652,9 @@ namespace YuzeToolkit.UnityAgent
             "path_delete",
             "Delete a file or directory. Directory deletion can be recursive.",
             AgentToolAccess.Write,
+            AgentToolRisk.Destructive,
+            AgentToolSurface.All,
+            false,
             AgentToolArguments.ObjectSchema(AgentJson.Object(
                     ("path", AgentToolArguments.StringProperty("File or directory path.")),
                     ("recursive", AgentToolArguments.BooleanProperty("Delete a non-empty directory recursively."))),
@@ -345,6 +668,7 @@ namespace YuzeToolkit.UnityAgent
             CancellationToken cancellationToken)
         {
             var path = AgentPath.Resolve(context, AgentToolArguments.RequiredString(arguments, "path"));
+            AgentPath.EnsureSafeDeletionTarget(context, path);
             var recursive = AgentToolArguments.OptionalBool(arguments, "recursive");
             return Run(token =>
             {
@@ -372,6 +696,9 @@ namespace YuzeToolkit.UnityAgent
             "path_copy",
             "Copy a file or directory to another non-overlapping path.",
             AgentToolAccess.Write,
+            AgentToolRisk.WorkspaceWrite,
+            AgentToolSurface.All,
+            false,
             AgentToolArguments.ObjectSchema(AgentJson.Object(
                     ("source", AgentToolArguments.StringProperty("Source file or directory.")),
                     ("destination", AgentToolArguments.StringProperty("Destination path.")),
@@ -446,6 +773,9 @@ namespace YuzeToolkit.UnityAgent
             "path_move",
             "Move or rename a file or directory.",
             AgentToolAccess.Write,
+            AgentToolRisk.WorkspaceWrite,
+            AgentToolSurface.All,
+            false,
             AgentToolArguments.ObjectSchema(AgentJson.Object(
                     ("source", AgentToolArguments.StringProperty("Source file or directory.")),
                     ("destination", AgentToolArguments.StringProperty("Destination path.")),

@@ -4,6 +4,12 @@
 
 ## 未发布
 
+- 为内嵌 Agent 增加 ObserveOnly/ConfirmWrites/FullAccess 能力模式、Tool 风险与 Editor/Player 表面、
+  请求前暴露过滤、执行时二次校验、有界文件根与受保护删除。
+- 增加由 SHA-256 保护的原子 `file_apply_patch`、安全的 `unity_snapshot` / `unity_scene_query`
+  查询 Tool、明确 `AgentTurnResult`、完整 Host 流事件转发与编译续跑失败识别。
+- 增加 6 个定向 UnityAgentTool EditMode 测试，覆盖策略、注册生命期、路径边界、精确 Patch、
+  Turn 失败结果与 Tool 执行事件；Agent Package 版本升至 0.3.0。
 - 让每条 AGENTS.md 与 Skill 根独立选择是否使用 `.unityagenttool` 命名空间，将四条 Package 默认根全部加入
   Player 内容，并让 ProjectRoot 默认根直接从项目根解析。
 - 将长 Tool 参数与结果拆成有界纯文本块，并放入限制高度的滚动区域，避免单个 UI Toolkit 文本元素超过

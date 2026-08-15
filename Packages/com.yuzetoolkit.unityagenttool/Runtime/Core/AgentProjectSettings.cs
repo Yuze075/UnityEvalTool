@@ -84,6 +84,8 @@ namespace YuzeToolkit.UnityAgent
 
         private static void Validate(AgentProjectSettingsDocument settings)
         {
+            if (!Enum.IsDefined(typeof(AgentPermissionMode), settings.PermissionMode))
+                throw new FormatException("Project settings contain an unknown Agent permission mode.");
             if (string.IsNullOrWhiteSpace(settings.EditorSystemPrompt) ||
                 string.IsNullOrWhiteSpace(settings.RuntimeSystemPrompt))
                 throw new FormatException("Editor and Runtime system prompts are required.");

@@ -36,7 +36,7 @@ namespace YuzeToolkit.UnityAgent
         }
 
         public async Task RunAsync(AgentSessionRuntime runtime, AgentSettingsDocument settings,
-            AgentProviderProfile profile, Func<Task> save, Action changed,
+            AgentProviderProfile profile, Func<Task> save, Action changed, Action<AgentStreamEvent>? onStreamEvent,
             CancellationToken cancellationToken)
         {
             var instructions = await _instructions.LoadAsync(settings, runtime.Document.WorkingDirectory,
@@ -62,16 +62,17 @@ namespace YuzeToolkit.UnityAgent
                 await CompactContextIfNeededAsync(runtime, profile, systemPrompt,
                     settings.DefaultToolTimeoutSeconds, save, changed, cancellationToken).ConfigureAwait(false);
                 var request = BuildRequest(runtime, profile, systemPrompt, settings.DefaultToolTimeoutSeconds);
-                var response = await _provider.CompleteAsync(profile, request, streamEvent =>
+                var response = await _provider.CompleteAsync(profile, request, value =>
                 {
                     lock (runtime.SyncRoot)
                     {
-                        if (streamEvent.Kind == AgentStreamEventKind.TextDelta)
-                            runtime.LiveText += streamEvent.Text;
-                        else if (streamEvent.Kind == AgentStreamEventKind.ReasoningDelta)
-                            runtime.LiveReasoning += streamEvent.Text;
+                        if (value.Kind == AgentStreamEventKind.TextDelta)
+                            runtime.LiveText += value.Text;
+                        else if (value.Kind == AgentStreamEventKind.ReasoningDelta)
+                            runtime.LiveReasoning += value.Text;
                     }
                     changed();
+                    onStreamEvent?.Invoke(value);
                 }, cancellationToken).ConfigureAwait(false);
                 ValidateProviderResponse(response);
 
@@ -110,10 +111,25 @@ namespace YuzeToolkit.UnityAgent
                 foreach (var call in response.ToolCalls)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var result = await ExecuteToolAsync(runtime, call, settings.DefaultToolTimeoutSeconds, save,
-                            changed, cancellationToken).ConfigureAwait(false);
+                    onStreamEvent?.Invoke(new AgentStreamEvent(
+                        AgentStreamEventKind.ToolExecutionStarted, call.Name, call.Id));
+                    AgentToolResult result;
+                    try
+                    {
+                        result = await ExecuteToolAsync(runtime, call, settings.DefaultToolTimeoutSeconds, save,
+                                changed, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        onStreamEvent?.Invoke(new AgentStreamEvent(
+                            AgentStreamEventKind.ToolExecutionCompleted,
+                            "Tool execution was canceled.", call.Id, true));
+                        throw;
+                    }
                     cancellationToken.ThrowIfCancellationRequested();
                     result = BoundToolResult(result);
+                    onStreamEvent?.Invoke(new AgentStreamEvent(
+                        AgentStreamEventKind.ToolExecutionCompleted, result.Text, call.Id, result.IsError));
                     lock (runtime.SyncRoot)
                     {
                         runtime.Document.Messages.Add(new AgentMessage
@@ -152,6 +168,7 @@ namespace YuzeToolkit.UnityAgent
             List<AgentMessage> messages;
             string model;
             string effort;
+            AgentPermissionMode permissionMode;
             lock (runtime.SyncRoot)
             {
                 messages = ProjectMessages(runtime.Document);
@@ -159,20 +176,22 @@ namespace YuzeToolkit.UnityAgent
                 effort = string.IsNullOrWhiteSpace(runtime.Document.ReasoningEffort)
                     ? profile.ReasoningEffort
                     : runtime.Document.ReasoningEffort;
+                permissionMode = runtime.Document.PermissionMode;
             }
+            var surface = AgentToolPolicy.CurrentSurface;
             return new AgentModelRequest
             {
                 SessionId = runtime.Document.Id,
                 ProviderThreadId = runtime.Document.ProviderThreadId,
                 WorkingDirectory = runtime.Document.WorkingDirectory,
-                PermissionMode = runtime.Document.PermissionMode,
+                PermissionMode = permissionMode,
                 DefaultToolTimeoutSeconds = Math.Max(1, defaultToolTimeoutSeconds),
                 SystemPrompt = systemPrompt,
                 Model = model,
                 ReasoningEffort = effort,
                 MaxOutputTokens = Math.Max(1, profile.MaxOutputTokens),
                 Messages = messages,
-                Tools = _tools.ListDescriptors()
+                Tools = _tools.ListDescriptors(permissionMode, surface)
             };
         }
 
@@ -194,8 +213,11 @@ namespace YuzeToolkit.UnityAgent
 
             AgentPermissionMode permissionMode;
             lock (runtime.SyncRoot) permissionMode = runtime.Document.PermissionMode;
-            if (permissionMode == AgentPermissionMode.ConfirmWrites &&
-                tool.Descriptor.Access != AgentToolAccess.ReadOnly)
+            var surface = AgentToolPolicy.CurrentSurface;
+            if (!AgentToolPolicy.IsExposed(tool.Descriptor, permissionMode, surface))
+                return AgentToolResult.Error(
+                    $"Agent Tool '{call.Name}' is not available in {permissionMode} mode on {surface}.");
+            if (AgentToolPolicy.RequiresApproval(tool.Descriptor, permissionMode))
             {
                 var approval = new AgentApprovalRequest
                 {
@@ -203,7 +225,7 @@ namespace YuzeToolkit.UnityAgent
                     ToolCallId = call.Id,
                     ToolName = call.Name,
                     ArgumentsJson = call.ArgumentsJson,
-                    Description = tool.Descriptor.Description
+                    Description = $"{tool.Descriptor.Risk}: {tool.Descriptor.Description}"
                 };
                 lock (runtime.SyncRoot)
                 {
@@ -227,7 +249,8 @@ namespace YuzeToolkit.UnityAgent
             {
                 return await tool.ExecuteAsync(
                     new AgentToolContext(runtime.Document.Id, runtime.Document.WorkingDirectory,
-                        defaultToolTimeoutSeconds), arguments, cancellationToken).ConfigureAwait(false);
+                        defaultToolTimeoutSeconds, permissionMode, surface), arguments, cancellationToken)
+                    .ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -257,7 +280,10 @@ namespace YuzeToolkit.UnityAgent
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 CompactionSnapshot snapshot;
-                var tools = _tools.ListDescriptors();
+                AgentPermissionMode permissionMode;
+                lock (runtime.SyncRoot)
+                    permissionMode = runtime.Document.PermissionMode;
+                var tools = _tools.ListDescriptors(permissionMode, AgentToolPolicy.CurrentSurface);
                 lock (runtime.SyncRoot)
                     snapshot = CaptureCompaction(runtime.Document, profile, systemPrompt, tools);
                 if (!snapshot.RequiresCompaction) return;

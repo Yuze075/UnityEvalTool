@@ -43,16 +43,30 @@ Provider Profile 保存模型 Context Window。HTTP 对话接近窗口时，对�
 改用一份语义摘要检查点和最近的完整消息边界。网络瞬时错误、429 与可恢复的 5xx 最多重试两次，并且只能发生
 在收到第一条 SSE 事件之前；任何部分模型输出都不会重试。
 
-内建 Editor/Runtime System Prompt 统一使用英文，声明 Unity 角色、文件、进程、Shell、Skill 与
-`unity_eval_js` 的真实 Tool 名和首次选用路径，并要求陌生 Unity 工作先从 `tools://` 发现模块。每次模型请求
-仍会携带完整结构化 Tool schema，具体参数与详细执行契约只由对应 Tool 描述维护。
+每次模型请求只会收到当前对话权限与 Unity 运行表面允许的 Tool，执行前会再做一次相同校验：
+
+- **ObserveOnly**：只暴露有边界的只读 Tool；每个新建独立 Player 对话都从此模式开始。
+- **ConfirmWrites**：Editor 文件访问限于 Unity 项目，Player 限于持久化/缓存目录；所有变更、进程、破坏性或 Full Trust Tool 执行前请求确认。
+- **FullAccess**：移除文件边界和审批，但删除仍会拒绝文件系统根、用户目录、项目根和对话工作目录。
+
+新安装的 Package 默认使用 ConfirmWrites；已有且有效的本机设置保留明确保存的模式。Tool 现在声明
+风险、Editor/Player 表面和未来并行安全 metadata；公开注册表返回可释放句柄，可选模块能安全移除自己的 Tool。
+
+内建 Editor/Runtime System Prompt 统一使用英文，声明 Unity 角色与真实 Tool 名。`file_read_text`
+对不超过 64 MB 的文件返回 SHA-256；`file_apply_patch` 最多处理 16 MB，必须提供该 Hash 和旧文本精确出现次数，通过原子替换写盘并返回
+有界 Diff。`unity_snapshot` 与 `unity_scene_query` 为 ObserveOnly 提供安全 Unity 查询；Full Trust
+的 `unity_eval_js` 只在对话允许变更 Tool 后可用。每次模型请求仍会携带完整结构化 Tool schema。
 
 ## 独立 Agent 边界
 
 AgentLoop、会话、审批、上下文压缩、Tool 调度和 `unity_eval_js` 全部在 Unity 进程内运行。默认 Host 直接创建
 HTTP 模型 Provider 与 UnityEvalTool 的进程内 `EvalExecutor`，不会启动或连接 Codex、Broker、MCP 或电脑级 CLI。
 Settings 中独立的 Eval 连接页面只管理外部程序访问 UnityEvalTool 的可选能力，不是 Agent 运行依赖。
-Process/Shell Tool 也只有在模型明确调用时才启动指定程序。
+Process/Shell Tool 只在 Editor 暴露，并且只在当前模式允许、模型明确调用后启动指定程序。
+
+`UnityAgentHost.SendMessageAsync` 现在返回包含持久化终态、错误和用量的 `AgentTurnResult`，不再用
+“成功完成的无类型 Task”表示 Agent 内部失败。`UnityAgentHost.StreamEvent` 会转发全部 Provider 流事件以及
+Tool 执行开始/结束事件，并携带对话 ID；单个订阅者异常只记录，不会中断 Agent。编译恢复会校验每个续跑结果后再清理 marker。
 
 OpenAI 模型通过 API Key 调用 OpenAI Responses API。ChatGPT/Codex 订阅不是可嵌入的 Provider 凭据，因此
 UnityAgentTool 不读取 Codex 登录缓存，也不再提供 Codex App Server。历史 `codex-app-server` Profile 会迁移为
@@ -131,6 +145,7 @@ var handle = DebugWindowModule.RegisterWindow(window =>
 
 - `UnityAgentTool`：Agent Core、统一 UI、DebugPanel、DebugWindow、Command Line 与 Log。
 - `UnityAgentTool.Editor`：EditorWindow 与 Editor Broker 设置桥接。
+- `UnityAgentTool.Editor.Tests`：安装 Unity Test Framework 1.4+ 时可用的定向 EditMode 测试。
 
 旧 Runtime Console registry、tab provider 程序集、Runtime Eval 页面、兼容 Provider 与
 DebugWindow MonoBehaviour 宿主均已删除。

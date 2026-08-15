@@ -48,10 +48,25 @@ latest complete message boundary is projected to the model. Transient HTTP netwo
 and recoverable 5xx responses are retried at most twice and only before the first SSE event; partial model
 output is never retried.
 
-The built-in Editor and Runtime system prompts are English. They define the Unity role, name the actual file,
-process, shell, Skill, and `unity_eval_js` entry Tools, and tell the model which one to call first—including
-starting unfamiliar Unity work by discovering `tools://` modules. Exact arguments and detailed execution
-contracts remain in the structured Tool schemas sent with every model request.
+Every model request receives only the Tools allowed by the conversation permission and current Unity surface,
+and execution repeats the same policy check. The modes are:
+
+- **ObserveOnly** exposes bounded read-only Tools. Every new standalone Player conversation starts here.
+- **ConfirmWrites** bounds file access to the Unity project in Editor or persistent/cache data in Player and asks
+  before every mutating, process, destructive, or full-trust Tool.
+- **FullAccess** removes the file boundary and approvals, but deletion still refuses filesystem, user-profile,
+  project, and conversation working-directory roots.
+
+Fresh package defaults use ConfirmWrites. Existing valid machine settings keep their explicitly persisted mode.
+Tools declare risk, Editor/Player surfaces, and future parallel-safety metadata; the public registry returns a
+disposable registration handle so optional modules can remove their own Tools safely.
+
+The built-in Editor and Runtime system prompts are English. They define the Unity role and actual Tool names.
+`file_read_text` returns a SHA-256 for files up to 64 MB; `file_apply_patch` accepts files up to 16 MB and requires
+that hash, exact old-text occurrence counts, and
+performs an atomic replacement with a bounded diff. `unity_snapshot` and `unity_scene_query` provide safe Unity
+inspection in ObserveOnly. The full-trust `unity_eval_js` remains available only after the conversation permits
+mutating Tools. Exact arguments and detailed execution contracts remain in the structured Tool schemas.
 
 ## Standalone Agent boundary
 
@@ -59,7 +74,14 @@ The Agent loop, sessions, approvals, context compaction, Tool dispatch and `unit
 inside the Unity process. The default host directly creates the HTTP model Provider and an in-process
 UnityEvalTool `EvalExecutor`; it does not start or connect to Codex, a Broker, MCP or the computer-level CLI.
 The separate Eval connection page manages optional external access to UnityEvalTool and is not an Agent runtime
-dependency. Process and shell Tools start a requested program only when the model explicitly calls them.
+dependency. Process and shell Tools are Editor-only and start a requested program only when the model explicitly
+calls them from a mode that exposes them.
+
+`UnityAgentHost.SendMessageAsync` returns `AgentTurnResult` with the persisted terminal state, error, and usage.
+Failures are no longer represented by a successfully completed untyped Task. `UnityAgentHost.StreamEvent` forwards
+all Provider stream events plus Tool execution start/completion events with the owning session id; one subscriber
+failure is logged without aborting the Agent turn. Compilation recovery checks every returned turn result before
+removing its retry marker.
 
 OpenAI models use the OpenAI Responses API with an API key. A ChatGPT/Codex subscription is not an embeddable
 Provider credential, so UnityAgentTool does not read Codex login caches or expose Codex App Server. Existing
@@ -149,6 +171,7 @@ interaction styling instead of Unity's default skin.
 
 - `UnityAgentTool`: Agent core, all shared UI, DebugPanel, DebugWindow API, Command Line and Log.
 - `UnityAgentTool.Editor`: EditorWindow and Editor Broker settings bridge.
+- `UnityAgentTool.Editor.Tests`: optional focused EditMode tests when Unity Test Framework 1.4+ is installed.
 
 The package does not expose the old Runtime Console registry, tab-provider assemblies, Eval runtime
 page, compatibility providers or DebugWindow MonoBehaviour host.

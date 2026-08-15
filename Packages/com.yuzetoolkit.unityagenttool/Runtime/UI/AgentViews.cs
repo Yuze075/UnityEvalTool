@@ -300,12 +300,15 @@ namespace YuzeToolkit.UnityAgent
 
             _permission = AgentUi.CompactDropdown(new[]
             {
-                AgentPermissionMode.FullAccess.ToString(), AgentPermissionMode.ConfirmWrites.ToString()
+                AgentPermissionMode.ObserveOnly.ToString(), AgentPermissionMode.ConfirmWrites.ToString(),
+                AgentPermissionMode.FullAccess.ToString()
             }, "Execution permission");
             _permission.style.width = 146;
-            _permission.ValueFormatter = value => value == AgentPermissionMode.FullAccess.ToString()
-                ? "Full access"
-                : "Confirm writes";
+            _permission.ValueFormatter = value => value == AgentPermissionMode.ObserveOnly.ToString()
+                ? "Observe only"
+                : value == AgentPermissionMode.ConfirmWrites.ToString()
+                    ? "Confirm writes"
+                    : "Full access";
             _permission.RegisterValueChangedCallback(_ => SaveConversationSelection());
             controls.Add(_permission);
             var spacer = new VisualElement();
@@ -657,7 +660,7 @@ namespace YuzeToolkit.UnityAgent
             if (profile == null || string.IsNullOrWhiteSpace(sessionId)) return;
             var permission = Enum.TryParse<AgentPermissionMode>(_permission.value, out var parsed)
                 ? parsed
-                : AgentPermissionMode.FullAccess;
+                : AgentPermissionMode.ObserveOnly;
             var effort = _effort.value == "default" ? string.Empty : _effort.value;
             if (string.IsNullOrWhiteSpace(_model.value))
                 throw new InvalidOperationException("Select a model before sending a message.");
@@ -782,7 +785,10 @@ namespace YuzeToolkit.UnityAgent
                 choices.Add(_effort.value);
                 _effort.choices = choices;
             }
-            _permission.SetValueWithoutNotify((current?.PermissionMode ?? settings.PermissionMode).ToString());
+            var defaultPermission = AgentPaths.IsEditor
+                ? settings.PermissionMode
+                : AgentPermissionMode.ObserveOnly;
+            _permission.SetValueWithoutNotify((current?.PermissionMode ?? defaultPermission).ToString());
 
             _status.text = current == null
                 ? "Draft · created on first send"
@@ -1726,7 +1732,8 @@ namespace YuzeToolkit.UnityAgent
             _scroll.Content.Add(defaults);
             _permission = AgentUi.Dropdown("Default permission", new[]
             {
-                AgentPermissionMode.FullAccess.ToString(), AgentPermissionMode.ConfirmWrites.ToString()
+                AgentPermissionMode.ObserveOnly.ToString(), AgentPermissionMode.ConfirmWrites.ToString(),
+                AgentPermissionMode.FullAccess.ToString()
             });
             defaults.Add(_permission);
             _toolTimeout = new AgentIntegerField("Default tool timeout (seconds)");

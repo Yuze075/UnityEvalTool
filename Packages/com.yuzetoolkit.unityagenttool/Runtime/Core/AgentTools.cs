@@ -12,7 +12,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly object _syncRoot = new();
         private readonly Dictionary<string, IAgentTool> _tools = new(StringComparer.Ordinal);
 
-        public void Register(IAgentTool tool)
+        public IDisposable Register(IAgentTool tool)
         {
             if (tool == null) throw new ArgumentNullException(nameof(tool));
             lock (_syncRoot)
@@ -21,6 +21,7 @@ namespace YuzeToolkit.UnityAgent
                     throw new InvalidOperationException($"Agent Tool '{tool.Descriptor.Name}' is already registered.");
                 _tools.Add(tool.Descriptor.Name, tool);
             }
+            return new ToolRegistration(this, tool);
         }
 
         public bool TryGet(string name, out IAgentTool tool)
@@ -35,6 +36,77 @@ namespace YuzeToolkit.UnityAgent
                 return _tools.Values.Select(tool => tool.Descriptor)
                     .OrderBy(descriptor => descriptor.Name, StringComparer.Ordinal).ToList();
         }
+
+        public IReadOnlyList<AgentToolDescriptor> ListDescriptors(
+            AgentPermissionMode permissionMode,
+            AgentToolSurface surface)
+        {
+            lock (_syncRoot)
+                return _tools.Values.Select(tool => tool.Descriptor)
+                    .Where(descriptor => AgentToolPolicy.IsExposed(descriptor, permissionMode, surface))
+                    .OrderBy(descriptor => descriptor.Name, StringComparer.Ordinal).ToList();
+        }
+
+        private void Unregister(IAgentTool tool)
+        {
+            lock (_syncRoot)
+            {
+                if (_tools.TryGetValue(tool.Descriptor.Name, out var current) && ReferenceEquals(current, tool))
+                    _tools.Remove(tool.Descriptor.Name);
+            }
+        }
+
+        private sealed class ToolRegistration : IDisposable
+        {
+            private AgentToolRegistry? _registry;
+            private IAgentTool? _tool;
+
+            public ToolRegistration(AgentToolRegistry registry, IAgentTool tool)
+            {
+                _registry = registry;
+                _tool = tool;
+            }
+
+            public void Dispose()
+            {
+                var registry = Interlocked.Exchange(ref _registry, null);
+                var tool = Interlocked.Exchange(ref _tool, null);
+                if (registry != null && tool != null) registry.Unregister(tool);
+            }
+        }
+    }
+
+    internal static class AgentToolPolicy
+    {
+        public static AgentToolSurface CurrentSurface =>
+            AgentPaths.IsEditor ? AgentToolSurface.Editor : AgentToolSurface.Player;
+
+        public static bool IsExposed(
+            AgentToolDescriptor descriptor,
+            AgentPermissionMode permissionMode,
+            AgentToolSurface surface)
+        {
+            if (descriptor == null) throw new ArgumentNullException(nameof(descriptor));
+            if (!Enum.IsDefined(typeof(AgentPermissionMode), permissionMode))
+                throw new ArgumentOutOfRangeException(nameof(permissionMode), permissionMode,
+                    "Unknown Agent permission mode.");
+            if (surface is not (AgentToolSurface.Editor or AgentToolSurface.Player))
+                throw new ArgumentOutOfRangeException(nameof(surface), surface,
+                    "Tool policy requires exactly one active surface.");
+            if ((descriptor.Surfaces & surface) == 0) return false;
+            return permissionMode != AgentPermissionMode.ObserveOnly ||
+                   descriptor.Risk == AgentToolRisk.ReadOnly;
+        }
+
+        public static bool RequiresApproval(AgentToolDescriptor descriptor, AgentPermissionMode permissionMode)
+        {
+            if (descriptor == null) throw new ArgumentNullException(nameof(descriptor));
+            return permissionMode == AgentPermissionMode.ConfirmWrites &&
+                   descriptor.Risk != AgentToolRisk.ReadOnly;
+        }
+
+        public static bool RestrictsFileSystem(AgentPermissionMode permissionMode) =>
+            permissionMode != AgentPermissionMode.FullAccess;
     }
 
     public sealed class AgentApprovalRequest
@@ -187,6 +259,18 @@ namespace YuzeToolkit.UnityAgent
                 result.Add(text);
             }
             return result;
+        }
+
+        public static List<Dictionary<string, object?>> RequiredObjects(
+            Dictionary<string, object?> arguments,
+            string key)
+        {
+            if (!arguments.ContainsKey(key))
+                throw new ArgumentException($"Required array argument '{key}' is missing.");
+            var values = AgentJson.GetObjectArray(arguments, key);
+            if (values.Count == 0)
+                throw new ArgumentException($"Required array argument '{key}' cannot be empty.");
+            return values;
         }
 
         public static Dictionary<string, object?> ObjectSchema(

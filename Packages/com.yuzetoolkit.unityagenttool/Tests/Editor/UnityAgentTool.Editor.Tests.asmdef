@@ -1,0 +1,28 @@
+{
+  "name": "UnityAgentTool.Editor.Tests",
+  "rootNamespace": "YuzeToolkit.UnityAgent.Tests",
+  "references": [
+    "UnityAgentTool",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [
+    "YUZE_USE_UNITY_TEST_FRAMEWORK"
+  ],
+  "versionDefines": [
+    {
+      "name": "com.unity.test-framework",
+      "expression": "1.4.0",
+      "define": "YUZE_USE_UNITY_TEST_FRAMEWORK"
+    }
+  ],
+  "noEngineReferences": false
+}

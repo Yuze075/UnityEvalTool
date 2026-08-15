@@ -83,6 +83,8 @@ namespace YuzeToolkit.UnityAgent
             }
         }
 
+        public event Action<AgentHostStreamEvent>? StreamEvent;
+
         public AgentApprovalService Approvals
         {
             get
@@ -313,8 +315,12 @@ namespace YuzeToolkit.UnityAgent
                     ProviderProfileId = profile.Id,
                     Model = profile.Model,
                     ReasoningEffort = profile.ReasoningEffort,
-                    PermissionMode = settings.PermissionMode,
-                    WorkingDirectory = AgentPaths.ProjectRoot,
+                    PermissionMode = AgentPaths.IsEditor
+                        ? settings.PermissionMode
+                        : AgentPermissionMode.ObserveOnly,
+                    WorkingDirectory = AgentPaths.IsEditor
+                        ? AgentPaths.ProjectRoot
+                        : AgentPaths.GetBasePath(AgentPathBase.PersistentData),
                     SortOrder = sortOrder
                 };
                 var runtime = new AgentSessionRuntime(document);
@@ -342,7 +348,7 @@ namespace YuzeToolkit.UnityAgent
             }
         }
 
-        public async Task SendMessageAsync(
+        public async Task<AgentTurnResult> SendMessageAsync(
             string sessionId,
             string text,
             CancellationToken cancellationToken = default)
@@ -371,6 +377,13 @@ namespace YuzeToolkit.UnityAgent
             }
             if (!await runtime.TurnGate.WaitAsync(0, token).ConfigureAwait(false))
                 throw new InvalidOperationException("This conversation already has an active turn.");
+            long startingInputTokens;
+            long startingOutputTokens;
+            lock (runtime.SyncRoot)
+            {
+                startingInputTokens = runtime.Document.Usage.InputTokens;
+                startingOutputTokens = runtime.Document.Usage.OutputTokens;
+            }
             var turnAdmitted = false;
             try
             {
@@ -413,6 +426,7 @@ namespace YuzeToolkit.UnityAgent
                 await loop.RunAsync(runtime, settings, profile,
                     () => SaveRuntimeAsync(runtime, token),
                     MarkChanged,
+                    value => PublishStreamEvent(runtime.Document.Id, value),
                     token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -439,6 +453,10 @@ namespace YuzeToolkit.UnityAgent
                     MarkChanged();
                     await SaveRuntimeAsync(runtime, CancellationToken.None).ConfigureAwait(false);
                 }
+                else
+                {
+                    throw;
+                }
             }
             catch (Exception exception)
             {
@@ -461,6 +479,12 @@ namespace YuzeToolkit.UnityAgent
                     MarkChanged();
                     await SaveRuntimeAsync(runtime, CancellationToken.None).ConfigureAwait(false);
                 }
+                else
+                {
+                    throw;
+                }
+                PublishStreamEvent(runtime.Document.Id,
+                    new AgentStreamEvent(AgentStreamEventKind.RunFailed, exception.Message, isError: true));
             }
             finally
             {
@@ -474,6 +498,7 @@ namespace YuzeToolkit.UnityAgent
                 if (turnAdmitted) ExitTurnAdmission();
                 runtime.TurnGate.Release();
             }
+            return CompleteTurn(runtime, startingInputTokens, startingOutputTokens);
         }
 
         public void StopSession(string sessionId)
@@ -1166,6 +1191,7 @@ namespace YuzeToolkit.UnityAgent
             _tools.Register(new ListDirectoryAgentTool());
             _tools.Register(new FileInfoAgentTool());
             _tools.Register(new WriteFileAgentTool());
+            _tools.Register(new ApplyPatchAgentTool());
             _tools.Register(new CreateDirectoryAgentTool());
             _tools.Register(new DeletePathAgentTool());
             _tools.Register(new CopyPathAgentTool());
@@ -1173,6 +1199,8 @@ namespace YuzeToolkit.UnityAgent
             var processRunner = new AgentProcessRunner();
             _tools.Register(new ProcessAgentTool(processRunner));
             _tools.Register(new ShellAgentTool(processRunner));
+            _tools.Register(new UnitySnapshotAgentTool());
+            _tools.Register(new UnitySceneQueryAgentTool());
             _tools.Register(new UnityEvalJsAgentTool(_evalService));
             _tools.Register(new SkillListAgentTool(_instructions, () => Settings));
             _tools.Register(new SkillReadAgentTool(_instructions, () => Settings));
@@ -1324,6 +1352,55 @@ namespace YuzeToolkit.UnityAgent
         private void MarkChanged()
         {
             Interlocked.Increment(ref _revision);
+        }
+
+        private void PublishStreamEvent(string sessionId, AgentStreamEvent value)
+        {
+            var handlers = StreamEvent;
+            if (handlers == null) return;
+            var hostEvent = new AgentHostStreamEvent(sessionId, value);
+            foreach (Action<AgentHostStreamEvent> handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler(hostEvent);
+                }
+                catch (Exception exception)
+                {
+                    UnityEngine.Debug.LogException(exception);
+                }
+            }
+        }
+
+        private static AgentTurnResult CreateTurnResult(
+            AgentSessionRuntime runtime,
+            long startingInputTokens,
+            long startingOutputTokens)
+        {
+            lock (runtime.SyncRoot)
+            {
+                return new AgentTurnResult(runtime.Document.Id, runtime.Document.State,
+                    runtime.Document.LastError, new AgentUsage
+                    {
+                        InputTokens = runtime.Document.Usage.InputTokens >= startingInputTokens
+                            ? runtime.Document.Usage.InputTokens - startingInputTokens
+                            : 0,
+                        OutputTokens = runtime.Document.Usage.OutputTokens >= startingOutputTokens
+                            ? runtime.Document.Usage.OutputTokens - startingOutputTokens
+                            : 0
+                    });
+            }
+        }
+
+        private AgentTurnResult CompleteTurn(
+            AgentSessionRuntime runtime,
+            long startingInputTokens,
+            long startingOutputTokens)
+        {
+            var result = CreateTurnResult(runtime, startingInputTokens, startingOutputTokens);
+            PublishStreamEvent(result.SessionId, new AgentStreamEvent(
+                AgentStreamEventKind.TurnCompleted, result.State.ToString(), isError: !result.IsSuccess));
+            return result;
         }
 
         private static string CreateTitle(string text)

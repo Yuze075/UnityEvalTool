@@ -141,7 +141,7 @@ namespace YuzeToolkit.UnityAgent
                 ProviderProfileId = AgentJson.GetString(root, "providerProfileId"),
                 Model = AgentJson.GetString(root, "model"),
                 ReasoningEffort = AgentJson.GetString(root, "reasoningEffort"),
-                PermissionMode = AgentJson.GetEnum(root, "permissionMode", AgentPermissionMode.FullAccess),
+                PermissionMode = AgentJson.GetEnum(root, "permissionMode", AgentPermissionMode.ObserveOnly),
                 SystemPrompt = AgentJson.GetString(root, "systemPrompt"),
                 WorkingDirectory = AgentJson.GetString(root, "workingDirectory"),
                 ProviderThreadId = AgentJson.GetString(root, "providerThreadId"),

@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+- Harden the embedded Agent with ObserveOnly/ConfirmWrites/FullAccess capability modes, Tool risk and Editor/Player
+  surfaces, request-time exposure filtering, execution-time enforcement, bounded file roots, and protected deletion.
+- Add SHA-256 guarded atomic `file_apply_patch`, safe `unity_snapshot` / `unity_scene_query` inspection Tools,
+  explicit `AgentTurnResult`, complete Host stream forwarding, and compilation-resume failure detection.
+- Add six focused UnityAgentTool EditMode tests for policy, registration lifetime, path boundaries, exact patching,
+  terminal failure results, and Tool execution events; bump the Agent package to 0.3.0.
 - Let each AGENTS.md and Skill root opt in or out of the `.unityagenttool` namespace, include every package-default
   root in Player content, and make the project defaults resolve directly from ProjectRoot.
 - Render long Tool arguments and results as bounded plain-text chunks inside a capped scroll region so one UI Toolkit

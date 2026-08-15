@@ -24,6 +24,9 @@ namespace YuzeToolkit.UnityAgent
                 "process_exec",
                 "Run a local executable directly and capture stdout, stderr and exit code.",
                 AgentToolAccess.Write,
+                AgentToolRisk.Process,
+                AgentToolSurface.Editor,
+                false,
                 AgentToolArguments.ObjectSchema(AgentJson.Object(
                         ("executable", AgentToolArguments.StringProperty("Executable name or absolute path.")),
                         ("arguments", AgentJson.Object(
@@ -74,6 +77,9 @@ namespace YuzeToolkit.UnityAgent
                 "shell_exec",
                 "Run a script with zsh, sh, bash, PowerShell or cmd on supported desktop platforms.",
                 AgentToolAccess.Write,
+                AgentToolRisk.Process,
+                AgentToolSurface.Editor,
+                false,
                 AgentToolArguments.ObjectSchema(AgentJson.Object(
                         ("script", AgentToolArguments.StringProperty("Complete shell script.")),
                         ("shell", AgentToolArguments.StringProperty(

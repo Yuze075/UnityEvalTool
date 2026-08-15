@@ -277,7 +277,7 @@ namespace YuzeToolkit.UnityAgent
                                    "task now: re-inspect the current files and Unity state, check the compilation " +
                                    "result, and proceed from the persisted conversation instead of assuming the " +
                                    "interrupted tool call completed.";
-                var tasks = new List<Task>();
+                var tasks = new List<Task<AgentTurnResult>>();
                 foreach (var id in marker.sessionIds.Distinct(StringComparer.Ordinal))
                 {
                     try
@@ -293,7 +293,15 @@ namespace YuzeToolkit.UnityAgent
                             AgentSessionState.Failed)) continue;
                     tasks.Add(host.SendMessageAsync(id, continuation));
                 }
-                await Task.WhenAll(tasks).ConfigureAwait(true);
+                var results = await Task.WhenAll(tasks).ConfigureAwait(true);
+                var failed = results.Where(result => !result.IsSuccess).ToList();
+                if (failed.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"{failed.Count} Agent conversation(s) failed to resume after compilation: " +
+                        string.Join("; ", failed.Select(result =>
+                            $"{result.SessionId}: {result.State} {result.Error}")));
+                }
             }
             catch (Exception exception)
             {

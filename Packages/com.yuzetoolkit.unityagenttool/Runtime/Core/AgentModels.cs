@@ -10,13 +10,33 @@ namespace YuzeToolkit.UnityAgent
     public enum AgentPermissionMode
     {
         FullAccess = 0,
-        ConfirmWrites = 1
+        ConfirmWrites = 1,
+        ObserveOnly = 2
     }
 
     public enum AgentToolAccess
     {
         Write = 0,
         ReadOnly = 1
+    }
+
+    public enum AgentToolRisk
+    {
+        ReadOnly = 0,
+        WorkspaceWrite = 1,
+        UnityMutation = 2,
+        Process = 3,
+        Destructive = 4,
+        FullTrust = 5
+    }
+
+    [Flags]
+    public enum AgentToolSurface
+    {
+        None = 0,
+        Editor = 1,
+        Player = 2,
+        All = Editor | Player
     }
 
     public enum AgentMessageRole
@@ -44,9 +64,12 @@ namespace YuzeToolkit.UnityAgent
         ReasoningDelta,
         ToolCallStarted,
         ToolCallArgumentsDelta,
+        ToolExecutionStarted,
+        ToolExecutionCompleted,
         UsageUpdated,
         RunCompleted,
-        RunFailed
+        RunFailed,
+        TurnCompleted
     }
 
     public sealed class AgentProviderProfile
@@ -144,7 +167,7 @@ namespace YuzeToolkit.UnityAgent
 
         public string DefaultProviderProfileId { get; set; } = string.Empty;
 
-        public AgentPermissionMode PermissionMode { get; set; }
+        public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.ConfirmWrites;
 
         public string EditorSystemPrompt { get; set; } = string.Empty;
 
@@ -187,7 +210,7 @@ namespace YuzeToolkit.UnityAgent
         public const int CurrentSchemaVersion = 5;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
-        public AgentPermissionMode PermissionMode { get; set; }
+        public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.ConfirmWrites;
         public string EditorSystemPrompt { get; set; } = string.Empty;
         public string RuntimeSystemPrompt { get; set; } = string.Empty;
         public int DefaultToolTimeoutSeconds { get; set; }
@@ -292,7 +315,7 @@ namespace YuzeToolkit.UnityAgent
 
         public string ReasoningEffort { get; set; } = string.Empty;
 
-        public AgentPermissionMode PermissionMode { get; set; }
+        public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.ObserveOnly;
 
         public string SystemPrompt { get; set; } = string.Empty;
 
@@ -347,11 +370,39 @@ namespace YuzeToolkit.UnityAgent
             string description,
             AgentToolAccess access,
             Dictionary<string, object?> parameters)
+            : this(name, description, access,
+                access == AgentToolAccess.ReadOnly ? AgentToolRisk.ReadOnly : AgentToolRisk.WorkspaceWrite,
+                AgentToolSurface.All, false, parameters)
+        {
+        }
+
+        public AgentToolDescriptor(
+            string name,
+            string description,
+            AgentToolAccess access,
+            AgentToolRisk risk,
+            AgentToolSurface surfaces,
+            bool parallelSafe,
+            Dictionary<string, object?> parameters)
         {
             if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Tool name is required.", nameof(name));
+            if (!Enum.IsDefined(typeof(AgentToolAccess), access))
+                throw new ArgumentOutOfRangeException(nameof(access), access, "Unknown Agent Tool access.");
+            if (!Enum.IsDefined(typeof(AgentToolRisk), risk))
+                throw new ArgumentOutOfRangeException(nameof(risk), risk, "Unknown Agent Tool risk.");
+            if (surfaces == AgentToolSurface.None || (surfaces & ~AgentToolSurface.All) != 0)
+                throw new ArgumentOutOfRangeException(nameof(surfaces), surfaces,
+                    "Agent Tool must target Editor, Player, or both surfaces.");
+            if (access == AgentToolAccess.ReadOnly && risk != AgentToolRisk.ReadOnly)
+                throw new ArgumentException("A read-only Agent Tool must use ReadOnly risk.", nameof(risk));
+            if (access != AgentToolAccess.ReadOnly && risk == AgentToolRisk.ReadOnly)
+                throw new ArgumentException("A mutating Agent Tool cannot use ReadOnly risk.", nameof(risk));
             Name = name;
             Description = description ?? string.Empty;
             Access = access;
+            Risk = risk;
+            Surfaces = surfaces;
+            ParallelSafe = parallelSafe;
             Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         }
 
@@ -360,6 +411,12 @@ namespace YuzeToolkit.UnityAgent
         public string Description { get; }
 
         public AgentToolAccess Access { get; }
+
+        public AgentToolRisk Risk { get; }
+
+        public AgentToolSurface Surfaces { get; }
+
+        public bool ParallelSafe { get; }
 
         public Dictionary<string, object?> Parameters { get; }
     }
@@ -377,11 +434,18 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class AgentToolContext
     {
-        internal AgentToolContext(string sessionId, string workingDirectory, int defaultTimeoutSeconds)
+        internal AgentToolContext(
+            string sessionId,
+            string workingDirectory,
+            int defaultTimeoutSeconds,
+            AgentPermissionMode permissionMode,
+            AgentToolSurface surface)
         {
             SessionId = sessionId;
             WorkingDirectory = workingDirectory;
             DefaultTimeoutSeconds = Math.Max(1, defaultTimeoutSeconds);
+            PermissionMode = permissionMode;
+            Surface = surface;
         }
 
         public string SessionId { get; }
@@ -389,6 +453,10 @@ namespace YuzeToolkit.UnityAgent
         public string WorkingDirectory { get; }
 
         public int DefaultTimeoutSeconds { get; }
+
+        public AgentPermissionMode PermissionMode { get; }
+
+        public AgentToolSurface Surface { get; }
     }
 
     public interface IAgentTool
@@ -443,11 +511,16 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class AgentStreamEvent
     {
-        public AgentStreamEvent(AgentStreamEventKind kind, string text = "", string callId = "")
+        public AgentStreamEvent(
+            AgentStreamEventKind kind,
+            string text = "",
+            string callId = "",
+            bool isError = false)
         {
             Kind = kind;
             Text = text ?? string.Empty;
             CallId = callId ?? string.Empty;
+            IsError = isError;
         }
 
         public AgentStreamEventKind Kind { get; }
@@ -455,6 +528,44 @@ namespace YuzeToolkit.UnityAgent
         public string Text { get; }
 
         public string CallId { get; }
+
+        public bool IsError { get; }
+    }
+
+    public sealed class AgentHostStreamEvent
+    {
+        public AgentHostStreamEvent(string sessionId, AgentStreamEvent streamEvent)
+        {
+            SessionId = string.IsNullOrWhiteSpace(sessionId)
+                ? throw new ArgumentException("Session id is required.", nameof(sessionId))
+                : sessionId;
+            StreamEvent = streamEvent ?? throw new ArgumentNullException(nameof(streamEvent));
+        }
+
+        public string SessionId { get; }
+
+        public AgentStreamEvent StreamEvent { get; }
+    }
+
+    public sealed class AgentTurnResult
+    {
+        public AgentTurnResult(string sessionId, AgentSessionState state, string error, AgentUsage usage)
+        {
+            SessionId = sessionId ?? string.Empty;
+            State = state;
+            Error = error ?? string.Empty;
+            Usage = usage ?? throw new ArgumentNullException(nameof(usage));
+        }
+
+        public string SessionId { get; }
+
+        public AgentSessionState State { get; }
+
+        public string Error { get; }
+
+        public AgentUsage Usage { get; }
+
+        public bool IsSuccess => State == AgentSessionState.Completed;
     }
 
     public interface IAgentModelProvider
