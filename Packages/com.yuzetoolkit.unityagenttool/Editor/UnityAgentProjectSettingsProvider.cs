@@ -241,8 +241,9 @@ namespace YuzeToolkit.UnityAgent
             parent.Add(agentsCard);
 
             var skillsCard = AgentUi.Card("Skill discovery roots",
-                $"Each base automatically uses {AgentPaths.SettingsDirectoryName}/{AgentPaths.SkillDirectoryName}. " +
-                "An optional relative path selects a child directory; ordering controls discovery priority.");
+                $"Each root may insert {AgentPaths.SettingsDirectoryName}, then always adds " +
+                $"{AgentPaths.SkillDirectoryName}. An optional relative path selects a child directory; " +
+                "ordering controls discovery priority.");
             _skillRoots = new AgentPathListEditor("Skill roots", "Add Skill root", true, ShowPathError);
             _skillRoots.SetItems(settings.SkillRoots);
             _skillRoots.Changed += MarkDirty;

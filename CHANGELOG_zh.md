@@ -4,13 +4,17 @@
 
 ## 未发布
 
+- 让每条 AGENTS.md 与 Skill 根独立选择是否使用 `.unityagenttool` 命名空间，将四条 Package 默认根全部加入
+  Player 内容，并让 ProjectRoot 默认根直接从项目根解析。
+- 将长 Tool 参数与结果拆成有界纯文本块，并放入限制高度的滚动区域，避免单个 UI Toolkit 文本元素超过
+  Unity 2022.3 的顶点上限。
 - 将 Package JSON 设为 Unity Agent 无 Provider 默认值的唯一内置来源，增加可选的项目 Resources 覆盖，
   并在本机配置缺失或损坏时重建，同时保留损坏文件。
 - 让 Project Settings 持久化与 Unity Agent 工作台中显式覆盖无 Provider 项目默认值的动作共用同一入口。
 - 将设置、密钥、历史与编译恢复数据统一放在 `Application.persistentDataPath/.unityagenttool`，并从上一版直接
   写入 persistentDataPath 的布局迁移数据。
-- 让每个 `AgentPathBase` 自动解析到其所属基点下的 `.unityagenttool` 命名空间，Skill 根再自动追加
-  `.agents/skill`，JSON 只保存固定命名空间内部路径，并由本机设置 schema V10 规范化同 ID 默认根。
+- 使用稳定 `AgentPathBase`、可选 `.unityagenttool` 命名空间、Skill 固定 `.agents/skills` 后缀与 JSON 相对
+  子路径表示指令根，并通过本机设置 schema V11 规范化同 ID 默认根。
 
 ## 2.0.4 - 2026-08-15
 

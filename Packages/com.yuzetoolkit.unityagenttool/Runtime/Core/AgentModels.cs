@@ -120,6 +120,12 @@ namespace YuzeToolkit.UnityAgent
 
         public AgentPathBase BasePath { get; set; } = AgentPathBase.ProjectRoot;
 
+        /// <summary>
+        /// When true, path resolution inserts the package-owned .unityagenttool namespace below
+        /// BasePath. Disable it for roots such as a project-level AGENTS.md or .agents/skills folder.
+        /// </summary>
+        public bool UseUnityAgentToolDirectory { get; set; } = true;
+
         public string RelativePath { get; set; } = string.Empty;
 
         /// <summary>
@@ -132,7 +138,7 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class AgentSettingsDocument
     {
-        public const int CurrentSchemaVersion = 10;
+        public const int CurrentSchemaVersion = 11;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -178,7 +184,7 @@ namespace YuzeToolkit.UnityAgent
     /// </summary>
     public sealed class AgentProjectSettingsDocument
     {
-        public const int CurrentSchemaVersion = 4;
+        public const int CurrentSchemaVersion = 5;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
         public AgentPermissionMode PermissionMode { get; set; }
@@ -215,6 +221,7 @@ namespace YuzeToolkit.UnityAgent
         {
             Id = value.Id,
             BasePath = value.BasePath,
+            UseUnityAgentToolDirectory = value.UseUnityAgentToolDirectory,
             RelativePath = value.RelativePath,
             IncludeInPlayerBuild = value.IncludeInPlayerBuild
         };

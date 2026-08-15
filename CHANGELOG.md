@@ -4,15 +4,18 @@
 
 ## Unreleased
 
+- Let each AGENTS.md and Skill root opt in or out of the `.unityagenttool` namespace, include every package-default
+  root in Player content, and make the project defaults resolve directly from ProjectRoot.
+- Render long Tool arguments and results as bounded plain-text chunks inside a capped scroll region so one UI Toolkit
+  text element cannot exceed Unity 2022.3's vertex limit.
 - Make the package JSON the single built-in source for provider-free Unity Agent defaults, add an optional
   project Resources override, and rebuild missing or invalid machine settings while retaining malformed files.
 - Unify Project Settings persistence with the Unity Agent workspace action that explicitly overwrites the
   provider-free project defaults.
 - Keep settings, secrets, histories, and compilation recovery under
   `Application.persistentDataPath/.unityagenttool`, migrating data from the previous direct persistent-data layout.
-- Make every `AgentPathBase` automatically resolve below its own `.unityagenttool` namespace, make Skill roots
-  automatically add `.agents/skill`, keep JSON paths relative to those fixed namespaces, and normalize matching
-  machine roots with settings schema V10.
+- Represent instruction roots with stable `AgentPathBase` anchors, an optional `.unityagenttool` namespace, the fixed
+  `.agents/skills` suffix for Skills, and relative JSON child paths; normalize matching machine roots through schema V11.
 
 ## 2.0.4 - 2026-08-15
 

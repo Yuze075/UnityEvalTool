@@ -208,6 +208,7 @@ Mapped from `scrollbar.css`:
 
 - Keep the established module hierarchy and interaction behavior; apply these same tokens and typography seats rather than inventing a second style family.
 - Debug window title/body use 16/24 and 14/22. Toolbar/control rows use 13/20 and 28–32px controls. Log metadata may use 12/18 but nothing smaller.
+- Tool-call arguments and results are untrusted variable-length text. Disable rich text, split them into text elements small enough to remain below Unity 2022.3's per-element mesh limit, and cap the detail viewport with an owned vertical scrollbar; do not discard the persisted value or shrink typography.
 - Runtime Console tabs, Log, CLI, EvalTool, and Tools share the same input, selector, popup, modal, and scrollbar contracts.
 - Standalone SystemInfo and PerformanceMonitor overlays are excluded. No global selector may alter their existing labels, bars, graphs, padding, or colors. Their embedded Unity Agent cards follow this section's Runtime Console tokens, typography, wrapping, and responsive layout rules.
 

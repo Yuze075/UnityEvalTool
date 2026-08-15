@@ -82,13 +82,15 @@ UnityAgentEditorCompilationRecovery.json  仅 Editor 使用的活动轮次恢复
 配置值。可选的 `Assets/Resources/UnityAgentProjectSettings.json` 覆盖 Package 默认并进入 Player。
 项目覆盖尚未保存时，Project Settings 直接显示 Package JSON；Unity Agent 配置页的
 **Overwrite Project Settings** 也通过同一套校验和资源写入入口保存当前无 Provider 配置。
-每个 `AgentPathBase` 枚举值都会自动在对应基点下追加 `.unityagenttool`。AGENTS.md 项只填写该命名空间内部的
-可选路径；Skill 项还会自动追加固定的 `.agents/skill`，其 `relativePath` 只表示该目录内部的可选子目录，默认
-为空。本机设置 schema V10 会按当前有效 JSON 默认中的稳定 ID 规范化已有的 Package Skill 默认根。
+每条 AGENTS.md 或 Skill 根都可独立决定是否在 `AgentPathBase` 下追加 `.unityagenttool`。Skill 根会在这个可选
+命名空间之后固定追加 `.agents/skills`，`relativePath` 只表示剩余的可选子路径。Package 默认的四条根全部进入
+Player 内容：两条 ProjectRoot 根关闭 `.unityagenttool`，分别解析为项目根与项目 `.agents/skills`；两条
+PersistentData 根保持启用。本机设置 schema V11 会按当前有效 JSON 默认中的稳定 ID 规范化已有 Package 默认根，
+旧自定义根则保持原先启用 `.unityagenttool` 的语义。
 
 当前 Editor 或 Player 的本机 `settings.json` 不存在、JSON 损坏或语义无效时，会从当前有效的项目覆盖或
 Package 默认重新生成完整本机配置。替换前会将损坏的主文件及备份保留为带时间戳的 `.invalid-*` 文件；
-除 schema V10 对同 ID 的 Package Skill 默认根执行一次路径规范化外，有效的现有本机配置不会被 Project
+除 schema V11 对同 ID 的 Package 默认根执行一次规范化外，有效的现有本机配置不会被 Project
 Settings 隐式改写。通过
 **Edit > Project Settings > YuzeToolkit > Unity Agent** 编辑权限、Editor/Runtime Prompt、Tool 限制与
 有序 AGENTS.md/Skill 根目录。Editor Play Mode 使用 Editor Prompt，Runtime Prompt 只用于独立 Player。

@@ -1437,6 +1437,7 @@ namespace YuzeToolkit.UnityAgent
             {
                 if (!string.Equals(left[index].Id, right[index].Id, StringComparison.Ordinal) ||
                     left[index].BasePath != right[index].BasePath ||
+                    left[index].UseUnityAgentToolDirectory != right[index].UseUnityAgentToolDirectory ||
                     !string.Equals(left[index].RelativePath, right[index].RelativePath, StringComparison.Ordinal) ||
                     left[index].IncludeInPlayerBuild != right[index].IncludeInPlayerBuild)
                     return false;

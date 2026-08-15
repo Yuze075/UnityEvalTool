@@ -72,8 +72,12 @@ namespace YuzeToolkit.UnityAgent
                 var relative = string.IsNullOrEmpty(root.RelativePath) ? "." : root.RelativePath;
                 var buildState = root.IncludeInPlayerBuild ? "included" : "Editor only";
                 var fixedPath = isSkillRoot
-                    ? $"{AgentPaths.SettingsDirectoryName} / {AgentPaths.SkillDirectoryName}"
-                    : AgentPaths.SettingsDirectoryName;
+                    ? root.UseUnityAgentToolDirectory
+                        ? $"{AgentPaths.SettingsDirectoryName} / {AgentPaths.SkillDirectoryName}"
+                        : AgentPaths.SkillDirectoryName
+                    : root.UseUnityAgentToolDirectory
+                        ? AgentPaths.SettingsDirectoryName
+                        : ".";
                 var item = new Label($"{index + 1}. {root.BasePath} / {fixedPath} / {relative}  ·  {buildState}");
                 AgentTooltip.Attach(item, isSkillRoot ? AgentPaths.ResolveSkill(root) : AgentPaths.Resolve(root));
                 item.style.color = new Color(0.72f, 0.76f, 0.82f);

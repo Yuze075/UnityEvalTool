@@ -14,7 +14,7 @@ namespace YuzeToolkit.UnityAgent
     public static class AgentPaths
     {
         public const string SettingsDirectoryName = ".unityagenttool";
-        public const string SkillDirectoryName = ".agents/skill";
+        public const string SkillDirectoryName = ".agents/skills";
         public const string SettingsFileName = "settings.json";
         public const string SecretsFileName = "secrets.json";
         public const string AgentConversationsFolderName = "AgentConversations";
@@ -70,7 +70,7 @@ namespace YuzeToolkit.UnityAgent
         {
             if (location == null) throw new ArgumentNullException(nameof(location));
             Validate(location, nameof(location));
-            var basePath = GetBasePath(location.BasePath);
+            var basePath = GetBasePath(location.BasePath, location.UseUnityAgentToolDirectory);
             if (!string.IsNullOrEmpty(fixedRelativePath))
                 basePath = Path.GetFullPath(Path.Combine(basePath, NormalizeRelativePath(fixedRelativePath)));
             return string.IsNullOrEmpty(location.RelativePath)
@@ -78,7 +78,9 @@ namespace YuzeToolkit.UnityAgent
                 : Path.GetFullPath(Path.Combine(basePath, NormalizeRelativePath(location.RelativePath)));
         }
 
-        public static string GetBasePath(AgentPathBase basePath)
+        public static string GetBasePath(AgentPathBase basePath) => GetBasePath(basePath, true);
+
+        public static string GetBasePath(AgentPathBase basePath, bool useUnityAgentToolDirectory)
         {
             if (!Enum.IsDefined(typeof(AgentPathBase), basePath))
                 throw new ArgumentOutOfRangeException(nameof(basePath), basePath, "Unknown Agent path base.");
@@ -102,7 +104,9 @@ namespace YuzeToolkit.UnityAgent
             if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && !uri.IsFile && !LooksLikeWindowsDrive(value))
                 throw new PlatformNotSupportedException(
                     $"{basePath} is not exposed as a local file-system path on this platform: {value}");
-            return Path.GetFullPath(Path.Combine(value, SettingsDirectoryName));
+            return useUnityAgentToolDirectory
+                ? Path.GetFullPath(Path.Combine(value, SettingsDirectoryName))
+                : Path.GetFullPath(value);
         }
 
         public static void Validate(AgentPathLocation location, string parameterName = "location")
@@ -163,26 +167,29 @@ namespace YuzeToolkit.UnityAgent
             };
             AgentPathBase? selected = null;
             string? selectedRelative = null;
+            var selectedUseUnityAgentToolDirectory = true;
             foreach (var candidate in bases)
             {
-                string candidateBase;
-                try
+                foreach (var useUnityAgentToolDirectory in new[] { false, true })
                 {
-                    candidateBase = GetBasePath(candidate);
-                    if (isSkillRoot)
-                        candidateBase = Path.GetFullPath(Path.Combine(candidateBase,
-                            NormalizeRelativePath(SkillDirectoryName)));
-                }
-                catch (Exception exception) when (exception is DirectoryNotFoundException or PlatformNotSupportedException)
-                {
-                    continue;
-                }
-                if (!HaveSamePathRoot(candidateBase, absolute)) continue;
-                var relative = MakeRelativePath(candidateBase, absolute);
-                if (selectedRelative == null || relative.Length < selectedRelative.Length)
-                {
+                    string candidateBase;
+                    try
+                    {
+                        candidateBase = GetBasePath(candidate, useUnityAgentToolDirectory);
+                        if (isSkillRoot)
+                            candidateBase = Path.GetFullPath(Path.Combine(candidateBase,
+                                NormalizeRelativePath(SkillDirectoryName)));
+                    }
+                    catch (Exception exception) when (exception is DirectoryNotFoundException or PlatformNotSupportedException)
+                    {
+                        continue;
+                    }
+                    if (!HaveSamePathRoot(candidateBase, absolute)) continue;
+                    var relative = MakeRelativePath(candidateBase, absolute);
+                    if (selectedRelative != null && relative.Length >= selectedRelative.Length) continue;
                     selected = candidate;
                     selectedRelative = relative;
+                    selectedUseUnityAgentToolDirectory = useUnityAgentToolDirectory;
                 }
             }
             if (selected == null || selectedRelative == null)
@@ -192,6 +199,7 @@ namespace YuzeToolkit.UnityAgent
             {
                 Id = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id,
                 BasePath = selected.Value,
+                UseUnityAgentToolDirectory = selectedUseUnityAgentToolDirectory,
                 RelativePath = selectedRelative
             };
         }

@@ -125,6 +125,11 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class AgentChatView : VisualElement, IDisposable
     {
+        // Unity 2022.3 starts truncating one text mesh at 49,152 vertices. Keeping each
+        // plain-text Label well below 12,288 glyphs leaves room for shaping expansion.
+        private const int MaximumToolDetailCharactersPerTextElement = 6_000;
+        private const float MaximumToolDetailHeight = 360f;
+
         private readonly UnityAgentHost _host;
         private readonly Action _openSettings;
         private readonly Action<string, string> _showError;
@@ -1362,14 +1367,48 @@ namespace YuzeToolkit.UnityAgent
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
             title.style.color = AgentUi.TextCaption;
             section.Add(title);
-            var text = new Label(value ?? string.Empty);
+
+            var content = value ?? string.Empty;
+            VisualElement contentHost = section;
+            if (content.Length > MaximumToolDetailCharactersPerTextElement)
+            {
+                var scroll = AgentUi.Scroll(ScrollViewMode.Vertical);
+                scroll.style.minWidth = 0;
+                scroll.style.maxHeight = MaximumToolDetailHeight;
+                scroll.style.marginTop = 3;
+                scroll.contentContainer.style.minWidth = 0;
+                section.Add(scroll);
+                contentHost = scroll;
+            }
+
+            if (content.Length == 0)
+            {
+                contentHost.Add(CreateToolDetailTextElement(string.Empty));
+                return section;
+            }
+
+            var offset = 0;
+            while (offset < content.Length)
+            {
+                var length = Math.Min(MaximumToolDetailCharactersPerTextElement, content.Length - offset);
+                if (offset + length < content.Length &&
+                    char.IsHighSurrogate(content[offset + length - 1]) &&
+                    char.IsLowSurrogate(content[offset + length]))
+                    length--;
+                contentHost.Add(CreateToolDetailTextElement(content.Substring(offset, length)));
+                offset += length;
+            }
+            return section;
+        }
+
+        private static Label CreateToolDetailTextElement(string value)
+        {
+            var text = new Label(value) { enableRichText = false };
             text.style.minWidth = 0;
             text.style.whiteSpace = WhiteSpace.Normal;
-            text.style.marginTop = 3;
             text.style.color = AgentUi.TextSecondary;
             AgentUi.ApplyTypography(text, AgentTypography.Caption, false);
-            section.Add(text);
-            return section;
+            return text;
         }
 
         private VisualElement CreateApproval(AgentApprovalRequest approval)
@@ -1719,8 +1758,8 @@ namespace YuzeToolkit.UnityAgent
             agentsCard.Add(_agentsRoots);
 
             var skillsCard = AgentUi.Card("Skills discovery",
-                $"Each base automatically uses {AgentPaths.SettingsDirectoryName}/{AgentPaths.SkillDirectoryName}. " +
-                "The optional relative path selects a child directory inside it.");
+                $"Each root may insert {AgentPaths.SettingsDirectoryName}, then always adds " +
+                $"{AgentPaths.SkillDirectoryName}. The optional relative path selects a child directory inside it.");
             FlattenSettingsCard(skillsCard);
             _scroll.Content.Add(skillsCard);
             _skillRoots = new AgentPathListEditor("Skill roots", "Add Skill root", true, ShowPathError);
@@ -2503,6 +2542,7 @@ namespace YuzeToolkit.UnityAgent
             _items.Add(new AgentPathLocation
             {
                 BasePath = AgentPathBase.ProjectRoot,
+                UseUnityAgentToolDirectory = true,
                 RelativePath = string.Empty,
                 IncludeInPlayerBuild = false
             });
@@ -2572,6 +2612,7 @@ namespace YuzeToolkit.UnityAgent
         {
             Id = value.Id,
             BasePath = value.BasePath,
+            UseUnityAgentToolDirectory = value.UseUnityAgentToolDirectory,
             RelativePath = value.RelativePath,
             IncludeInPlayerBuild = value.IncludeInPlayerBuild
         };
@@ -2581,6 +2622,7 @@ namespace YuzeToolkit.UnityAgent
     {
         private readonly AgentChoiceField _basePath;
         private readonly AgentTextField _relativePath;
+        private readonly AgentToggle _useUnityAgentToolDirectory;
         private readonly AgentToggle? _includeInBuild;
         private readonly Label _preview;
         private readonly bool _isSkillRoot;
@@ -2603,12 +2645,17 @@ namespace YuzeToolkit.UnityAgent
             row.Add(_basePath);
             _relativePath = AgentUi.Field("Relative path", string.Empty,
                 isSkillRoot
-                    ? "Optional child path inside the base's fixed .unityagenttool/.agents/skill folder."
-                    : "Optional path inside the selected base's .unityagenttool folder. Absolute paths are rejected.");
+                    ? "Optional child path after the selected base, optional .unityagenttool, and fixed .agents/skills folders."
+                    : "Optional path after the selected base and optional .unityagenttool folder. Absolute paths are rejected.");
             _relativePath.style.flexGrow = 1;
             _relativePath.style.minWidth = 0;
             _relativePath.RegisterValueChangedCallback(_ => ChangedByUser());
             row.Add(_relativePath);
+            _useUnityAgentToolDirectory = new AgentToggle("Use .unityagenttool");
+            AgentTooltip.Attach(_useUnityAgentToolDirectory,
+                "Insert the .unityagenttool folder below the selected base before resolving this root.");
+            _useUnityAgentToolDirectory.RegisterValueChangedCallback(_ => ChangedByUser());
+            row.Add(_useUnityAgentToolDirectory);
             if (showBuildToggle)
             {
                 _includeInBuild = new AgentToggle("Player build");
@@ -2632,6 +2679,7 @@ namespace YuzeToolkit.UnityAgent
             _id = value.Id;
             _basePath.SetValueWithoutNotify(value.BasePath.ToString());
             _relativePath.SetValueWithoutNotify(value.RelativePath);
+            _useUnityAgentToolDirectory.SetValueWithoutNotify(value.UseUnityAgentToolDirectory);
             _includeInBuild?.SetValueWithoutNotify(value.IncludeInPlayerBuild);
             RefreshPreview();
         }
@@ -2652,6 +2700,7 @@ namespace YuzeToolkit.UnityAgent
             {
                 Id = _id,
                 BasePath = basePath,
+                UseUnityAgentToolDirectory = _useUnityAgentToolDirectory.value,
                 RelativePath = _relativePath.value.Trim(),
                 IncludeInPlayerBuild = _includeInBuild?.value ?? false
             };
