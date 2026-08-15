@@ -2,6 +2,16 @@
 
 [English](CHANGELOG.md) | **简体中文**
 
+## 未发布
+
+- 将 Package JSON 设为 Unity Agent 无 Provider 默认值的唯一内置来源，增加可选的项目 Resources 覆盖，
+  并在本机配置缺失或损坏时重建，同时保留损坏文件。
+- 让 Project Settings 持久化与 Unity Agent 工作台中显式覆盖无 Provider 项目默认值的动作共用同一入口。
+- 将设置、密钥、历史与编译恢复数据统一放在 `Application.persistentDataPath/.unityagenttool`，并从上一版直接
+  写入 persistentDataPath 的布局迁移数据。
+- 让每个 `AgentPathBase` 自动解析到其所属基点下的 `.unityagenttool` 命名空间，Skill 根再自动追加
+  `.agents/skill`，JSON 只保存固定命名空间内部路径，并由本机设置 schema V10 规范化同 ID 默认根。
+
 ## 2.0.4 - 2026-08-15
 
 - 将 token 鉴权下沉到每条 Unity 连接。项目默认关闭，只在 Resources Asset 保存加盐 PBKDF2

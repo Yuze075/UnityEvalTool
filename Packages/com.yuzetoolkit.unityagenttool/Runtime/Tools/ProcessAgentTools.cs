@@ -105,7 +105,7 @@ namespace YuzeToolkit.UnityAgent
                     context.DefaultTimeoutSeconds)));
             var invocation = AgentShellResolver.Resolve(shell);
             var temporaryDirectory = Path.Combine(
-                AgentPaths.GetBasePath(AgentPathBase.TemporaryCache), "UnityAgentTool", "Scripts");
+                AgentPaths.GetBasePath(AgentPathBase.TemporaryCache), "Scripts");
             Directory.CreateDirectory(temporaryDirectory);
             var scriptPath = Path.Combine(temporaryDirectory,
                 Guid.NewGuid().ToString("N") + invocation.ScriptExtension);

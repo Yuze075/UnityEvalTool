@@ -99,7 +99,7 @@ namespace YuzeToolkit.UnityAgent
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             return AgentPaths.IsEditor
-                ? ResolveConfiguredRoots(settings.AgentsRoots, "AGENTS.md")
+                ? ResolveConfiguredRoots(settings.AgentsRoots, "AGENTS.md", isSkillRoot: false)
                 : ReadPackagedRoots().AgentsRoots;
         }
 
@@ -107,13 +107,14 @@ namespace YuzeToolkit.UnityAgent
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             return AgentPaths.IsEditor
-                ? ResolveConfiguredRoots(settings.SkillRoots, "Skill")
+                ? ResolveConfiguredRoots(settings.SkillRoots, "Skill", isSkillRoot: true)
                 : ReadPackagedRoots().SkillRoots;
         }
 
         private static IReadOnlyList<AgentResolvedPath> ResolveConfiguredRoots(
             IReadOnlyList<AgentPathLocation>? locations,
-            string kind)
+            string kind,
+            bool isSkillRoot)
         {
             if (locations == null)
                 throw new InvalidDataException($"{kind} roots collection is null.");
@@ -125,7 +126,7 @@ namespace YuzeToolkit.UnityAgent
                 AgentPaths.Validate(location);
                 if (!usedIds.Add(location.Id))
                     throw new InvalidDataException($"Duplicate {kind} root id '{location.Id}'.");
-                var resolved = AgentPaths.Resolve(location);
+                var resolved = isSkillRoot ? AgentPaths.ResolveSkill(location) : AgentPaths.Resolve(location);
                 // The first entry wins when multiple portable locations resolve to the same directory.
                 if (roots.Any(existing => AgentPaths.PathsEqual(existing.Path, resolved))) continue;
                 roots.Add(new AgentResolvedPath

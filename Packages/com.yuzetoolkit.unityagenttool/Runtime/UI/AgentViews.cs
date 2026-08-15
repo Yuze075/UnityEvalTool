@@ -1468,7 +1468,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly CommandLineStore _commandLineStore = new();
         private readonly Label _status;
         private readonly CancellationTokenSource _lifetime = new();
-        private AgentSettingsDocument _editing = AgentSettingsDocument.CreateDefault();
+        private AgentSettingsDocument _editing = new();
         private string _selectedProfileId = string.Empty;
         private long _lastRevision = -1;
         private readonly HashSet<string> _discoveryStartedProfiles = new(StringComparer.Ordinal);
@@ -1690,11 +1690,11 @@ namespace YuzeToolkit.UnityAgent
                 AgentPermissionMode.FullAccess.ToString(), AgentPermissionMode.ConfirmWrites.ToString()
             });
             defaults.Add(_permission);
-            _toolTimeout = new AgentIntegerField("Default tool timeout (seconds)") { value = 120 };
+            _toolTimeout = new AgentIntegerField("Default tool timeout (seconds)");
             AgentTooltip.Attach(_toolTimeout,
                 "Used when a process, shell, or Unity eval tool call does not specify its own timeout.");
             defaults.Add(_toolTimeout);
-            _maximumAgentSteps = new AgentIntegerField("Maximum model steps per turn") { value = 64 };
+            _maximumAgentSteps = new AgentIntegerField("Maximum model steps per turn");
             AgentTooltip.Attach(_maximumAgentSteps,
                 "Stops a looping Agent turn with an explicit StepLimitReached result.");
             defaults.Add(_maximumAgentSteps);
@@ -1715,13 +1715,15 @@ namespace YuzeToolkit.UnityAgent
             var agentsCard = AgentUi.Card("AGENTS.md discovery", "Ordered highest priority first. Each root is portable across computers.");
             FlattenSettingsCard(agentsCard);
             _scroll.Content.Add(agentsCard);
-            _agentsRoots = new AgentPathListEditor("AGENTS.md roots", "Add AGENTS.md root", ShowPathError);
+            _agentsRoots = new AgentPathListEditor("AGENTS.md roots", "Add AGENTS.md root", false, ShowPathError);
             agentsCard.Add(_agentsRoots);
 
-            var skillsCard = AgentUi.Card("Skills discovery", "Configured separately from AGENTS.md. Point directly to a directory containing Skills.");
+            var skillsCard = AgentUi.Card("Skills discovery",
+                $"Each base automatically uses {AgentPaths.SettingsDirectoryName}/{AgentPaths.SkillDirectoryName}. " +
+                "The optional relative path selects a child directory inside it.");
             FlattenSettingsCard(skillsCard);
             _scroll.Content.Add(skillsCard);
-            _skillRoots = new AgentPathListEditor("Skill roots", "Add Skill root", ShowPathError);
+            _skillRoots = new AgentPathListEditor("Skill roots", "Add Skill root", true, ShowPathError);
             skillsCard.Add(_skillRoots);
 
             var fileCard = AgentUi.Card("Storage", "All non-secret user configuration has one fixed root. Histories use two fixed child folders.");
@@ -1742,7 +1744,7 @@ namespace YuzeToolkit.UnityAgent
                     () => RunUiTask(ReloadAsync)), 128));
 
             var projectCard = AgentUi.Card("Project Settings",
-                "Versioned provider-free defaults used only when an Editor or Player has no machine settings.json.");
+                "Package JSON defaults with an optional versioned project Resources override.");
             FlattenSettingsCard(projectCard);
             var projectActions = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap } };
             var openProject = AgentUi.Button("Open Unity Project Settings",
@@ -1751,9 +1753,17 @@ namespace YuzeToolkit.UnityAgent
                 AgentUi.AccentForeground, AgentIconKind.Settings);
             openProject.SetEnabled(UnityAgentEvalSettingsBridge.CanOpenProjectSettings);
             projectActions.Add(openProject);
+            var overwriteProject = AgentUi.Button("Overwrite Project Settings",
+                "Write the current provider-free configuration to the project Resources override.",
+                () => _showConfirmation("Overwrite Project Settings?",
+                    "Replace the project Resources defaults with the permission, prompts, Tool limits, and roots currently shown here?",
+                    () => RunUiTask(OverwriteProjectSettingsAsync)), 220, AgentUi.Surface3,
+                AgentUi.TextSecondary, AgentIconKind.Check);
+            overwriteProject.SetEnabled(UnityAgentEvalSettingsBridge.CanOverwriteProjectSettings);
+            projectActions.Add(overwriteProject);
             projectCard.Add(projectActions);
             var projectHint = new Label(UnityAgentEvalSettingsBridge.CanOpenProjectSettings
-                ? "Existing machine settings are never overwritten. Editor Play Mode uses the Editor Prompt; standalone Players use Runtime Prompt."
+                ? "Valid machine settings stay unchanged; missing or invalid settings are rebuilt from the effective defaults."
                 : "Project defaults are read-only in Player builds.");
             projectHint.style.color = AgentUi.Muted;
             projectHint.style.whiteSpace = WhiteSpace.Normal;
@@ -1914,23 +1924,40 @@ namespace YuzeToolkit.UnityAgent
             var missingModel = _editing.ProviderProfiles.FirstOrDefault(value => string.IsNullOrWhiteSpace(value.Model));
             if (missingModel != null)
                 throw new InvalidOperationException($"Provider “{missingModel.Name}” has no selected model. Refresh its catalog or choose a curated fallback before saving.");
-            _editing.PermissionMode = Enum.TryParse<AgentPermissionMode>(_permission.value, out var permission)
-                ? permission
-                : AgentPermissionMode.FullAccess;
-            _editing.DefaultToolTimeoutSeconds = Math.Max(1, _toolTimeout.value);
-            _editing.MaximumAgentSteps = Math.Max(1, _maximumAgentSteps.value);
-            _editing.EditorSystemPrompt = string.IsNullOrWhiteSpace(_editorSystemPrompt.value)
-                ? AgentPromptDefaults.EditorSystemPrompt
-                : _editorSystemPrompt.value;
-            _editing.RuntimeSystemPrompt = string.IsNullOrWhiteSpace(_runtimeSystemPrompt.value)
-                ? AgentPromptDefaults.RuntimeSystemPrompt
-                : _runtimeSystemPrompt.value;
-            _editing.AgentsRoots = _agentsRoots.GetItems();
-            _editing.SkillRoots = _skillRoots.GetItems();
+            CollectConfigurationFields();
             _editing.DefaultProviderProfileId = _selectedProfileId;
             await _host.SaveSettingsAsync(_editing, _lifetime.Token);
             _editing = _host.Settings;
             _status.text = "Saved  ·  " + DateTime.Now.ToString("HH:mm:ss");
+        }
+
+        private Task OverwriteProjectSettingsAsync()
+        {
+            CollectConfigurationFields();
+            UnityAgentEvalSettingsBridge.OverwriteProjectSettings(_editing);
+            _status.text = "Project Settings overwritten  ·  " + DateTime.Now.ToString("HH:mm:ss");
+            return Task.CompletedTask;
+        }
+
+        private void CollectConfigurationFields()
+        {
+            if (!Enum.TryParse<AgentPermissionMode>(_permission.value, out var permission))
+                throw new InvalidOperationException("Permission mode is invalid.");
+            if (string.IsNullOrWhiteSpace(_editorSystemPrompt.value))
+                throw new InvalidOperationException("Editor system prompt is required.");
+            if (string.IsNullOrWhiteSpace(_runtimeSystemPrompt.value))
+                throw new InvalidOperationException("Runtime system prompt is required.");
+            if (_toolTimeout.value < 1)
+                throw new InvalidOperationException("Default Tool timeout must be positive.");
+            if (_maximumAgentSteps.value < 1)
+                throw new InvalidOperationException("Maximum Agent steps must be positive.");
+            _editing.PermissionMode = permission;
+            _editing.DefaultToolTimeoutSeconds = _toolTimeout.value;
+            _editing.MaximumAgentSteps = _maximumAgentSteps.value;
+            _editing.EditorSystemPrompt = _editorSystemPrompt.value;
+            _editing.RuntimeSystemPrompt = _runtimeSystemPrompt.value;
+            _editing.AgentsRoots = _agentsRoots.GetItems();
+            _editing.SkillRoots = _skillRoots.GetItems();
         }
 
         private async Task DiscoverModelsAsync()
@@ -2432,14 +2459,16 @@ namespace YuzeToolkit.UnityAgent
     internal sealed class AgentPathListEditor : VisualElement
     {
         private readonly string _addLabel;
+        private readonly bool _isSkillRoot;
         private readonly Action<string> _showError;
         private readonly VisualElement _list;
         private readonly List<AgentPathLocation> _items = new();
         private readonly List<AgentPathLocationEditor> _editors = new();
 
-        public AgentPathListEditor(string label, string addLabel, Action<string> showError)
+        public AgentPathListEditor(string label, string addLabel, bool isSkillRoot, Action<string> showError)
         {
             _addLabel = addLabel;
+            _isSkillRoot = isSkillRoot;
             _showError = showError;
             var heading = new Label(label);
             heading.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -2500,7 +2529,7 @@ namespace YuzeToolkit.UnityAgent
                 top.Add(AgentUi.IconButton(AgentIconKind.ChevronDown, "Lower priority", () => Move(index, 1), 30));
                 top.Add(AgentUi.IconButton(AgentIconKind.Delete, "Remove root", () => Remove(index), 30, AgentUi.Danger));
                 card.Add(top);
-                var editor = new AgentPathLocationEditor(true, _showError);
+                var editor = new AgentPathLocationEditor(true, _isSkillRoot, _showError);
                 editor.SetValue(item);
                 _editors.Add(editor);
                 editor.Changed += value =>
@@ -2554,11 +2583,13 @@ namespace YuzeToolkit.UnityAgent
         private readonly AgentTextField _relativePath;
         private readonly AgentToggle? _includeInBuild;
         private readonly Label _preview;
+        private readonly bool _isSkillRoot;
         private readonly Action<string> _showError;
         private string _id = Guid.NewGuid().ToString("N");
 
-        public AgentPathLocationEditor(bool showBuildToggle, Action<string> showError)
+        public AgentPathLocationEditor(bool showBuildToggle, bool isSkillRoot, Action<string> showError)
         {
+            _isSkillRoot = isSkillRoot;
             _showError = showError;
             var row = AgentUi.WrapRow();
             Add(row);
@@ -2571,7 +2602,9 @@ namespace YuzeToolkit.UnityAgent
             _basePath.RegisterValueChangedCallback(_ => ChangedByUser());
             row.Add(_basePath);
             _relativePath = AgentUi.Field("Relative path", string.Empty,
-                "Optional path relative to the selected stable base. Absolute paths are rejected.");
+                isSkillRoot
+                    ? "Optional child path inside the base's fixed .unityagenttool/.agents/skill folder."
+                    : "Optional path inside the selected base's .unityagenttool folder. Absolute paths are rejected.");
             _relativePath.style.flexGrow = 1;
             _relativePath.style.minWidth = 0;
             _relativePath.RegisterValueChangedCallback(_ => ChangedByUser());
@@ -2644,7 +2677,8 @@ namespace YuzeToolkit.UnityAgent
         {
             try
             {
-                _preview.text = AgentPaths.Resolve(CreateValue());
+                var value = CreateValue();
+                _preview.text = _isSkillRoot ? AgentPaths.ResolveSkill(value) : AgentPaths.Resolve(value);
                 _preview.style.color = AgentUi.Muted;
             }
             catch (Exception exception)

@@ -78,7 +78,8 @@ namespace YuzeToolkit.UnityAgent
             UnityAgentEvalSettingsBridge.ConfigureEditorActions(
                 EditorBrokerBootstrap.Reconnect,
                 OpenBrokerFolder,
-                UnityAgentProjectSettingsProvider.Open);
+                UnityAgentProjectSettingsProvider.Open,
+                UnityAgentProjectSettingsProvider.OverwriteFromMachineSettings);
             AssemblyReloadEvents.beforeAssemblyReload -= UnityAgentHost.DisposeDefault;
             AssemblyReloadEvents.beforeAssemblyReload += UnityAgentHost.DisposeDefault;
             EditorApplication.quitting -= UnityAgentHost.DisposeDefault;
@@ -155,6 +156,7 @@ namespace YuzeToolkit.UnityAgent
             AssemblyReloadEvents.beforeAssemblyReload += BeforeAssemblyReload;
             EditorApplication.update -= Update;
             EditorApplication.update += Update;
+            MigrateLegacyMarker();
             _resumePending = File.Exists(MarkerPath);
             EditorApplication.delayCall += TryResume;
         }
@@ -381,7 +383,24 @@ namespace YuzeToolkit.UnityAgent
             }
         }
 
-        private static string MarkerPath => Path.Combine(Application.persistentDataPath, MarkerFileName);
+        private static void MigrateLegacyMarker()
+        {
+            if (File.Exists(MarkerPath) || !File.Exists(LegacyMarkerPath)) return;
+            try
+            {
+                Directory.CreateDirectory(AgentPaths.SettingsRoot);
+                File.Move(LegacyMarkerPath, MarkerPath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Debug.LogError("Unity Agent could not migrate its compilation recovery marker. " +
+                               exception.Message);
+            }
+        }
+
+        private static string MarkerPath => Path.Combine(AgentPaths.SettingsRoot, MarkerFileName);
+
+        private static string LegacyMarkerPath => Path.Combine(AgentPaths.LegacySettingsRoot, MarkerFileName);
 
         [Serializable]
         private sealed class RecoveryMarker

@@ -13,7 +13,8 @@ namespace YuzeToolkit.UnityAgent
     /// </summary>
     public static class AgentPaths
     {
-        public const string LegacySettingsDirectoryName = ".unityagenttool";
+        public const string SettingsDirectoryName = ".unityagenttool";
+        public const string SkillDirectoryName = ".agents/skill";
         public const string SettingsFileName = "settings.json";
         public const string SecretsFileName = "secrets.json";
         public const string AgentConversationsFolderName = "AgentConversations";
@@ -27,10 +28,9 @@ namespace YuzeToolkit.UnityAgent
 
         public static RuntimePlatform RuntimePlatform => Snapshot.RuntimePlatform;
 
-        public static string SettingsRoot => Path.GetFullPath(Snapshot.PersistentData);
+        public static string SettingsRoot => GetBasePath(AgentPathBase.PersistentData);
 
-        internal static string LegacySettingsRoot =>
-            Path.GetFullPath(Path.Combine(Snapshot.PersistentData, LegacySettingsDirectoryName));
+        internal static string LegacySettingsRoot => Path.GetFullPath(Snapshot.PersistentData);
 
         /// <summary>
         /// Capture Unity-owned path properties once on Unity's main thread. All later path
@@ -58,9 +58,21 @@ namespace YuzeToolkit.UnityAgent
 
         public static string Resolve(AgentPathLocation location)
         {
+            return Resolve(location, string.Empty);
+        }
+
+        public static string ResolveSkill(AgentPathLocation location)
+        {
+            return Resolve(location, SkillDirectoryName);
+        }
+
+        private static string Resolve(AgentPathLocation location, string fixedRelativePath)
+        {
             if (location == null) throw new ArgumentNullException(nameof(location));
             Validate(location, nameof(location));
             var basePath = GetBasePath(location.BasePath);
+            if (!string.IsNullOrEmpty(fixedRelativePath))
+                basePath = Path.GetFullPath(Path.Combine(basePath, NormalizeRelativePath(fixedRelativePath)));
             return string.IsNullOrEmpty(location.RelativePath)
                 ? basePath
                 : Path.GetFullPath(Path.Combine(basePath, NormalizeRelativePath(location.RelativePath)));
@@ -90,7 +102,7 @@ namespace YuzeToolkit.UnityAgent
             if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && !uri.IsFile && !LooksLikeWindowsDrive(value))
                 throw new PlatformNotSupportedException(
                     $"{basePath} is not exposed as a local file-system path on this platform: {value}");
-            return Path.GetFullPath(value);
+            return Path.GetFullPath(Path.Combine(value, SettingsDirectoryName));
         }
 
         public static void Validate(AgentPathLocation location, string parameterName = "location")
@@ -130,7 +142,7 @@ namespace YuzeToolkit.UnityAgent
             }
         }
 
-        internal static AgentPathLocation FromLegacyPath(string id, string path)
+        internal static AgentPathLocation FromLegacyPath(string id, string path, bool isSkillRoot = false)
         {
             if (string.IsNullOrWhiteSpace(path))
                 throw new FormatException("Legacy Agent content root path is empty.");
@@ -157,6 +169,9 @@ namespace YuzeToolkit.UnityAgent
                 try
                 {
                     candidateBase = GetBasePath(candidate);
+                    if (isSkillRoot)
+                        candidateBase = Path.GetFullPath(Path.Combine(candidateBase,
+                            NormalizeRelativePath(SkillDirectoryName)));
                 }
                 catch (Exception exception) when (exception is DirectoryNotFoundException or PlatformNotSupportedException)
                 {

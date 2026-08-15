@@ -24,11 +24,12 @@ namespace YuzeToolkit.UnityAgent
 
     public sealed class FileAgentStore : IAgentStore, IDisposable
     {
-        private const string LegacyMigrationMarkerName = ".legacy-store-migrated-v1";
+        private const string LegacyMigrationMarkerName = ".legacy-store-migrated-v2";
         private const int MaximumDocumentCharacters = 64_000_000;
         private readonly string _settingsRootPath;
         private readonly bool _usesDefaultSettingsRoot;
-        private readonly AgentProjectSettingsDocument _projectDefaults;
+        private readonly AgentProjectSettingsDocument? _projectDefaults;
+        private readonly Exception? _projectDefaultsError;
         private readonly SemaphoreSlim _ioGate = new(1, 1);
         private readonly string _sessionsPath;
         private bool _settingsLoaded;
@@ -38,7 +39,16 @@ namespace YuzeToolkit.UnityAgent
             if (string.IsNullOrWhiteSpace(rootPath)) throw new ArgumentException("Storage root is required.", nameof(rootPath));
             _settingsRootPath = Path.GetFullPath(rootPath);
             _usesDefaultSettingsRoot = AgentPaths.PathsEqual(_settingsRootPath, GetDefaultRootPath());
-            _projectDefaults = UnityAgentProjectSettings.Load();
+            try
+            {
+                _projectDefaults = UnityAgentProjectSettings.Load();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
+                                               FormatException or ArgumentException or InvalidOperationException or
+                                               OverflowException)
+            {
+                _projectDefaultsError = exception;
+            }
             _sessionsPath = Path.Combine(_settingsRootPath, AgentPaths.AgentConversationsFolderName);
         }
 
@@ -145,24 +155,48 @@ namespace YuzeToolkit.UnityAgent
                         ? string.Empty
                         : Path.Combine(legacyRoot, AgentPaths.SettingsFileName);
                     AgentSettingsDocument settings;
-                    if (File.Exists(path) || File.Exists(path + ".bak"))
+                    if (File.Exists(path))
                     {
-                        var requiresUpgrade = StoredSettingsRequireUpgrade(path, cancellationToken);
-                        var restoreMissingPrimary = !File.Exists(path) && File.Exists(path + ".bak");
-                        settings = ReadDocument(path, AgentDocumentCodec.DeserializeSettings, cancellationToken);
-                        if (requiresUpgrade || restoreMissingPrimary)
+                        try
+                        {
+                            var requiresUpgrade = StoredSettingsRequireUpgrade(path, cancellationToken);
+                            settings = ReadDocument(path,
+                                json => AgentDocumentCodec.DeserializeSettings(json, _projectDefaults),
+                                cancellationToken);
+                            UnityAgentHost.ValidateSettings(settings);
+                            if (requiresUpgrade)
+                                WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
+                        }
+                        catch (Exception exception) when (IsMalformedSettingsDocumentError(exception))
+                        {
+                            ArchiveMalformedSettings(path);
+                            settings = CreateMachineDefaults();
+                            UnityAgentHost.ValidateSettings(settings);
                             WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
+                        }
                     }
                     else if (!string.IsNullOrEmpty(legacySettingsPath) &&
-                             (File.Exists(legacySettingsPath) || File.Exists(legacySettingsPath + ".bak")))
+                             File.Exists(legacySettingsPath))
                     {
-                        settings = ReadDocument(legacySettingsPath, AgentDocumentCodec.DeserializeSettings,
-                            cancellationToken);
+                        try
+                        {
+                            settings = ReadDocument(legacySettingsPath,
+                                json => AgentDocumentCodec.DeserializeSettings(json, _projectDefaults),
+                                cancellationToken);
+                            UnityAgentHost.ValidateSettings(settings);
+                        }
+                        catch (Exception exception) when (IsMalformedSettingsDocumentError(exception))
+                        {
+                            ArchiveMalformedSettings(legacySettingsPath);
+                            settings = CreateMachineDefaults();
+                        }
+                        UnityAgentHost.ValidateSettings(settings);
                         WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
                     }
                     else
                     {
                         settings = CreateMachineDefaults();
+                        UnityAgentHost.ValidateSettings(settings);
                         // Materialize defaults immediately so users may edit the complete configuration file.
                         WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
                     }
@@ -424,9 +458,27 @@ namespace YuzeToolkit.UnityAgent
 
         private AgentSettingsDocument CreateMachineDefaults()
         {
-            var settings = AgentSettingsDocument.CreateDefault();
-            _projectDefaults.ApplyTo(settings);
-            return settings;
+            if (_projectDefaults == null)
+                throw new InvalidOperationException(
+                    "Machine settings require recovery, but the effective project/package defaults are unavailable.",
+                    _projectDefaultsError);
+            return AgentSettingsDocument.CreateDefault(_projectDefaults);
+        }
+
+        private static bool IsMalformedSettingsDocumentError(Exception exception)
+        {
+            if (exception is FormatException or ArgumentException or InvalidOperationException or OverflowException)
+                return true;
+            return exception is InvalidDataException &&
+                   (exception.InnerException == null || IsMalformedSettingsDocumentError(exception.InnerException));
+        }
+
+        private static void ArchiveMalformedSettings(string path)
+        {
+            var suffix = ".invalid-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssfffZ");
+            if (File.Exists(path)) File.Move(path, path + suffix);
+            var backup = path + ".bak";
+            if (File.Exists(backup)) File.Move(backup, backup + suffix);
         }
 
         private static string GetLegacyRootPath()
@@ -436,7 +488,7 @@ namespace YuzeToolkit.UnityAgent
                 File.Exists(Path.Combine(recent, AgentPaths.SettingsFileName) + ".bak")) return recent;
             return Path.GetFullPath(AgentPaths.IsEditor
                 ? Path.Combine(AgentPaths.ProjectRoot, "Library", "UnityAgentTool")
-                : Path.Combine(AgentPaths.GetBasePath(AgentPathBase.PersistentData), "UnityAgentTool"));
+                : Path.Combine(AgentPaths.LegacySettingsRoot, "UnityAgentTool"));
         }
 
         private static void CopySessionDocuments(
@@ -513,10 +565,6 @@ namespace YuzeToolkit.UnityAgent
                     !root.ContainsKey("skillRoots") ||
                     !root.ContainsKey("editorSystemPrompt") ||
                     !root.ContainsKey("runtimeSystemPrompt")) return true;
-                if (AgentPromptDefaults.IsPreviousEditorPrompt(
-                        AgentJson.GetString(root, "editorSystemPrompt")) ||
-                    AgentPromptDefaults.IsPreviousRuntimePrompt(
-                        AgentJson.GetString(root, "runtimeSystemPrompt"))) return true;
                 return AgentJson.GetObjectArray(root, "providerProfiles")
                     .Any(profile => !profile.ContainsKey("providerPresetId") ||
                                     string.IsNullOrWhiteSpace(

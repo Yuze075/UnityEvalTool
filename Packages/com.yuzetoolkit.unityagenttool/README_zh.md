@@ -58,14 +58,15 @@ OpenAI 模型通过 API Key 调用 OpenAI Responses API。ChatGPT/Codex 订阅�
 UnityAgentTool 不读取 Codex 登录缓存，也不再提供 Codex App Server。历史 `codex-app-server` Profile 会迁移为
 标准 OpenAI API 预设，之后需要 `OPENAI_API_KEY` 或本机保存的 API Key。
 
-Editor 中若活动对话触发脚本编译，本包会先在 `Application.persistentDataPath` 写入同时绑定当前项目与 Editor
+Editor 中若活动对话触发脚本编译，本包会先在 `Application.persistentDataPath/.unityagenttool` 写入同时绑定当前项目与 Editor
 进程的恢复 marker，再中断并持久化该轮。成功编译与 Domain Reload 后，或失败编译结束后，系统会追加一次包含
 编译错误/警告数量的续跑消息，并要求 Agent 重新检查 Unity 状态；Domain Reload 不会保留缓存 Unity 对象和
 JavaScript VM。其它 Editor 进程留下的 marker 会被删除，不会在下次启动时自动执行旧任务。
 
 ## 持久化
 
-所有机器级非密钥设置固定存放在 `Application.persistentDataPath/settings.json`：
+所有 Unity Agent 本机数据统一使用 `Application.persistentDataPath/.unityagenttool`；机器级非密钥设置固定存放在
+`Application.persistentDataPath/.unityagenttool/settings.json`：
 
 ```text
 AgentConversations/       Agent 对话文档
@@ -73,10 +74,22 @@ CommandLineHistory/       命令行文档与当前选择状态
 UnityAgentEditorCompilationRecovery.json  仅 Editor 使用的活动轮次恢复 marker
 ```
 
+旧布局直接写在 `Application.persistentDataPath` 下的数据，会在 `.unityagenttool` 中尚无对应文件或历史时按类型迁移。
+
 命令行输入、输出和草稿会跨 Unity 重启保存；JavaScript `EvalSession` 不恢复。Provider 密钥只写入
-本机 `secrets.json`，不会进入项目默认配置。`Assets/Resources/UnityAgentProjectSettings.json`
-保存可打入 Player 的无 Provider 默认值。只有当前 Editor 或 Player 不存在本机 `settings.json` 时，才从
-这套默认值生成完整本机配置；已经存在或内容损坏的本机配置都不会被 Project Settings 覆盖。通过
+本机 `secrets.json`，不会进入默认配置。Package 自带的
+`Runtime/Resources/UnityAgentPackageSettings.json` 是无 Provider 默认值的唯一内置来源，C# 不重复保存
+配置值。可选的 `Assets/Resources/UnityAgentProjectSettings.json` 覆盖 Package 默认并进入 Player。
+项目覆盖尚未保存时，Project Settings 直接显示 Package JSON；Unity Agent 配置页的
+**Overwrite Project Settings** 也通过同一套校验和资源写入入口保存当前无 Provider 配置。
+每个 `AgentPathBase` 枚举值都会自动在对应基点下追加 `.unityagenttool`。AGENTS.md 项只填写该命名空间内部的
+可选路径；Skill 项还会自动追加固定的 `.agents/skill`，其 `relativePath` 只表示该目录内部的可选子目录，默认
+为空。本机设置 schema V10 会按当前有效 JSON 默认中的稳定 ID 规范化已有的 Package Skill 默认根。
+
+当前 Editor 或 Player 的本机 `settings.json` 不存在、JSON 损坏或语义无效时，会从当前有效的项目覆盖或
+Package 默认重新生成完整本机配置。替换前会将损坏的主文件及备份保留为带时间戳的 `.invalid-*` 文件；
+除 schema V10 对同 ID 的 Package Skill 默认根执行一次路径规范化外，有效的现有本机配置不会被 Project
+Settings 隐式改写。通过
 **Edit > Project Settings > YuzeToolkit > Unity Agent** 编辑权限、Editor/Runtime Prompt、Tool 限制与
 有序 AGENTS.md/Skill 根目录。Editor Play Mode 使用 Editor Prompt，Runtime Prompt 只用于独立 Player。
 

@@ -1,23 +1,46 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace YuzeToolkit.UnityAgent
 {
     /// <summary>
-    /// Loads provider-free project defaults from a Resources TextAsset. The file is versioned with
-    /// the Unity project and included in Player builds. Invalid or missing content deliberately
-    /// falls back to the built-in defaults instead of preventing Agent startup.
+    /// Loads provider-free defaults from the package JSON, optionally overridden by the project
+    /// Resources JSON. Configuration values are never duplicated as C# defaults.
     /// </summary>
     public static class UnityAgentProjectSettings
     {
         public const string ResourceName = "UnityAgentProjectSettings";
+        public const string PackageResourceName = "UnityAgentPackageSettings";
 
         public static AgentProjectSettingsDocument Load()
         {
+            var packageDefaults = LoadPackageDefaults();
             var asset = Resources.Load<TextAsset>(ResourceName);
-            if (asset == null) return new AgentProjectSettingsDocument();
+            if (asset == null) return packageDefaults;
+            try
+            {
+                var settings = AgentDocumentCodec.DeserializeProjectSettings(asset.text, packageDefaults);
+                Validate(settings);
+                return settings;
+            }
+            catch (Exception exception) when (exception is FormatException or ArgumentException or
+                                               InvalidOperationException or OverflowException)
+            {
+                throw new InvalidDataException(
+                    $"Project Resources/{ResourceName}.json is invalid. Correct or remove the project override.",
+                    exception);
+            }
+        }
+
+        public static AgentProjectSettingsDocument LoadPackageDefaults()
+        {
+            var asset = Resources.Load<TextAsset>(PackageResourceName);
+            if (asset == null)
+                throw new InvalidOperationException(
+                    $"UnityAgentTool package default Resources/{PackageResourceName}.json is missing.");
             try
             {
                 var settings = AgentDocumentCodec.DeserializeProjectSettings(asset.text);
@@ -27,24 +50,23 @@ namespace YuzeToolkit.UnityAgent
             catch (Exception exception) when (exception is FormatException or ArgumentException or
                                                InvalidOperationException or OverflowException)
             {
-                Debug.LogWarning(
-                    $"Unity Agent Project Settings could not be parsed and built-in defaults will be used. " +
-                    exception.Message);
-                return new AgentProjectSettingsDocument();
+                throw new InvalidDataException(
+                    $"UnityAgentTool package default Resources/{PackageResourceName}.json is invalid.",
+                    exception);
             }
         }
 
         public static AgentSettingsDocument CreateMachineDefaults()
         {
-            var settings = AgentSettingsDocument.CreateDefault();
-            Load().ApplyTo(settings);
-            return settings;
+            return AgentSettingsDocument.CreateDefault(Load());
         }
 
         /// <summary>Parses and validates one provider-free project settings document.</summary>
-        public static AgentProjectSettingsDocument Deserialize(string json)
+        public static AgentProjectSettingsDocument Deserialize(
+            string json,
+            AgentProjectSettingsDocument? packageDefaults = null)
         {
-            var settings = AgentDocumentCodec.DeserializeProjectSettings(json);
+            var settings = AgentDocumentCodec.DeserializeProjectSettings(json, packageDefaults);
             Validate(settings);
             return settings;
         }

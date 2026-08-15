@@ -109,11 +109,13 @@ namespace YuzeToolkit.UnityAgent
         private static Action? _reconnect;
         private static Action? _openBrokerFolder;
         private static Action? _openProjectSettings;
+        private static Action<AgentSettingsDocument>? _overwriteProjectSettings;
 
         public static bool IsBrokerControlAvailable => _getBrokerEnabled != null && _setBrokerEnabled != null;
         public static bool CanReconnect => _reconnect != null;
         public static bool CanOpenBrokerFolder => _openBrokerFolder != null;
         public static bool CanOpenProjectSettings => _openProjectSettings != null;
+        public static bool CanOverwriteProjectSettings => _overwriteProjectSettings != null;
         public static bool IncludeEditorOnlyTools => IsBrokerControlAvailable;
         public static string RuntimeStateLabel => AgentPaths.IsEditor ? "Editor" : "Player";
         public static bool BrokerEnabled => _getBrokerEnabled?.Invoke() ?? false;
@@ -141,11 +143,14 @@ namespace YuzeToolkit.UnityAgent
         public static void ConfigureEditorActions(
             Action reconnect,
             Action openBrokerFolder,
-            Action openProjectSettings)
+            Action openProjectSettings,
+            Action<AgentSettingsDocument> overwriteProjectSettings)
         {
             _reconnect = reconnect ?? throw new ArgumentNullException(nameof(reconnect));
             _openBrokerFolder = openBrokerFolder ?? throw new ArgumentNullException(nameof(openBrokerFolder));
             _openProjectSettings = openProjectSettings ?? throw new ArgumentNullException(nameof(openProjectSettings));
+            _overwriteProjectSettings = overwriteProjectSettings ??
+                                        throw new ArgumentNullException(nameof(overwriteProjectSettings));
         }
 
         public static void Reconnect() =>
@@ -158,6 +163,10 @@ namespace YuzeToolkit.UnityAgent
         public static void OpenProjectSettings() =>
             (_openProjectSettings ?? throw new InvalidOperationException(
                 "Project Settings are only available in the Unity Editor."))();
+
+        public static void OverwriteProjectSettings(AgentSettingsDocument settings) =>
+            (_overwriteProjectSettings ?? throw new InvalidOperationException(
+                "Project Settings are only writable in the Unity Editor."))(settings);
     }
 
     /// <summary>

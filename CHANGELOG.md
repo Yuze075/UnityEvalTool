@@ -2,6 +2,18 @@
 
 **English** | [简体中文](CHANGELOG_zh.md)
 
+## Unreleased
+
+- Make the package JSON the single built-in source for provider-free Unity Agent defaults, add an optional
+  project Resources override, and rebuild missing or invalid machine settings while retaining malformed files.
+- Unify Project Settings persistence with the Unity Agent workspace action that explicitly overwrites the
+  provider-free project defaults.
+- Keep settings, secrets, histories, and compilation recovery under
+  `Application.persistentDataPath/.unityagenttool`, migrating data from the previous direct persistent-data layout.
+- Make every `AgentPathBase` automatically resolve below its own `.unityagenttool` namespace, make Skill roots
+  automatically add `.agents/skill`, keep JSON paths relative to those fixed namespaces, and normalize matching
+  machine roots with settings schema V10.
+
 ## 2.0.4 - 2026-08-15
 
 - Move token authorization to each Unity connection. Projects default to disabled, store

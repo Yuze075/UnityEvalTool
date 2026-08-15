@@ -128,56 +128,25 @@ namespace YuzeToolkit.UnityAgent
         /// </summary>
         public bool IncludeInPlayerBuild { get; set; }
 
-        public static AgentPathLocation ProjectAgentsRoot() => new()
-        {
-            Id = "project-agents",
-            BasePath = AgentPathBase.ProjectRoot,
-            RelativePath = string.Empty,
-            IncludeInPlayerBuild = true
-        };
-
-        public static AgentPathLocation ProjectSkillsRoot() => new()
-        {
-            Id = "project-skills",
-            BasePath = AgentPathBase.ProjectRoot,
-            RelativePath = ".agents/skills",
-            IncludeInPlayerBuild = true
-        };
-
-        public static AgentPathLocation PersistentAgentsRoot() => new()
-        {
-            Id = "persistent-agents",
-            BasePath = AgentPathBase.PersistentData,
-            RelativePath = string.Empty,
-            IncludeInPlayerBuild = false
-        };
-
-        public static AgentPathLocation PersistentSkillsRoot() => new()
-        {
-            Id = "persistent-skills",
-            BasePath = AgentPathBase.PersistentData,
-            RelativePath = ".agents/skills",
-            IncludeInPlayerBuild = false
-        };
     }
 
     public sealed class AgentSettingsDocument
     {
-        public const int CurrentSchemaVersion = 7;
+        public const int CurrentSchemaVersion = 10;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
         public string DefaultProviderProfileId { get; set; } = string.Empty;
 
-        public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.FullAccess;
+        public AgentPermissionMode PermissionMode { get; set; }
 
-        public string EditorSystemPrompt { get; set; } = AgentPromptDefaults.EditorSystemPrompt;
+        public string EditorSystemPrompt { get; set; } = string.Empty;
 
-        public string RuntimeSystemPrompt { get; set; } = AgentPromptDefaults.RuntimeSystemPrompt;
+        public string RuntimeSystemPrompt { get; set; } = string.Empty;
 
-        public int DefaultToolTimeoutSeconds { get; set; } = 120;
+        public int DefaultToolTimeoutSeconds { get; set; }
 
-        public int MaximumAgentSteps { get; set; } = 64;
+        public int MaximumAgentSteps { get; set; }
 
         public List<AgentProviderProfile> ProviderProfiles { get; set; } = new();
 
@@ -187,26 +156,19 @@ namespace YuzeToolkit.UnityAgent
         /// <summary>Ordered, highest-priority-first directories containing Skills.</summary>
         public List<AgentPathLocation> SkillRoots { get; set; } = new();
 
-        public static AgentSettingsDocument CreateDefault()
+        public static AgentSettingsDocument CreateDefault(AgentProjectSettingsDocument projectDefaults)
         {
+            if (projectDefaults == null) throw new ArgumentNullException(nameof(projectDefaults));
             var profile = new AgentProviderProfile();
             if (!AgentProviderCatalog.ApplyPreset(profile, "openai"))
                 throw new InvalidOperationException("The built-in OpenAI Provider preset is missing.");
-            return new AgentSettingsDocument
+            var settings = new AgentSettingsDocument
             {
                 DefaultProviderProfileId = profile.Id,
-                ProviderProfiles = new List<AgentProviderProfile> { profile },
-                AgentsRoots = new List<AgentPathLocation>
-                {
-                    AgentPathLocation.ProjectAgentsRoot(),
-                    AgentPathLocation.PersistentAgentsRoot()
-                },
-                SkillRoots = new List<AgentPathLocation>
-                {
-                    AgentPathLocation.ProjectSkillsRoot(),
-                    AgentPathLocation.PersistentSkillsRoot()
-                }
+                ProviderProfiles = new List<AgentProviderProfile> { profile }
             };
+            projectDefaults.ApplyTo(settings);
+            return settings;
         }
     }
 
@@ -219,19 +181,13 @@ namespace YuzeToolkit.UnityAgent
         public const int CurrentSchemaVersion = 4;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
-        public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.FullAccess;
-        public string EditorSystemPrompt { get; set; } = AgentPromptDefaults.EditorSystemPrompt;
-        public string RuntimeSystemPrompt { get; set; } = AgentPromptDefaults.RuntimeSystemPrompt;
-        public int DefaultToolTimeoutSeconds { get; set; } = 120;
-        public int MaximumAgentSteps { get; set; } = 64;
-        public List<AgentPathLocation> AgentsRoots { get; set; } = new()
-        {
-            AgentPathLocation.ProjectAgentsRoot(), AgentPathLocation.PersistentAgentsRoot()
-        };
-        public List<AgentPathLocation> SkillRoots { get; set; } = new()
-        {
-            AgentPathLocation.ProjectSkillsRoot(), AgentPathLocation.PersistentSkillsRoot()
-        };
+        public AgentPermissionMode PermissionMode { get; set; }
+        public string EditorSystemPrompt { get; set; } = string.Empty;
+        public string RuntimeSystemPrompt { get; set; } = string.Empty;
+        public int DefaultToolTimeoutSeconds { get; set; }
+        public int MaximumAgentSteps { get; set; }
+        public List<AgentPathLocation> AgentsRoots { get; set; } = new();
+        public List<AgentPathLocation> SkillRoots { get; set; } = new();
 
         public static AgentProjectSettingsDocument FromSettings(AgentSettingsDocument settings) => new()
         {
@@ -249,8 +205,8 @@ namespace YuzeToolkit.UnityAgent
             settings.PermissionMode = PermissionMode;
             settings.EditorSystemPrompt = EditorSystemPrompt;
             settings.RuntimeSystemPrompt = RuntimeSystemPrompt;
-            settings.DefaultToolTimeoutSeconds = Math.Max(1, DefaultToolTimeoutSeconds);
-            settings.MaximumAgentSteps = Math.Max(1, MaximumAgentSteps);
+            settings.DefaultToolTimeoutSeconds = DefaultToolTimeoutSeconds;
+            settings.MaximumAgentSteps = MaximumAgentSteps;
             settings.AgentsRoots = AgentsRoots.Select(ClonePath).ToList();
             settings.SkillRoots = SkillRoots.Select(ClonePath).ToList();
         }
@@ -262,121 +218,6 @@ namespace YuzeToolkit.UnityAgent
             RelativePath = value.RelativePath,
             IncludeInPlayerBuild = value.IncludeInPlayerBuild
         };
-    }
-
-    public static class AgentPromptDefaults
-    {
-        internal const string LegacySharedSystemPrompt =
-            "You are a Unity development agent running inside the current Unity process. " +
-            "Work autonomously through multiple tool calls until the user's task is complete. " +
-            "Inspect relevant files and Unity state before changing them, preserve unrelated work, " +
-            "report tool failures honestly, and never claim an action succeeded without its tool result. " +
-            "Use unity_eval_js for native Unity and IEvalTool operations. Use file and process tools for host operations.";
-
-        internal const string PreviousEditorSystemPrompt =
-            "You are a Unity Editor development agent running inside the current Unity Editor process. " +
-            "Work autonomously through multiple tool calls until the user's task is complete. " +
-            "Inspect relevant files and Unity state before changing them, preserve unrelated work, " +
-            "report tool failures honestly, and never claim an action succeeded without its tool result. " +
-            "Use unity_eval_js for native Unity and IEvalTool operations. Use file and process tools for host operations.";
-
-        internal const string PreviousRuntimeSystemPrompt =
-            "You are a runtime Unity game agent embedded in the currently running Player. " +
-            "Operate only through tools available in this build, prioritize observing and controlling live game state, " +
-            "do not assume UnityEditor APIs or project source files exist, and report unavailable operations explicitly. " +
-            "Continue through multiple safe tool calls until the user's runtime task is complete.";
-
-        internal const string PreviousEditorSystemPromptV2 =
-            "You are an AI Agent developer working inside the current Unity Editor project. " +
-            "Use the available Unity, file, process, and project-instruction tools according to their own descriptions. " +
-            "Inspect the relevant source, assets, and live Editor state before acting; implement the requested Unity work, " +
-            "preserve unrelated changes, and validate the actual result. Continue through tool calls until the task is complete " +
-            "or a concrete blocker remains. Before the first tool call, state the immediate direction in one short sentence; " +
-            "update only for important findings or changes of direction, and lead the final response with the outcome.";
-
-        internal const string PreviousRuntimeSystemPromptV2 =
-            "You are a Unity runtime debugging Agent embedded in the currently running Player. " +
-            "Use the available runtime tools according to their own descriptions to reproduce or observe the symptom, " +
-            "locate the relevant GameObjects and systems, inspect components, logs, and live state, then trace the evidence " +
-            "to the most likely root cause. Runtime cannot modify project source or Editor assets: do not assume UnityEditor APIs " +
-            "or project files exist, and do not present temporary live-state changes as a fix. Continue until the diagnosis is " +
-            "complete or a concrete limitation remains, then report the evidence, conclusion, and recommended Editor-side change.";
-
-        internal const string PreviousEditorSystemPromptV3 =
-            "You are an AI Agent developer working inside the current Unity Editor project. Help the user inspect, debug, " +
-            "implement, and validate Unity C# code, packages, assets, scenes, prefabs, project settings, and live Editor state. " +
-            "Start by following the appended AGENTS.md instructions and call skill_read before acting when an available Skill " +
-            "matches the task. For workspace inspection use directory_list, path_info, and file_read_text; for edits use " +
-            "file_write_text, directory_create, path_copy, path_move, and path_delete. Use shell_exec for shell scripts and " +
-            "process_exec for direct executables. For Unity objects, assets, APIs, and Editor state use unity_eval_js; when the " +
-            "Unity surface is unfamiliar, begin there by importing tools:// to discover modules, then import the relevant module " +
-            "and use its generated positional methods, falling back to CS.* only for uncovered APIs. Exact arguments are provided " +
-            "by each Tool schema. Work in a compact loop: inspect the minimum relevant state, act, verify the actual result, and " +
-            "continue until complete or concretely blocked. Preserve unrelated work, re-check Unity after compilation or Domain " +
-            "Reload, keep progress brief, and lead the final reply with the outcome.";
-
-        internal const string PreviousRuntimeSystemPromptV3 =
-            "You are a Unity Player debugging Agent embedded in the currently running game. Help the user reproduce problems, " +
-            "inspect live GameObjects, components, systems, logs, and state, test narrow hypotheses, and trace the evidence to a " +
-            "root cause. Start with unity_eval_js for live Unity state; when the surface is unfamiliar, import tools:// to discover " +
-            "runtime modules, then use the relevant generated positional methods and fall back to CS.* only when needed. Use " +
-            "directory_list, path_info, and file_read_text for accessible runtime files; use shell_exec or process_exec only on " +
-            "supported desktop builds. file_write_text and other write Tools may record explicit diagnostic output, but a Player " +
-            "cannot edit project source, packages, scenes, prefabs, or other Editor assets, so live or local changes are experiments " +
-            "rather than permanent fixes. Exact arguments are provided by each Tool schema. Continue until the diagnosis is complete " +
-            "or a concrete runtime limitation remains, then briefly report the evidence, conclusion, and the Editor-side change or " +
-            "next check that should follow.";
-
-        public const string EditorSystemPrompt =
-            "You are an AI Agent developer operating inside the current Unity Editor project. In this state, project source, " +
-            "packages, serialized assets, scenes, prefabs, project settings, and live Editor state are available for authorized " +
-            "inspection and modification. Help the user inspect, debug, implement, and validate Unity work. Before acting, follow " +
-            "the appended AGENTS.md instructions. When an available Skill matches the task, call skill_read before acting; use " +
-            "skill_list when you need to rediscover the available Skills. Choose the first Tool by the target: use directory_list, " +
-            "path_info, and file_read_text to inspect the workspace, and file_write_text, directory_create, path_copy, path_move, " +
-            "and path_delete for filesystem changes. Use shell_exec for shell pipelines, searches, Git, and build scripts; use " +
-            "process_exec to invoke one executable directly. Use unity_eval_js for GameObjects, components, Unity APIs, AssetDatabase, " +
-            "scenes, prefabs, importers, project settings, and other Unity-managed state. Every unity_eval_js call must define " +
-            "async function execute() and return concise serializable data. For the first unfamiliar Unity call, use " +
-            "async function execute() { const index = await import('tools://'); return index.listTools(); }. Use " +
-            "index.getToolDetails('Tool/Path') when details are needed, then import only the relevant tools://Tool/Path module and " +
-            "call its generated positional methods. Prefer those modules and use CS.* only for APIs they do not cover. Read each " +
-            "Tool schema for exact arguments and do not invent unavailable Tools or module paths. Work in a compact loop: inspect " +
-            "the minimum relevant state, act, verify the actual result, and continue until complete or concretely blocked. Preserve " +
-            "unrelated work, return immediately when an Editor action schedules compilation, resume by re-checking Unity after " +
-            "compilation or Domain Reload, keep progress brief, and lead the final reply with the outcome.";
-
-        public const string RuntimeSystemPrompt =
-            "You are a Unity Player debugging Agent embedded in the currently running standalone game. In this state, inspect and " +
-            "control live runtime state to reproduce problems, test narrow hypotheses, and trace evidence to a root cause. Project " +
-            "source, packages, UnityEditor APIs, and Editor assets are unavailable and cannot be permanently fixed from the Player. " +
-            "Before acting, follow the appended AGENTS.md instructions. When an available Skill matches the task, call skill_read " +
-            "before acting; use skill_list when you need to rediscover the packaged Skills. Start runtime investigation with " +
-            "unity_eval_js for GameObjects, components, systems, logs, and live state. Every unity_eval_js call must define async " +
-            "function execute() and return concise serializable data. For the first unfamiliar runtime call, use " +
-            "async function execute() { const index = await import('tools://'); return index.listTools(); }. Use " +
-            "index.getToolDetails('Runtime') or another returned Tool path when details are needed, then import only the relevant " +
-            "tools://Tool/Path module and call its generated positional methods. Prefer those modules and use CS.* only for APIs " +
-            "they do not cover. Use directory_list, path_info, and file_read_text only for accessible runtime files such as logs, " +
-            "configuration, and saves. Use directory_create, file_write_text, path_copy, path_move, or path_delete only for explicit " +
-            "diagnostic artifacts or user-requested local data operations; they do not edit the Unity project. Use shell_exec for " +
-            "supported desktop shell diagnostics and process_exec for one direct executable invocation. Read each Tool schema for " +
-            "exact arguments and do not invent unavailable Tools or module paths. Continue through safe observations and narrow " +
-            "experiments until the diagnosis is complete or a concrete runtime limitation remains. Treat every live or local " +
-            "mutation as an experiment rather than a permanent fix, then briefly report the evidence, conclusion, and the " +
-            "Editor-side change or next check that should follow.";
-
-        internal static bool IsPreviousEditorPrompt(string prompt) =>
-            string.Equals(prompt, LegacySharedSystemPrompt, StringComparison.Ordinal) ||
-            string.Equals(prompt, PreviousEditorSystemPrompt, StringComparison.Ordinal) ||
-            string.Equals(prompt, PreviousEditorSystemPromptV2, StringComparison.Ordinal) ||
-            string.Equals(prompt, PreviousEditorSystemPromptV3, StringComparison.Ordinal);
-
-        internal static bool IsPreviousRuntimePrompt(string prompt) =>
-            string.Equals(prompt, LegacySharedSystemPrompt, StringComparison.Ordinal) ||
-            string.Equals(prompt, PreviousRuntimeSystemPrompt, StringComparison.Ordinal) ||
-            string.Equals(prompt, PreviousRuntimeSystemPromptV2, StringComparison.Ordinal) ||
-            string.Equals(prompt, PreviousRuntimeSystemPromptV3, StringComparison.Ordinal);
     }
 
     public sealed class AgentToolCall
@@ -444,7 +285,7 @@ namespace YuzeToolkit.UnityAgent
 
         public string ReasoningEffort { get; set; } = string.Empty;
 
-        public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.FullAccess;
+        public AgentPermissionMode PermissionMode { get; set; }
 
         public string SystemPrompt { get; set; } = string.Empty;
 
@@ -561,9 +402,9 @@ namespace YuzeToolkit.UnityAgent
 
         public string WorkingDirectory { get; set; } = string.Empty;
 
-        public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.FullAccess;
+        public AgentPermissionMode PermissionMode { get; set; }
 
-        public int DefaultToolTimeoutSeconds { get; set; } = 120;
+        public int DefaultToolTimeoutSeconds { get; set; }
 
         public string SystemPrompt { get; set; } = string.Empty;
 

@@ -28,7 +28,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly SemaphoreSlim _settingsMutationGate = new(1, 1);
         private readonly object _operationSyncRoot = new();
         private readonly object _turnAdmissionSyncRoot = new();
-        private AgentSettingsDocument _settings = AgentSettingsDocument.CreateDefault();
+        private AgentSettingsDocument _settings = new();
         private AgentLoop? _loop;
         private bool _initialized;
         private bool _disposed;
@@ -1332,7 +1332,7 @@ namespace YuzeToolkit.UnityAgent
             return title.Length <= 42 ? title : title.Substring(0, 42) + "…";
         }
 
-        private static void ValidateSettings(AgentSettingsDocument settings)
+        internal static void ValidateSettings(AgentSettingsDocument settings)
         {
             if (settings.ProviderProfiles == null || settings.ProviderProfiles.Count == 0)
                 throw new ArgumentException("At least one Provider profile is required.", nameof(settings));
@@ -1374,6 +1374,8 @@ namespace YuzeToolkit.UnityAgent
                 throw new ArgumentException("Editor system prompt is required.", nameof(settings));
             if (string.IsNullOrWhiteSpace(settings.RuntimeSystemPrompt))
                 throw new ArgumentException("Runtime system prompt is required.", nameof(settings));
+            if (settings.DefaultToolTimeoutSeconds < 1)
+                throw new ArgumentException("Default Tool timeout must be positive.", nameof(settings));
             if (settings.MaximumAgentSteps < 1)
                 throw new ArgumentException("Maximum Agent steps must be positive.", nameof(settings));
         }

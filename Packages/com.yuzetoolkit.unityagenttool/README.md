@@ -67,7 +67,7 @@ Provider credential, so UnityAgentTool does not read Codex login caches or expos
 locally saved API key.
 
 In Editor, active conversations are paused when script compilation starts. The package writes a
-process- and project-bound recovery marker to `Application.persistentDataPath`, interrupts and persists the
+process- and project-bound recovery marker to `Application.persistentDataPath/.unityagenttool`, interrupts and persists the
 turn, then appends one continuation message after a successful Domain Reload or a failed compilation. The
 continuation includes compiler counts and tells the Agent to re-inspect Unity state because cached Unity
 objects and the JavaScript VM do not survive a reload. A marker from another Editor process is discarded
@@ -75,7 +75,8 @@ instead of automatically running work after a restart.
 
 ## Persistence
 
-All non-secret machine settings live at `Application.persistentDataPath/settings.json` with fixed folders:
+All machine-local Unity Agent data uses `Application.persistentDataPath/.unityagenttool`; non-secret settings live at
+`Application.persistentDataPath/.unityagenttool/settings.json` with fixed folders:
 
 ```text
 AgentConversations/       Agent conversation documents
@@ -83,14 +84,29 @@ CommandLineHistory/       Command Line documents and selected-session state
 UnityAgentEditorCompilationRecovery.json  Editor-only active-turn recovery marker
 ```
 
+Data written directly under `Application.persistentDataPath` by the previous layout is migrated by type when the
+corresponding file or history is not already present in `.unityagenttool`.
+
 Command Line input, output and drafts survive Unity restarts. JavaScript `EvalSession` instances do not.
-Provider secrets stay in the machine-local `secrets.json`. Provider-free defaults in
-`Assets/Resources/UnityAgentProjectSettings.json` are included in Player builds. When—and only when—the current
-Editor or Player has no machine `settings.json`, the complete machine configuration is created from these
-defaults. An existing or malformed machine file is never replaced by Project Settings. Edit the defaults
-through **Edit > Project Settings > YuzeToolkit > Unity Agent**; the page covers permission, Editor/Runtime
-prompts, Tool limits, and ordered AGENTS.md/Skill roots. Editor Play Mode uses the Editor prompt; the Runtime
-prompt is reserved for standalone Players.
+Provider secrets stay in the machine-local `secrets.json`. The package-owned
+`Runtime/Resources/UnityAgentPackageSettings.json` is the only built-in source for provider-free defaults;
+configuration values are not duplicated in C#. An optional
+`Assets/Resources/UnityAgentProjectSettings.json` overrides it and is included in Player builds. Project Settings
+shows the package JSON until the project override is saved, while **Overwrite Project Settings** in the Unity Agent
+configuration page writes the same provider-free projection through the same validated asset path.
+Every `AgentPathBase` value automatically resolves below a `.unityagenttool` folder owned by that base. AGENTS.md
+entries store optional paths inside that namespace. Skill entries automatically add the fixed `.agents/skill`
+directory and store only an optional child path inside it, so the default Skill relative path is empty. Settings
+schema V10 refreshes matching package-owned Skill roots from the effective JSON defaults.
+
+When the current Editor or Player has no machine `settings.json`, or that document is malformed or semantically
+invalid, the complete machine configuration is recreated from the effective project/package defaults. Malformed
+machine files and their backups are retained with a timestamped `.invalid-*` suffix before replacement. A valid
+existing machine file is never changed implicitly by Project Settings, except for the one-time schema V10 normalization
+of matching package-owned persistent root IDs. Edit project defaults through
+**Edit > Project Settings > YuzeToolkit > Unity Agent**; the page covers permission, Editor/Runtime prompts, Tool
+limits, and ordered AGENTS.md/Skill roots. Editor Play Mode uses the Editor prompt; the Runtime prompt is reserved
+for standalone Players.
 
 ## Runtime Host
 

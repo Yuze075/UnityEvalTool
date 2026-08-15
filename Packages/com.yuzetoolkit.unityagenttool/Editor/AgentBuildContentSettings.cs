@@ -8,8 +8,8 @@ namespace YuzeToolkit.UnityAgent
 {
     /// <summary>
     /// Read-only build summary used by Editor settings surfaces. Build inclusion is represented by
-    /// the two ordered root lists in the active machine settings. Project Settings only seed a
-    /// machine settings file when none exists.
+    /// the two ordered root lists in the active machine settings. Effective package/project defaults
+    /// seed a machine settings file when it is missing or invalid.
     /// </summary>
     internal sealed class AgentBuildContentView : VisualElement
     {
@@ -45,11 +45,14 @@ namespace YuzeToolkit.UnityAgent
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             _rootList.Clear();
-            AddRoots("AGENTS.md", settings.AgentsRoots);
-            AddRoots("Skills", settings.SkillRoots);
+            AddRoots("AGENTS.md", settings.AgentsRoots, isSkillRoot: false);
+            AddRoots("Skills", settings.SkillRoots, isSkillRoot: true);
         }
 
-        private void AddRoots(string heading, IReadOnlyList<AgentPathLocation> roots)
+        private void AddRoots(
+            string heading,
+            IReadOnlyList<AgentPathLocation> roots,
+            bool isSkillRoot)
         {
             var label = new Label(heading);
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -68,8 +71,11 @@ namespace YuzeToolkit.UnityAgent
                 var root = roots[index];
                 var relative = string.IsNullOrEmpty(root.RelativePath) ? "." : root.RelativePath;
                 var buildState = root.IncludeInPlayerBuild ? "included" : "Editor only";
-                var item = new Label($"{index + 1}. {root.BasePath} / {relative}  ·  {buildState}");
-                AgentTooltip.Attach(item, AgentPaths.Resolve(root));
+                var fixedPath = isSkillRoot
+                    ? $"{AgentPaths.SettingsDirectoryName} / {AgentPaths.SkillDirectoryName}"
+                    : AgentPaths.SettingsDirectoryName;
+                var item = new Label($"{index + 1}. {root.BasePath} / {fixedPath} / {relative}  ·  {buildState}");
+                AgentTooltip.Attach(item, isSkillRoot ? AgentPaths.ResolveSkill(root) : AgentPaths.Resolve(root));
                 item.style.color = new Color(0.72f, 0.76f, 0.82f);
                 _rootList.Add(item);
             }

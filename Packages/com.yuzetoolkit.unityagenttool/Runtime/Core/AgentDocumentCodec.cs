@@ -12,7 +12,9 @@ namespace YuzeToolkit.UnityAgent
         public static string SerializeSettings(AgentSettingsDocument settings) =>
             AgentJson.Stringify(ToJson(settings));
 
-        public static AgentSettingsDocument DeserializeSettings(string json)
+        public static AgentSettingsDocument DeserializeSettings(
+            string json,
+            AgentProjectSettingsDocument? projectDefaults = null)
         {
             if (string.IsNullOrWhiteSpace(json))
                 throw new FormatException("Agent settings JSON is empty.");
@@ -24,36 +26,22 @@ namespace YuzeToolkit.UnityAgent
                     $"Settings schema version {sourceSchemaVersion} is newer than the supported version " +
                     $"{AgentSettingsDocument.CurrentSchemaVersion}.");
             }
+            var legacySystemPrompt = root.ContainsKey("systemPrompt")
+                ? AgentJson.GetString(root, "systemPrompt")
+                : string.Empty;
             var settings = new AgentSettingsDocument
             {
                 SchemaVersion = sourceSchemaVersion,
                 DefaultProviderProfileId = AgentJson.GetString(root, "defaultProviderProfileId"),
-                PermissionMode = AgentJson.GetEnum(root, "permissionMode", AgentPermissionMode.FullAccess),
-                EditorSystemPrompt = AgentJson.GetString(root, "editorSystemPrompt",
-                    AgentJson.GetString(root, "systemPrompt", AgentPromptDefaults.EditorSystemPrompt)),
-                RuntimeSystemPrompt = AgentJson.GetString(root, "runtimeSystemPrompt",
-                    sourceSchemaVersion < 3
-                        ? AgentJson.GetString(root, "systemPrompt", AgentPromptDefaults.RuntimeSystemPrompt)
-                        : AgentPromptDefaults.RuntimeSystemPrompt),
-                DefaultToolTimeoutSeconds = Math.Max(1, EvalData.GetInt(root, "defaultToolTimeoutSeconds", 120)),
-                MaximumAgentSteps = Math.Max(1, EvalData.GetInt(root, "maximumAgentSteps", 64))
+                PermissionMode = ReadRequiredEnum(root, "permissionMode", projectDefaults?.PermissionMode),
+                EditorSystemPrompt = ReadRequiredString(root, "editorSystemPrompt", projectDefaults?.EditorSystemPrompt,
+                    legacySystemPrompt),
+                RuntimeSystemPrompt = ReadRequiredString(root, "runtimeSystemPrompt", projectDefaults?.RuntimeSystemPrompt,
+                    sourceSchemaVersion < 3 ? legacySystemPrompt : string.Empty),
+                DefaultToolTimeoutSeconds = ReadRequiredInt(root, "defaultToolTimeoutSeconds",
+                    projectDefaults?.DefaultToolTimeoutSeconds),
+                MaximumAgentSteps = ReadRequiredInt(root, "maximumAgentSteps", projectDefaults?.MaximumAgentSteps)
             };
-
-            if (sourceSchemaVersion < AgentSettingsDocument.CurrentSchemaVersion)
-            {
-                // Schema V7 intentionally replaces both complete prompts. Earlier releases could
-                // persist one shared or partially updated prompt, so retaining any V6 text would
-                // leave the Tool quick-start contract inconsistent across machines.
-                settings.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
-                settings.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
-            }
-            else
-            {
-                if (AgentPromptDefaults.IsPreviousEditorPrompt(settings.EditorSystemPrompt))
-                    settings.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
-                if (AgentPromptDefaults.IsPreviousRuntimePrompt(settings.RuntimeSystemPrompt))
-                    settings.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
-            }
 
             foreach (var value in AgentJson.GetObjectArray(root, "providerProfiles"))
                 settings.ProviderProfiles.Add(ReadProviderProfile(value));
@@ -65,7 +53,7 @@ namespace YuzeToolkit.UnityAgent
             }
             else
             {
-                settings.AgentsRoots.Add(AgentPathLocation.ProjectAgentsRoot());
+                settings.AgentsRoots = CloneRoots(projectDefaults?.AgentsRoots, "agentsRoots");
                 ReadLegacyContentRoots(root, settings, includeAgents: true);
             }
 
@@ -76,14 +64,22 @@ namespace YuzeToolkit.UnityAgent
             }
             else
             {
-                settings.SkillRoots.Add(AgentPathLocation.ProjectSkillsRoot());
+                settings.SkillRoots = CloneRoots(projectDefaults?.SkillRoots, "skillRoots");
                 ReadLegacyContentRoots(root, settings, includeAgents: false);
             }
 
-            if (sourceSchemaVersion < 3)
+            // Schema V9 makes every AgentPathBase resolve below its own .unityagenttool namespace.
+            if (sourceSchemaVersion < 9 && projectDefaults != null)
             {
-                EnsureDefaultRoot(settings.AgentsRoots, AgentPathLocation.PersistentAgentsRoot());
-                EnsureDefaultRoot(settings.SkillRoots, AgentPathLocation.PersistentSkillsRoot());
+                RefreshDefaultRoots(settings.AgentsRoots, projectDefaults.AgentsRoots, persistentOnly: true);
+                RefreshDefaultRoots(settings.SkillRoots, projectDefaults.SkillRoots, persistentOnly: true);
+            }
+
+            // Schema V10 gives every Skill root the fixed .agents/skill prefix. Matching
+            // package-owned roots are refreshed from JSON so callers no longer repeat it.
+            if (sourceSchemaVersion < 10 && projectDefaults != null)
+            {
+                RefreshDefaultRoots(settings.SkillRoots, projectDefaults.SkillRoots, persistentOnly: false);
             }
 
             if (settings.ProviderProfiles.Count == 0)
@@ -97,6 +93,13 @@ namespace YuzeToolkit.UnityAgent
             if (string.IsNullOrWhiteSpace(settings.DefaultProviderProfileId) ||
                 settings.ProviderProfiles.All(profile => profile.Id != settings.DefaultProviderProfileId))
                 settings.DefaultProviderProfileId = settings.ProviderProfiles[0].Id;
+            if (string.IsNullOrWhiteSpace(settings.EditorSystemPrompt) ||
+                string.IsNullOrWhiteSpace(settings.RuntimeSystemPrompt))
+                throw new FormatException("Editor and Runtime system prompts are required.");
+            if (settings.DefaultToolTimeoutSeconds < 1)
+                throw new FormatException("Default Tool timeout must be positive.");
+            if (settings.MaximumAgentSteps < 1)
+                throw new FormatException("Maximum Agent steps must be positive.");
             settings.SchemaVersion = AgentSettingsDocument.CurrentSchemaVersion;
             return settings;
         }
@@ -190,7 +193,9 @@ namespace YuzeToolkit.UnityAgent
                 ("agentsRoots", settings.AgentsRoots.Select(ToJson).Cast<object?>().ToList()),
                 ("skillRoots", settings.SkillRoots.Select(ToJson).Cast<object?>().ToList())));
 
-        public static AgentProjectSettingsDocument DeserializeProjectSettings(string json)
+        public static AgentProjectSettingsDocument DeserializeProjectSettings(
+            string json,
+            AgentProjectSettingsDocument? packageDefaults = null)
         {
             if (string.IsNullOrWhiteSpace(json))
                 throw new FormatException("Unity Agent Project Settings JSON is empty.");
@@ -203,30 +208,99 @@ namespace YuzeToolkit.UnityAgent
             var result = new AgentProjectSettingsDocument
             {
                 SchemaVersion = AgentProjectSettingsDocument.CurrentSchemaVersion,
-                PermissionMode = AgentJson.GetEnum(root, "permissionMode", AgentPermissionMode.FullAccess),
-                EditorSystemPrompt = AgentJson.GetString(root, "editorSystemPrompt",
-                    AgentPromptDefaults.EditorSystemPrompt),
-                RuntimeSystemPrompt = AgentJson.GetString(root, "runtimeSystemPrompt",
-                    AgentPromptDefaults.RuntimeSystemPrompt),
-                DefaultToolTimeoutSeconds = Math.Max(1,
-                    EvalData.GetInt(root, "defaultToolTimeoutSeconds", 120)),
-                MaximumAgentSteps = Math.Max(1, EvalData.GetInt(root, "maximumAgentSteps", 64)),
-                AgentsRoots = AgentJson.GetObjectArray(root, "agentsRoots").Select(ReadPathLocation).ToList(),
-                SkillRoots = AgentJson.GetObjectArray(root, "skillRoots").Select(ReadPathLocation).ToList()
+                PermissionMode = ReadRequiredEnum(root, "permissionMode", packageDefaults?.PermissionMode),
+                EditorSystemPrompt = ReadRequiredString(root, "editorSystemPrompt",
+                    packageDefaults?.EditorSystemPrompt),
+                RuntimeSystemPrompt = ReadRequiredString(root, "runtimeSystemPrompt",
+                    packageDefaults?.RuntimeSystemPrompt),
+                DefaultToolTimeoutSeconds = ReadRequiredInt(root, "defaultToolTimeoutSeconds",
+                    packageDefaults?.DefaultToolTimeoutSeconds),
+                MaximumAgentSteps = ReadRequiredInt(root, "maximumAgentSteps",
+                    packageDefaults?.MaximumAgentSteps),
+                AgentsRoots = root.ContainsKey("agentsRoots")
+                    ? AgentJson.GetObjectArray(root, "agentsRoots").Select(ReadPathLocation).ToList()
+                    : CloneRoots(packageDefaults?.AgentsRoots, "agentsRoots"),
+                SkillRoots = root.ContainsKey("skillRoots")
+                    ? AgentJson.GetObjectArray(root, "skillRoots").Select(ReadPathLocation).ToList()
+                    : CloneRoots(packageDefaults?.SkillRoots, "skillRoots")
             };
-            if (version < AgentProjectSettingsDocument.CurrentSchemaVersion)
-            {
-                result.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
-                result.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
-            }
-            else
-            {
-                if (AgentPromptDefaults.IsPreviousEditorPrompt(result.EditorSystemPrompt))
-                    result.EditorSystemPrompt = AgentPromptDefaults.EditorSystemPrompt;
-                if (AgentPromptDefaults.IsPreviousRuntimePrompt(result.RuntimeSystemPrompt))
-                    result.RuntimeSystemPrompt = AgentPromptDefaults.RuntimeSystemPrompt;
-            }
             return result;
+        }
+
+        private static string ReadRequiredString(
+            Dictionary<string, object?> root,
+            string key,
+            string? defaultValue,
+            string legacyValue = "")
+        {
+            if (root.ContainsKey(key)) return AgentJson.GetString(root, key);
+            if (!string.IsNullOrEmpty(legacyValue)) return legacyValue;
+            if (defaultValue != null) return defaultValue;
+            throw new FormatException($"JSON property '{key}' is required.");
+        }
+
+        private static int ReadRequiredInt(
+            Dictionary<string, object?> root,
+            string key,
+            int? defaultValue)
+        {
+            if (root.ContainsKey(key)) return EvalData.GetInt(root, key);
+            if (defaultValue.HasValue) return defaultValue.Value;
+            throw new FormatException($"JSON property '{key}' is required.");
+        }
+
+        private static TEnum ReadRequiredEnum<TEnum>(
+            Dictionary<string, object?> root,
+            string key,
+            TEnum? defaultValue)
+            where TEnum : struct, Enum
+        {
+            if (root.ContainsKey(key))
+                return AgentJson.GetEnum(root, key, defaultValue ?? default);
+            if (defaultValue.HasValue) return defaultValue.Value;
+            throw new FormatException($"JSON property '{key}' is required.");
+        }
+
+        private static bool ReadRequiredBool(Dictionary<string, object?> root, string key)
+        {
+            if (!root.ContainsKey(key))
+                throw new FormatException($"JSON property '{key}' is required.");
+            if (root[key] is bool value) return value;
+            throw new FormatException($"JSON property '{key}' must be a Boolean value.");
+        }
+
+        private static List<AgentPathLocation> CloneRoots(
+            IReadOnlyList<AgentPathLocation>? roots,
+            string propertyName)
+        {
+            if (roots == null)
+                throw new FormatException($"JSON property '{propertyName}' is required.");
+            return roots.Select(CloneRoot).ToList();
+        }
+
+        private static void RefreshDefaultRoots(
+            List<AgentPathLocation> roots,
+            IReadOnlyList<AgentPathLocation> defaults,
+            bool persistentOnly)
+        {
+            foreach (var defaultRoot in defaults)
+            {
+                if (persistentOnly && defaultRoot.BasePath != AgentPathBase.PersistentData) continue;
+                var index = roots.FindIndex(value =>
+                    string.Equals(value.Id, defaultRoot.Id, StringComparison.Ordinal));
+                if (index >= 0) roots[index] = CloneRoot(defaultRoot);
+            }
+        }
+
+        private static AgentPathLocation CloneRoot(AgentPathLocation value)
+        {
+            return new AgentPathLocation
+            {
+                Id = value.Id,
+                BasePath = value.BasePath,
+                RelativePath = value.RelativePath,
+                IncludeInPlayerBuild = value.IncludeInPlayerBuild
+            };
         }
 
         private static Dictionary<string, object?> ToJson(AgentSettingsDocument settings)
@@ -333,10 +407,10 @@ namespace YuzeToolkit.UnityAgent
         {
             var location = new AgentPathLocation
             {
-                Id = AgentJson.GetString(value, "id", Guid.NewGuid().ToString("N")),
-                BasePath = AgentJson.GetEnum(value, "basePath", AgentPathBase.ProjectRoot),
-                RelativePath = AgentJson.GetString(value, "relativePath"),
-                IncludeInPlayerBuild = EvalData.GetBool(value, "includeInPlayerBuild")
+                Id = ReadRequiredString(value, "id", null),
+                BasePath = ReadRequiredEnum<AgentPathBase>(value, "basePath", null),
+                RelativePath = ReadRequiredString(value, "relativePath", null),
+                IncludeInPlayerBuild = ReadRequiredBool(value, "includeInPlayerBuild")
             };
             AgentPaths.Validate(location);
             return location;
@@ -465,19 +539,22 @@ namespace YuzeToolkit.UnityAgent
                 if (!include) continue;
                 var legacyId = AgentJson.GetString(value, "id", Guid.NewGuid().ToString("N"));
                 var path = AgentJson.GetString(value, "path");
-                var source = includeAgents
-                    ? path
-                    : PathCombineLegacy(path, ".agents/skills");
+                var source = includeAgents ? path : PathCombineLegacy(path, ".agents/skills");
                 var location = AgentPaths.FromLegacyPath(
-                    (includeAgents ? "agents-" : "skills-") + legacyId, source);
+                    (includeAgents ? "agents-" : "skills-") + legacyId, source, isSkillRoot: !includeAgents);
                 // V1's separate ProjectSettings build-selection asset cannot be represented reliably in
                 // portable settings. Preserve the explicit project default, keep migrated external roots safe.
                 location.IncludeInPlayerBuild = location.BasePath == AgentPathBase.ProjectRoot &&
                     (includeAgents
                         ? string.IsNullOrEmpty(location.RelativePath)
-                        : location.RelativePath.Replace('\\', '/') == ".agents/skills");
+                        : string.IsNullOrEmpty(location.RelativePath));
                 var list = includeAgents ? settings.AgentsRoots : settings.SkillRoots;
-                if (list.Any(existing => AgentPaths.PathsEqual(AgentPaths.Resolve(existing), AgentPaths.Resolve(location))))
+                var resolvedLocation = includeAgents
+                    ? AgentPaths.Resolve(location)
+                    : AgentPaths.ResolveSkill(location);
+                if (list.Any(existing => AgentPaths.PathsEqual(
+                        includeAgents ? AgentPaths.Resolve(existing) : AgentPaths.ResolveSkill(existing),
+                        resolvedLocation)))
                     continue;
                 list.Add(location);
             }
@@ -489,13 +566,5 @@ namespace YuzeToolkit.UnityAgent
             return System.IO.Path.Combine(root, child);
         }
 
-        private static void EnsureDefaultRoot(List<AgentPathLocation> roots, AgentPathLocation required)
-        {
-            if (roots.Any(value => value.BasePath == required.BasePath &&
-                                   string.Equals(value.RelativePath.Replace('\\', '/').TrimEnd('/'),
-                                       required.RelativePath.Replace('\\', '/').TrimEnd('/'),
-                                       StringComparison.Ordinal))) return;
-            roots.Add(required);
-        }
     }
 }
