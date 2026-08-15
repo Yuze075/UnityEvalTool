@@ -2,6 +2,15 @@
 
 [English](CHANGELOG.md) | **简体中文**
 
+## 2.0.4 - 2026-08-15
+
+- 将 token 鉴权下沉到每条 Unity 连接。项目默认关闭，只在 Resources Asset 保存加盐 PBKDF2
+  verifier；验证 Pending 时仍可发现，但拒绝所有操作。
+- Broker 改为凭据存储与转发层，不再充当鉴权门禁。MCP Bearer 输入和 CLI `--token` 默认最多
+  持久化 5 个原始候选 token，支持手工维护 `auth.json`，并向 Pending Unity 广播候选值。
+- 通过 Unity 标准 Resources 管线把公开 verifier 配置加入 Player，并明确无法抵御 Player
+  二进制补丁的安全边界。
+
 ## 2.0.3 - 2026-08-15
 
 - 要求所有 C# 与 loader-backed JavaScript Eval Function 声明非空安全 metadata，在注册阶段

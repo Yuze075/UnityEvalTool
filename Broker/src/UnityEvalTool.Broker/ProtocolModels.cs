@@ -14,7 +14,11 @@ internal sealed record UnityRegistration(
     string UnityVersion,
     string PackageVersion,
     string Environment,
-    UnityStatus Status);
+    UnityStatus Status)
+{
+    public bool AuthorizationRequired { get; init; }
+    public string AuthorizationState { get; init; } = "NotRequired";
+}
 
 internal sealed record UnityStatus(
     string Phase,
@@ -45,7 +49,11 @@ internal sealed record UnityInstanceSnapshot(
     bool IsConnected,
     DateTimeOffset ConnectedAtUtc,
     DateTimeOffset LastTransportHeartbeatAtUtc,
-    UnityStatus Status);
+    UnityStatus Status)
+{
+    public bool AuthorizationRequired { get; init; }
+    public string AuthorizationState { get; init; } = "NotRequired";
+}
 
 internal sealed record RegistrySnapshot(
     long RegistryRevision,
@@ -67,7 +75,21 @@ internal sealed record HealthSnapshot(
     DateTimeOffset StartedAtUtc,
     long RegistryRevision,
     int ConnectedUnityCount,
-    bool RequireToken);
+    bool RequireToken)
+{
+    public int StoredTokenCount { get; init; }
+    public int MaxStoredTokenCount { get; init; }
+}
+
+internal sealed record UnityRegistrationResponse(
+    string InstanceId,
+    string ProtocolVersion,
+    string BrokerInstanceId,
+    IReadOnlyList<string> Tokens);
+
+internal sealed record AuthTokensPayload(IReadOnlyList<string> Tokens);
+
+internal sealed record UnityAuthorizationUpdate(string State);
 
 internal sealed record UnityCommandRequest(
     string SessionId,
@@ -95,6 +117,9 @@ internal sealed record ProtocolError(string Code, string Message, bool MayHaveEx
 [JsonSerializable(typeof(RegistrySnapshot))]
 [JsonSerializable(typeof(ConnectionLeaseResult))]
 [JsonSerializable(typeof(HealthSnapshot))]
+[JsonSerializable(typeof(UnityRegistrationResponse))]
+[JsonSerializable(typeof(AuthTokensPayload))]
+[JsonSerializable(typeof(UnityAuthorizationUpdate))]
 [JsonSerializable(typeof(UnityCommandRequest))]
 [JsonSerializable(typeof(ProtocolEnvelope))]
 [JsonSerializable(typeof(ProtocolError))]

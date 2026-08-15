@@ -10,9 +10,9 @@ AI MCP clients ──HTTP /mcp──┐
 原生 unity CLI ───WS /cli───┘                                      └────────── Unity B
 ```
 
-Broker 拥有发现、状态快照、事件驱动等待、选择租约、可选认证、MCP 协议、CLI 控制台和
-请求路由。Unity 拥有主线程真实状态、编译/重载观察、PuerTS VM、helper tool 注册和
-CLI 命令解析。
+Broker 拥有发现、状态快照、事件驱动等待、选择租约、本机候选 token 存储、MCP 协议、
+CLI 控制台和请求路由。Unity 拥有鉴权、主线程真实状态、编译/重载观察、PuerTS VM、
+helper tool 注册和 CLI 命令解析。
 
 ## 源码归属
 
@@ -20,8 +20,8 @@ CLI 命令解析。
 |---|---|---|
 | 原生 Broker | 仓库 `Broker/src/UnityEvalTool.Broker` | 2347、注册表、MCP、CLI、用户服务管理 |
 | npm 打包 | 仓库 `Broker/npm` | 平台选择、显式用户服务 helper、RID 平台包 |
-| Unity 传输 | `Runtime/Broker` | 注册、可选认证、心跳、中转请求、session |
-| Editor 生命周期 | `Editor/Broker` | 稳定进程身份、编译/重载状态、拉起 Broker |
+| Unity 传输 | `Runtime/Broker` | 注册、项目 token 验证、心跳、中转请求、session |
+| Editor 生命周期 | `Editor/Broker` | 稳定进程身份、Resources 鉴权设置、编译/重载状态、拉起 Broker |
 | Eval 引擎 | `Runtime/Core` 与 `Runtime/Tools` | PuerTS 执行和生成的 helper module |
 | CLI 解析 | `Runtime/CLI/EvalCliCommandService*` | 现有命令语法和打印结果 |
 
@@ -52,7 +52,8 @@ Broker 内部，不依赖 eval。编译失败不会卸载旧脚本域，而是�
 
 ## 安全
 
-Kestrel 只监听 loopback，并拒绝非 loopback Host/Origin。token 认证默认关闭。在 Broker
-进程环境中设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true` 后，会为 MCP、Unity 与 CLI 一并开启；
-Broker 随后在 `~/.unityevaltool/auth.json` 创建随机 token，Unix 权限仅允许当前用户读写。
-端口冲突、非法安全配置和协议不匹配都会明确失败。
+Kestrel 只监听 loopback，并拒绝非 loopback Host/Origin。Broker 没有全局鉴权策略；MCP/CLI
+输入或用户编辑的 `auth.json` 提供原始候选 token，Broker 只保存和转发。每个 Unity 项目
+默认不验证，或在 Resources Asset 保存加盐 PBKDF2 verifier，并在任一候选值匹配前拒绝所有
+操作。一次连接匹配成功后，在该连接生命周期内保持 Authorized。端口冲突、非法凭据/配置
+文件、非法项目 verifier 和协议不匹配都会明确失败。

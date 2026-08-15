@@ -52,7 +52,7 @@ a JavaScript backend for your project.
 In Unity, open **Window > Package Manager**, choose **Add package from git URL**, and enter:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4
 ```
 
 The equivalent `Packages/manifest.json` dependency is:
@@ -60,7 +60,7 @@ The equivalent `Packages/manifest.json` dependency is:
 ```json
 {
   "dependencies": {
-    "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3"
+    "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4"
   }
 }
 ```
@@ -129,19 +129,26 @@ The Broker exposes a Streamable HTTP MCP endpoint at:
 http://127.0.0.1:2347/mcp
 ```
 
-Token authentication is disabled by default for the local trusted environment, so the MCP
-client only needs the endpoint URL. To opt in, set `UNITYEVALTOOL_REQUIRE_TOKEN=true` in the
-Broker process environment before starting it. The Broker then creates
-`~/.unityevaltool/auth.json` with current-user-only permissions; read its `token` and
-configure the MCP client to send:
+Project token verification is disabled by default, so the MCP client normally needs only
+the endpoint URL. To protect one project or shipped Player, open **Project Settings >
+YuzeToolkit > UnityEvalTool**, generate or enter a token, apply it, and enable verification.
+Unity stores only a salted verifier in
+`Assets/Resources/UnityEvalToolAuthorizationSettings.asset`; the original token is not saved
+in the project. Unity includes this asset in Player builds and loads it through the standard
+Resources API.
+
+Supply that token once from an MCP client:
 
 ```text
-Authorization: Bearer <token>
+Authorization: Bearer <token[/another-token...]>
 ```
 
-MCP client configuration formats differ. Add the authorization value only when token
-authentication is enabled, and do not commit the token to source control. Unity and the
-native CLI read an existing auth file automatically in that mode.
+The Broker persists supplied tokens in `~/.unityevaltool/auth.json` and offers them to every
+connected Unity that is still awaiting verification. Later MCP calls may omit the header.
+The native CLI has the same provisioning behavior through `unity --token <token> ...`.
+You may also edit `auth.json` directly; the default capacity is five distinct tokens and
+`~/.unityevaltool/config.json` can override it with `maxStoredTokens` (hard maximum 32).
+Token values allow ASCII letters, digits, `_`, and `-`; `/` separates multiple values.
 
 The server exposes three MCP tools, used in this order:
 
@@ -169,7 +176,7 @@ and the [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PRO
 Install UnityAgentTool after UnityEvalTool with **Add package from git URL**:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityagenttool#v2.0.3
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityagenttool#v2.0.4
 ```
 
 Then place `Runtime/Panel/Prefabs/DebugPanel.prefab` from that package in a scene or a
@@ -181,13 +188,14 @@ The default keys are `F8` for Unity Agent and `F10` for the Performance and Syst
 
 ## Security boundary
 
-The Broker binds only to `127.0.0.1:2347` and rejects non-loopback Host/Origin values. Token
-authentication is off by default and can be enabled explicitly with
-`UNITYEVALTOOL_REQUIRE_TOKEN=true`. Supported non-WebGL release Players that include
-UnityEvalTool intentionally register with the Broker and retain arbitrary-JavaScript
-evaluation; this behavior is not limited to Development Builds and does not depend on
-UnityAgentTool. Decide deliberately whether the default loopback trust boundary, or the
-optional token-authenticated mode, belongs in your shipped product. See
+The Broker binds only to `127.0.0.1:2347` and rejects non-loopback Host/Origin values. It does
+not authenticate callers globally: it only persists and forwards candidate tokens. Each
+Unity project or Player independently decides whether verification is required and accepts
+commands only after one candidate produces its stored salted verifier. Supported non-WebGL
+release Players that include UnityEvalTool intentionally register with the Broker and retain
+arbitrary-JavaScript evaluation; this behavior is not limited to Development Builds and does
+not depend on UnityAgentTool. The verifier prevents ordinary Broker access without the token,
+but cannot prevent an attacker who can patch the Player binary. See
 [Editor and Player registration](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES.md).
 
 ## Service management and uninstall

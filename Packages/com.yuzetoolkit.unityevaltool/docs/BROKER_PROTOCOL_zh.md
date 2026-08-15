@@ -13,8 +13,25 @@
 - `http://127.0.0.1:2347/health`：Broker 健康状态快照。
 
 Broker 只绑定 loopback。如果 `2347` 不可用，必须明确失败，不得静默改用其它端口。
-token 认证默认关闭。在 Broker 进程环境中设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true` 后，
-会为 MCP、Unity 与 CLI 一并开启；健康状态快照通过 `requireToken` 报告实际模式。
+Broker 不设置全局鉴权门禁，只保存候选 token 并转发给 Unity；验证结果由每条 Unity 连接
+自己决定。健康状态中的 `requireToken` 固定为 false，同时报告 `storedTokenCount` 与
+`maxStoredTokenCount`。
+
+MCP 可通过 `Authorization: Bearer token[/token...]` 或 `X-UnityEvalTool-Token` 录入候选值；
+CLI 通过公开的 `--token` 参数把同一列表放入 `cli/hello`。值只允许 ASCII 大小写字母、数字、
+`_`、`-`，`/` 仅作为列表分隔符。显式传入的值保存到 `~/.unityevaltool/auth.json`；默认容量
+为 5，可在 `~/.unityevaltool/config.json` 用 `maxStoredTokens` 调整，硬上限 32。相同值不会
+重复保存。
+
+手工配置使用以下 schema（单数 `token` 镜像第一项，用于兼容旧读取方）：
+
+```json
+{
+  "schemaVersion": 2,
+  "token": "project-one_token",
+  "tokens": ["project-one_token", "project-two_token"]
+}
+```
 
 ## 消息封装
 
@@ -37,17 +54,26 @@ Unity 和 CLI WebSocket 每条 WebSocket 消息交换一个 UTF-8 JSON object：
 
 Unity 的第一条消息必须是 `unity/register`。其 payload 包含：
 
-- `authToken`：默认为空；仅在 Broker 已开启 token 认证时必填
+- `authToken`：保留为空的兼容字段
 - `instanceId`：在单个 Unity 进程的 Domain Reload 之间保持稳定
 - `connectionEpoch`：每个 Unity 侧连接 generation 递增
 - `processId` 和 `processStartedAtUtc`
 - `projectName`、规范化 `projectPath`、`unityVersion`、`packageVersion`
 - `environment`：`Editor` 或 `Player`
+- `authorizationRequired`：该 Unity 项目是否要求 token
+- `authorizationState`：初始 `NotRequired` 或 `Pending` 状态
 - 完整的初始 `status`
 
 只有主 Unity Editor 进程可以注册。Asset Import Worker 绝对不得注册或启动 Broker。
 成功响应包含 `brokerInstanceId`，它在当前 Broker 进程中唯一。如果该值改变，Unity
 会丢弃所有保留的 PuerTS session，避免新 Broker 进程意外继承已不属于它的 session。
+同一响应会在 `tokens` 中带上当前保存的所有候选值。Unity 使用项目 salt 对候选值做 hash，
+并通过 `unity/authorization` 发布 `Authorized`、`Pending` 或 `NotRequired`。之后新增的候选值
+通过 `auth/tokens` event 发送。
+
+Pending Unity 仍会出现在发现和状态结果中，但 `ready` 等待以及所有 MCP/CLI 操作都会以
+`UnityAuthorizationPending` 拒绝。验证对每次 Unity 连接只执行一次；任一候选值成功后，
+后续命令不会重复验证，也不设置过期时间。
 
 ## 状态
 
@@ -109,6 +135,7 @@ Unity 在 `CompilationPipeline.compilationStarted` 时发布 `Compiling`，在�
 ## 稳定错误码
 
 - `AuthenticationFailed`
+- `UnityAuthorizationPending`
 - `ProtocolMismatch`
 - `InvalidRequest`
 - `DiscoveryRequired`

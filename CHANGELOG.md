@@ -2,6 +2,17 @@
 
 **English** | [简体中文](CHANGELOG_zh.md)
 
+## 2.0.4 - 2026-08-15
+
+- Move token authorization to each Unity connection. Projects default to disabled, store
+  only a salted PBKDF2 verifier in a Resources asset, and remain discoverable but refuse all
+  operations while verification is pending.
+- Make the Broker a credential store/router instead of an authorization gate. MCP Bearer
+  input and CLI `--token` persist up to five raw candidate tokens by default, support manual
+  `auth.json` configuration, and broadcast candidates to pending Unity clients.
+- Include public verification settings in Player builds through Unity's standard Resources
+  pipeline, and document the Player binary-patching limitation.
+
 ## 2.0.3 - 2026-08-15
 
 - Require every C# and loader-backed JavaScript Eval Function to declare non-empty safety

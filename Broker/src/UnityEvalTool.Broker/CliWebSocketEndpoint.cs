@@ -5,8 +5,7 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 
 internal static class CliWebSocketEndpoint
 {
-    public static async Task HandleAsync(HttpContext context, BrokerRegistry registry, AuthTokenStore tokens,
-        BrokerSecurityOptions security)
+    public static async Task HandleAsync(HttpContext context, BrokerRegistry registry, AuthTokenStore tokens)
     {
         if (!context.WebSockets.IsWebSocketRequest)
         {
@@ -25,12 +24,12 @@ internal static class CliWebSocketEndpoint
         using var sendGate = new SemaphoreSlim(1, 1);
         var consoleId = Guid.NewGuid().ToString("N");
         string? selectedHandle = null;
-        var authorized = false;
+        var initialized = false;
         try
         {
             while (socket.State == WebSocketState.Open && !context.RequestAborted.IsCancellationRequested)
             {
-                using var document = authorized
+                using var document = initialized
                     ? await WebSocketJson.ReceiveAsync(socket, context.RequestAborted)
                     : await WebSocketAuthenticationGate.ReceiveFirstMessageAsync(socket, context.RequestAborted);
                 if (document == null) break;
@@ -41,18 +40,29 @@ internal static class CliWebSocketEndpoint
                 try
                 {
                     JsonElement result;
-                    if (!authorized)
+                    if (!initialized)
                     {
                         if (!string.Equals(envelope.Method, "cli/hello", StringComparison.Ordinal))
-                            throw new BrokerOperationException(BrokerErrorCodes.AuthenticationFailed,
+                            throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest,
                                 "The first CLI request must be cli/hello.");
-                        var token = envelope.Payload.TryGetProperty("authToken", out var tokenElement)
+                        var tokenList = envelope.Payload.TryGetProperty("token", out var tokenElement)
                             ? tokenElement.GetString()
-                            : null;
-                        if (!security.Accepts(tokens, token))
-                            throw new BrokerOperationException(BrokerErrorCodes.AuthenticationFailed,
-                                "CLI Broker token is invalid.");
-                        authorized = true;
+                            : envelope.Payload.TryGetProperty("authToken", out var legacyTokenElement)
+                                ? legacyTokenElement.GetString()
+                                : null;
+                        try
+                        {
+                            if (!string.IsNullOrEmpty(tokenList))
+                            {
+                                tokens.AddTokenList(tokenList);
+                                await registry.BroadcastTokensAsync(tokens.GetTokens(), context.RequestAborted);
+                            }
+                        }
+                        catch (InvalidDataException ex)
+                        {
+                            throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest, ex.Message);
+                        }
+                        initialized = true;
                         authenticationSlot.Dispose();
                         result = JsonDocument.Parse($"{{\"consoleId\":\"{consoleId}\",\"protocolVersion\":\"{BrokerConstants.ProtocolVersion}\"}}")
                             .RootElement.Clone();
@@ -80,7 +90,7 @@ internal static class CliWebSocketEndpoint
                 catch (BrokerOperationException ex)
                 {
                     var error = new ProtocolError(ex.Code, ex.Message, ex.MayHaveExecuted);
-                    if (!authorized)
+                    if (!initialized)
                     {
                         await WebSocketAuthenticationGate.SendErrorAndRejectAsync(socket, envelope.Method,
                             envelope.Id, error, sendGate);

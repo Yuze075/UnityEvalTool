@@ -27,7 +27,7 @@ Do not install multiple PuerTS backends in one Unity project.
 Use Unity Package Manager's **Add package from git URL** command:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4
 ```
 
 For a local source checkout, use **Add package from disk** and select this package's
@@ -58,8 +58,11 @@ using the executable directory as their project path. Release Players intentiona
 the same arbitrary-JavaScript eval surface as the Editor. This is not gated by Development
 Build and is independent of the optional UnityAgentTool package.
 
-The default trust boundary is the current user's loopback Broker; token authentication is
-an explicit opt-in through `UNITYEVALTOOL_REQUIRE_TOKEN=true`. If that capability is not
+Project token verification is disabled by default. Enable it per project under **Project
+Settings > YuzeToolkit > UnityEvalTool** when a shipped Player must reject Brokers that do
+not possess the token. The project stores only a salted verifier in
+`Assets/Resources/UnityEvalToolAuthorizationSettings.asset`, which Unity includes in Player
+builds and loads through the standard Resources API. If this eval capability is not
 appropriate for a shipped product, exclude or alter the package as an explicit product
 decision. WebGL is not a supported Broker target.
 
@@ -119,9 +122,10 @@ or data composed from those types whenever possible.
 | `ws://127.0.0.1:2347/unity` | Unity registration and routing |
 | `ws://127.0.0.1:2347/cli` | Native CLI consoles |
 
-The Broker binds loopback only and fails explicitly if port `2347` is unavailable. Token
-authentication is disabled by default and can be enabled for MCP, Unity, and CLI together
-with `UNITYEVALTOOL_REQUIRE_TOKEN=true` in the Broker process environment.
+The Broker binds loopback only and fails explicitly if port `2347` is unavailable. It does
+not own the authorization decision: MCP and CLI may provision candidate tokens into
+`~/.unityevaltool/auth.json`, while each Unity connection verifies them and remains visible
+but non-executable in `Pending` state until one matches.
 
 ## Build from source
 

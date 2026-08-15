@@ -25,7 +25,7 @@ Unity Package 与必需 Broker/CLI 的安装和首次使用说明见[仓库使�
 使用 Unity Package Manager 的 **Add package from git URL**：
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4
 ```
 
 如果使用本地源码 checkout，选择 **Add package from disk**，然后选中该 Package
@@ -51,9 +51,11 @@ Editor 会在 eval 之外独立报告导入、编译、编译失败、程序集�
 文件目录作为项目路径注册。Release Player 会有意保留与 Editor 相同的任意 JavaScript
 eval 能力。它不受 Development Build 开关限制，也不依赖可选的 UnityAgentTool Package。
 
-默认信任边界是当前用户的 loopback Broker；token 认证通过
-`UNITYEVALTOOL_REQUIRE_TOKEN=true` 显式开启。如果该能力不适合产品发行版，应把排除或
-修改 Package 作为明确的产品决策。WebGL 不是受支持的 Broker 目标。
+项目 token 验证默认关闭。发行 Player 需要拒绝没有 token 的 Broker 时，在
+**Project Settings > YuzeToolkit > UnityEvalTool** 中按项目开启。项目只在
+`Assets/Resources/UnityEvalToolAuthorizationSettings.asset` 保存加盐 verifier；Unity 会将其
+直接打入 Player，并通过标准 Resources API 读取。如果该 eval 能力不适合产品发行版，应把
+排除或修改 Package 作为明确的产品决策。WebGL 不是受支持的 Broker 目标。
 
 生命周期细节与公开连接 API 见 [Editor 与 Player 注册](docs/RUNTIME_SERVICES_zh.md)。
 
@@ -107,8 +109,9 @@ Tool 树和函数契约，不依赖任何 Debug UI。根 Tool 可通过 `EvalToo
 | `ws://127.0.0.1:2347/unity` | Unity 注册与中转 |
 | `ws://127.0.0.1:2347/cli` | 原生 CLI 控制台 |
 
-Broker 只绑定 loopback，并在 `2347` 端口不可用时明确失败。token 认证默认关闭；可在
-Broker 进程环境中设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true`，为 MCP、Unity 与 CLI 一并开启。
+Broker 只绑定 loopback，并在 `2347` 端口不可用时明确失败。它不决定鉴权结果：MCP 与 CLI
+可把候选 token 录入 `~/.unityevaltool/auth.json`；每条 Unity 连接自行验证，在匹配前以
+`Pending` 状态保持可发现但不可执行。
 
 ## 从源码构建
 

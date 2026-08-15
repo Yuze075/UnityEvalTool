@@ -24,7 +24,7 @@ because npm dependency lifecycle scripts may be disabled; check the command's ex
 Add the Unity-side package through Unity Package Manager:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4
 ```
 
 Open the Unity project, wait for compilation, then run `unity list`. Seeing that Editor is
@@ -52,17 +52,20 @@ Connect a Streamable HTTP MCP client to:
 http://127.0.0.1:2347/mcp
 ```
 
-Token authentication is disabled by default, so MCP clients only need the endpoint URL. To
-enable authentication, set `UNITYEVALTOOL_REQUIRE_TOKEN=true` in the Broker process
-environment before startup. The Broker then creates `~/.unityevaltool/auth.json`; read its
-`token` and send:
+Unity projects do not require token verification by default, so MCP clients normally need
+only the endpoint URL. When a Unity project has enabled verification in Project Settings,
+provision its token once by sending:
 
 ```text
-Authorization: Bearer <token>
+Authorization: Bearer <token[/another-token...]>
 ```
 
-Do not commit the token. Unity and the native CLI read an existing auth file automatically
-when authentication is enabled. The MCP workflow is always
+The Broker stores supplied values in `~/.unityevaltool/auth.json`; later calls may omit the
+header. The CLI equivalent is `unity --token <token> ...`, and `auth.json` may also be edited
+directly. Its default capacity is five tokens; set `maxStoredTokens` in
+`~/.unityevaltool/config.json` to change it, up to 32. The Broker only forwards candidates;
+each Unity verifies its own token and stays discoverable but non-executable while pending.
+The MCP workflow is always
 `unity_status` → `unity_connect` → `eval`; discovery and explicit selection are mandatory.
 See the [user guide](https://github.com/Yuze075/UnityEvalTool#readme) and
 [protocol specification](https://github.com/Yuze075/UnityEvalTool/blob/main/Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL.md).

@@ -5,6 +5,12 @@
 仓库级[变更记录](../../../CHANGELOG_zh.md) 是 Unity Package、电脑级 Broker/CLI、npm Package 和
 Roslyn Generator 的规范发行历史。
 
+## 2.0.4 - 2026-08-15
+
+- 增加按项目配置的 Unity 鉴权，包括 Resources 加盐 verifier Asset、UI Toolkit 设置页、
+  标准 Player 打包和明确的 Pending/Authorized 状态。
+- MCP/CLI 可向 Broker 录入多个持久候选值，但唯一鉴权决策仍由 Unity 执行；验证默认关闭。
+
 ## 2.0.3 - 2026-08-15
 
 - 要求每个 C# 与 JavaScript Tool 函数提供显式非空 safety metadata，在注册前完成校验，

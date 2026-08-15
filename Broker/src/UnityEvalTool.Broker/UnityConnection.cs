@@ -13,6 +13,7 @@ internal sealed class UnityConnection : IAsyncDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private readonly Action<UnityConnection, UnityStatus> _onStatus;
     private readonly Action<UnityConnection> _onHeartbeat;
+    private string _authorizationState;
     private int _disposed;
 
     public UnityConnection(WebSocket socket, UnityRegistration registration,
@@ -25,6 +26,9 @@ internal sealed class UnityConnection : IAsyncDisposable
         LastTransportHeartbeatAtUtc = ConnectedAtUtc;
         _onStatus = onStatus;
         _onHeartbeat = onHeartbeat;
+        _authorizationState = registration.AuthorizationRequired
+            ? NormalizeAuthorizationState(registration.AuthorizationState, "Pending")
+            : "NotRequired";
     }
 
     public UnityRegistration Registration { get; }
@@ -32,6 +36,10 @@ internal sealed class UnityConnection : IAsyncDisposable
     public DateTimeOffset ConnectedAtUtc { get; }
     public DateTimeOffset LastTransportHeartbeatAtUtc { get; private set; }
     public bool IsConnected => _socket.State == WebSocketState.Open && Volatile.Read(ref _disposed) == 0;
+    public bool AuthorizationRequired => Registration.AuthorizationRequired;
+    public string AuthorizationState => Volatile.Read(ref _authorizationState);
+    public bool IsAuthorized => !AuthorizationRequired ||
+                                string.Equals(AuthorizationState, "Authorized", StringComparison.Ordinal);
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -65,6 +73,19 @@ internal sealed class UnityConnection : IAsyncDisposable
                 if (string.Equals(envelope.Type, "event", StringComparison.Ordinal) &&
                     string.Equals(envelope.Method, "unity/heartbeat", StringComparison.Ordinal))
                     continue;
+
+                if (string.Equals(envelope.Type, "event", StringComparison.Ordinal) &&
+                    string.Equals(envelope.Method, "unity/authorization", StringComparison.Ordinal))
+                {
+                    var update = envelope.Payload.Deserialize(BrokerJsonContext.Default.UnityAuthorizationUpdate)
+                                 ?? throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest,
+                                     "Unity authorization payload is empty.");
+                    _authorizationState = AuthorizationRequired
+                        ? NormalizeAuthorizationState(update.State, "Pending")
+                        : "NotRequired";
+                    _onHeartbeat(this);
+                    continue;
+                }
             }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
@@ -185,6 +206,15 @@ internal sealed class UnityConnection : IAsyncDisposable
         await RequestAsync("session/release", request, TimeSpan.FromSeconds(35), cancellationToken);
     }
 
+    public async Task SendTokensAsync(IReadOnlyList<string> tokens, CancellationToken cancellationToken)
+    {
+        if (!AuthorizationRequired || IsAuthorized || !IsConnected) return;
+        var payload = JsonSerializer.SerializeToElement(new AuthTokensPayload(tokens),
+            BrokerJsonContext.Default.AuthTokensPayload);
+        await WebSocketJson.SendAsync(_socket,
+            WebSocketJson.CreateEnvelope("event", "auth/tokens", null, payload), _sendGate, cancellationToken);
+    }
+
     public UnityInstanceSnapshot ToSnapshot()
     {
         var status = Status;
@@ -204,7 +234,22 @@ internal sealed class UnityConnection : IAsyncDisposable
         return new UnityInstanceSnapshot(registration.InstanceId, registration.ConnectionEpoch,
             registration.ProcessId, registration.ProcessStartedAtUtc, registration.ProjectName,
             registration.ProjectPath, registration.UnityVersion, registration.PackageVersion,
-            registration.Environment, IsConnected, ConnectedAtUtc, LastTransportHeartbeatAtUtc, status);
+            registration.Environment, IsConnected, ConnectedAtUtc, LastTransportHeartbeatAtUtc, status)
+        {
+            AuthorizationRequired = AuthorizationRequired,
+            AuthorizationState = AuthorizationState
+        };
+    }
+
+    private static string NormalizeAuthorizationState(string? state, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(state)) return fallback;
+        if (string.Equals(state, "NotRequired", StringComparison.Ordinal) ||
+            string.Equals(state, "Pending", StringComparison.Ordinal) ||
+            string.Equals(state, "Authorized", StringComparison.Ordinal))
+            return state;
+        throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest,
+            $"Unity reported unsupported authorization state '{state}'.");
     }
 
     public async ValueTask DisposeAsync()

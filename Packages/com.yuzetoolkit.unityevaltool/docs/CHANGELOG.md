@@ -5,6 +5,13 @@
 The repository-level [changelog](../../../CHANGELOG.md) is the canonical release history
 for the Unity package, computer-level Broker/CLI, npm packages, and Roslyn generator.
 
+## 2.0.4 - 2026-08-15
+
+- Add per-project Unity authorization with a Resources salted-verifier asset, UI Toolkit
+  settings page, standard Player inclusion, and explicit Pending/Authorized states.
+- Let MCP/CLI provision multiple persistent Broker candidates while Unity performs the only
+  authorization decision; verification remains disabled by default.
+
 ## 2.0.3 - 2026-08-15
 
 - Require explicit non-empty safety metadata for every C# and JavaScript Tool function,

@@ -50,7 +50,7 @@ UnityEvalTool Package 会声明 core 依赖，但不会替项目选择 JavaScrip
 在 Unity 中打开 **Window > Package Manager**，选择 **Add package from git URL**，输入：
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4
 ```
 
 对应的 `Packages/manifest.json` 依赖是：
@@ -58,7 +58,7 @@ https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unit
 ```json
 {
   "dependencies": {
-    "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3"
+    "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4"
   }
 }
 ```
@@ -122,17 +122,23 @@ Broker 提供以下 Streamable HTTP MCP 端点：
 http://127.0.0.1:2347/mcp
 ```
 
-本机可信环境默认关闭 token 认证，因此 MCP Client 只需配置端点 URL。若要显式开启，
-请在启动 Broker 前为其进程环境设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true`。Broker 随后会
-以仅当前用户可读的权限创建 `~/.unityevaltool/auth.json`；读取其中的 `token`，让
-MCP Client 发送：
+项目 token 验证默认关闭，因此 MCP Client 通常只需配置端点 URL。若要保护某个项目或
+发行 Player，请打开 **Project Settings > YuzeToolkit > UnityEvalTool**，生成或输入 token，
+Apply 后开启验证。Unity 只会把加盐 verifier 保存到
+`Assets/Resources/UnityEvalToolAuthorizationSettings.asset`，原始 token 不会写入项目。
+Unity 会把该资源直接打进 Player，并通过标准 Resources API 读取。
+
+首次可让 MCP Client 携带该 token：
 
 ```text
-Authorization: Bearer <token>
+Authorization: Bearer <token[/另一个-token...]>
 ```
 
-不同 MCP Client 的配置格式不同。仅在已开启 token 认证时加入上述 HTTP Header，
-且不要把 token 提交到版本控制；Unity 与原生 CLI 会在该模式下自动读取已有 auth 文件。
+Broker 会把传入值持久化到 `~/.unityevaltool/auth.json`，并发送给仍在等待验证的所有 Unity；
+之后 MCP 可以不再携带 Header。原生 CLI 通过 `unity --token <token> ...` 执行同样的首次录入。
+也可直接维护 `auth.json`。默认最多保存 5 个不同 token，可在
+`~/.unityevaltool/config.json` 通过 `maxStoredTokens` 调整（硬上限 32）。token 只允许 ASCII
+大小写字母、数字、`_`、`-`，`/` 用来分隔多个值。
 
 MCP Server 只提供三个工具，必须按此顺序使用：
 
@@ -159,7 +165,7 @@ handle 过期、失效或 Unity 进程被替换时才重新连接。修改型 `e
 安装 UnityEvalTool 后，使用 **Add package from git URL** 添加 UnityAgentTool：
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityagenttool#v2.0.3
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityagenttool#v2.0.4
 ```
 
 然后把该 Package 中的 `Runtime/Panel/Prefabs/DebugPanel.prefab` 放入 Scene 或常驻
@@ -170,11 +176,12 @@ Prefab。面板不会自动创建。模块、持久化模型、默认快捷键�
 
 ## 安全边界
 
-Broker 只绑定 `127.0.0.1:2347`，并拒绝非 loopback Host/Origin。token 认证默认关闭，
-可通过 `UNITYEVALTOOL_REQUIRE_TOKEN=true` 显式开启。包含 UnityEvalTool 的、受支持的
-非 WebGL Release Player 会有意向 Broker 注册，并保留任意 JavaScript eval 能力；它不仅限于
-Development Build，也不依赖 UnityAgentTool。请明确决定发行产品中应使用默认 loopback
-信任边界，还是显式开启 token 认证。详见
+Broker 只绑定 `127.0.0.1:2347`，并拒绝非 loopback Host/Origin。Broker 本身不做全局鉴权，
+只负责保存并转发候选 token；每个 Unity 项目或 Player 自己决定是否要求验证，并且只有某个
+候选 token 能生成已保存的加盐 verifier 后才接受操作。包含 UnityEvalTool 的、受支持的非
+WebGL Release Player 会有意向 Broker 注册，并保留任意 JavaScript eval 能力；它不仅限于
+Development Build，也不依赖 UnityAgentTool。该 verifier 能阻止不知道 token 的普通 Broker
+访问，但不能抵御能够修改 Player 二进制的攻击者。详见
 [Editor 与 Player 注册](Packages/com.yuzetoolkit.unityevaltool/docs/RUNTIME_SERVICES_zh.md)。
 
 ## 服务管理与卸载

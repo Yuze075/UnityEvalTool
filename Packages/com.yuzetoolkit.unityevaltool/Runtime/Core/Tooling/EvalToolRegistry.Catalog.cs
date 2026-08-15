@@ -337,7 +337,7 @@ namespace YuzeToolkit
                 "host" => "Host/IP address to bind or connect.",
                 "port" => "Port number. 0 means choose an available port where supported.",
                 "token" => "Bearer token for authenticated local connections.",
-                "requireToken" => "Whether token authentication is required.",
+                "requireToken" => "Legacy Broker-global flag; always false because each Unity connection authorizes independently.",
                 "enabled" => "Desired enabled state.",
                 "depth" => "Maximum object formatting or hierarchy traversal depth.",
                 "size" => "New serialized array size.",

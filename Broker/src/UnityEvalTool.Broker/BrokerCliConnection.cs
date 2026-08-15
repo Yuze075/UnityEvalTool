@@ -10,10 +10,10 @@ internal sealed class BrokerCliConnection : IAsyncDisposable
     private readonly ClientWebSocket _socket = new();
     private readonly SemaphoreSlim _requestGate = new(1, 1);
 
-    public async Task ConnectAsync(string? token, CancellationToken cancellationToken)
+    public async Task ConnectAsync(string? tokenList, CancellationToken cancellationToken)
     {
         await _socket.ConnectAsync(new Uri($"ws://{BrokerConstants.Host}:{BrokerConstants.Port}/cli"), cancellationToken);
-        await RequestAsync("cli/hello", new JsonObject { ["authToken"] = token }, cancellationToken);
+        await RequestAsync("cli/hello", new JsonObject { ["token"] = tokenList }, cancellationToken);
     }
 
     public Task<JsonElement> ListAsync(CancellationToken cancellationToken) =>

@@ -57,6 +57,7 @@ namespace YuzeToolkit
         private Label _connectionBadge = null!;
         private Label _phaseBadge = null!;
         private Label _connection = null!;
+        private Label _authorization = null!;
         private Label _phase = null!;
         private Label _canEval = null!;
         private Label _busyReason = null!;
@@ -147,6 +148,7 @@ namespace YuzeToolkit
 
             var connectionCard = CreateCard("Connection", "Live registration and evaluation availability");
             _connection = AddField(connectionCard, "Broker connection");
+            _authorization = AddField(connectionCard, "Authorization");
             _phase = AddField(connectionCard, "Unity phase");
             _canEval = AddField(connectionCard, "Evaluation");
             _busyReason = AddField(connectionCard, "Busy reason");
@@ -230,12 +232,18 @@ namespace YuzeToolkit
             var connectionText = !enabled ? "Disabled" : connected ? "Connected" : running ? "Reconnecting" : "Stopped";
             _connection.text = connectionText;
             ApplyBadge(_connectionBadge, connectionText, connected ? "success" : enabled ? "warning" : "muted");
+            _authorization.text = client.AuthorizationState;
+            _authorization.EnableInClassList("uet-workbench-value-success",
+                string.Equals(client.AuthorizationState, "Authorized", StringComparison.Ordinal) ||
+                string.Equals(client.AuthorizationState, "NotRequired", StringComparison.Ordinal));
             _phase.text = status.Phase;
             ApplyBadge(_phaseBadge, status.Phase, status.CanEval ? "success" : "warning");
-            _canEval.text = status.CanEval && connected
+            var authorized = string.Equals(client.AuthorizationState, "Authorized", StringComparison.Ordinal) ||
+                             string.Equals(client.AuthorizationState, "NotRequired", StringComparison.Ordinal);
+            _canEval.text = status.CanEval && connected && authorized
                 ? string.Equals(status.Phase, "CompilationFailed", StringComparison.Ordinal) ? "Repair" : "Ready"
                 : "Unavailable";
-            _canEval.EnableInClassList("uet-workbench-value-success", status.CanEval && connected);
+            _canEval.EnableInClassList("uet-workbench-value-success", status.CanEval && connected && authorized);
             _busyReason.text = string.IsNullOrWhiteSpace(status.BusyReason) ? "—" : status.BusyReason;
             _runtimeState.text = status.IsPlaying
                 ? status.IsPaused ? _host.RuntimeStateLabel + " / Paused" : _host.RuntimeStateLabel + " / Playing"

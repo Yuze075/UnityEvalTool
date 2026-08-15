@@ -14,18 +14,25 @@ Editor 和受支持的非 WebGL Player 都主动向它注册。
 `EditorBrokerStatusMonitor` 捕获编译和程序集重载状态。Domain Reload 前，客户端会
 发布 `Reloading` 并断开；之后使用同一进程 instance ID 和更高 VM generation 重连。
 
+项目鉴权在 **Project Settings > YuzeToolkit > UnityEvalTool** 配置，单一制作源为
+`Assets/Resources/UnityEvalToolAuthorizationSettings.asset`。Asset 不存在或 `RequireToken` 为
+false 时关闭验证。Apply token 会创建随机 salt，只保存 `PBKDF2-HMAC-SHA256-v1` verifier；
+原始 token 绝不会序列化进项目。
+
 ## Player
 
 `UnityBrokerRuntimeBootstrap` 会在非 Editor 构建中创建隐藏的 `DontDestroyOnLoad`
 runner，报告运行时心跳和播放状态，以可执行程序目录作为项目路径注册，并在退出时
-发布 `Exiting`。Broker 仍由已安装的用户服务负责托管。
+发布 `Exiting`。Unity 会通过标准 Resources 管线把鉴权 Asset 加入 Player，运行时按资源名
+直接加载，不使用额外的构建后复制或生成文件。Broker 仍由已安装的用户服务负责托管。
 
 这是明确保留的正式产品契约，不是仅供 Editor 或 Development Build 使用的降级路径：
 受支持的 Release Player 同样会注册，并接受任意 JavaScript eval。可选的 UnityAgentTool
-UI Package 与 UnityEvalTool 的 Player runtime client 相互独立。默认信任边界是当前用户的
-loopback Broker；在 Broker 进程环境中设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true` 后，会增加
-仅该用户可读的共享 token。集成本 Package 的项目除非明确改变产品设计，否则应完整保留
-所选择的链路。
+UI Package 与 UnityEvalTool 的 Player runtime client 相互独立。验证默认关闭；开启后 Player
+以 `Pending` 注册，用内嵌 salt 对 Broker 发送的候选 token 做 hash，只有某个 verifier 匹配后
+才接受命令。Broker 只在本机保存原始候选值，不决定鉴权结果。该边界能防止不知道 token 的
+普通访问，但不能抵御可修改 Player 二进制的攻击者。集成本 Package 的项目除非明确改变产品
+设计，否则应完整保留所选择的链路。
 
 WebGL 不是受支持的 Broker 目标，因为该平台无法使用本地 ClientWebSocket/
 当前用户服务模型。
@@ -33,6 +40,7 @@ WebGL 不是受支持的 Broker 目标，因为该平台无法使用本地 Clien
 ## 公共运行时接口
 
 - `UnityBrokerClient.Shared.IsConnected`
+- `UnityBrokerClient.Shared.AuthorizationState`
 - `UnityBrokerClient.Shared.Identity`
 - `UnityBrokerClient.Shared.GetSessionSnapshots("mcp:")`
 - `UnityBrokerClient.Shared.GetSessionSnapshots("cli:")`

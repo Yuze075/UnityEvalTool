@@ -9,6 +9,9 @@ internal static class CliApplication
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken)
     {
         InstallMetadataStore.RegisterCurrentExecutable();
+        var parsedArguments = ExtractTokenOption(args);
+        args = parsedArguments.Arguments;
+        var suppliedTokenList = parsedArguments.TokenList;
         var command = args.Length == 0 ? string.Empty : args[0].ToLowerInvariant();
         if (command is "-h" or "--help" or "help")
         {
@@ -23,7 +26,7 @@ internal static class CliApplication
         }
         if (command == "doctor") return await DoctorAsync(cancellationToken);
 
-        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(suppliedTokenList, cancellationToken);
         if (command is "list" or "status")
         {
             PrintRegistry(await connection.ListAsync(cancellationToken));
@@ -62,16 +65,16 @@ internal static class CliApplication
         return 0;
     }
 
-    private static async Task<BrokerCliConnection> OpenConnectionAsync(CancellationToken cancellationToken)
+    private static async Task<BrokerCliConnection> OpenConnectionAsync(string? tokenList,
+        CancellationToken cancellationToken)
     {
-        var tokenStore = new AuthTokenStore();
         Exception? lastError = null;
         for (var attempt = 0; attempt < 30; attempt++)
         {
             var connection = new BrokerCliConnection();
             try
             {
-                await connection.ConnectAsync(tokenStore.TryReadExistingToken(), cancellationToken);
+                await connection.ConnectAsync(tokenList, cancellationToken);
                 return connection;
             }
             catch (Exception ex)
@@ -154,6 +157,12 @@ internal static class CliApplication
         var selected = snapshot.GetProperty("selectedUnity");
         if (selected.ValueKind == JsonValueKind.Null)
             throw new BrokerOperationException(BrokerErrorCodes.UnityDisconnected, "Selected Unity is unavailable.");
+        var authorizationState = selected.TryGetProperty("authorizationState", out var authorizationElement)
+            ? authorizationElement.GetString() ?? "NotRequired"
+            : "NotRequired";
+        if (string.Equals(authorizationState, "Pending", StringComparison.Ordinal))
+            throw new BrokerOperationException(BrokerErrorCodes.UnityAuthorizationPending,
+                "Unity is connected but its project token has not been verified. Supply --token or update auth.json.");
         var status = selected.GetProperty("status");
         if (CanExecute(status)) return;
         var phase = status.GetProperty("phase").GetString() ?? "Unknown";
@@ -212,6 +221,7 @@ internal static class CliApplication
             var status = instance.GetProperty("status");
             Console.WriteLine($"{instance.GetProperty("instanceId").GetString()}  " +
                               $"{instance.GetProperty("projectName").GetString()}  " +
+                              $"{(instance.TryGetProperty("authorizationState", out var auth) ? auth.GetString() : "NotRequired")}  " +
                               $"{status.GetProperty("phase").GetString()}  " +
                               $"PID {instance.GetProperty("processId").GetInt32()}  " +
                               instance.GetProperty("projectPath").GetString());
@@ -234,7 +244,9 @@ internal static class CliApplication
     {
         InstallMetadataStore.RegisterCurrentExecutable();
         Console.WriteLine("Executable: " + (InstallMetadataStore.GetCurrentExecutable() ?? "unpublished/dotnet host"));
-        Console.WriteLine("Auth file: " + new AuthTokenStore().FilePath + " (only used when token authentication is enabled)");
+        var tokenStore = new AuthTokenStore();
+        Console.WriteLine($"Auth file: {tokenStore.FilePath} ({tokenStore.GetTokens().Count}/{tokenStore.MaxStoredTokens} stored tokens)");
+        Console.WriteLine("Auth config: " + tokenStore.ConfigPath);
         Console.WriteLine("Broker endpoint: http://127.0.0.1:2347");
         try
         {
@@ -256,6 +268,36 @@ internal static class CliApplication
             ? "\"" + argument.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) + "\""
             : argument));
 
+    private static (string? TokenList, string[] Arguments) ExtractTokenOption(IReadOnlyList<string> args)
+    {
+        string? tokenList = null;
+        var remaining = new List<string>(args.Count);
+        for (var index = 0; index < args.Count; index++)
+        {
+            var argument = args[index];
+            if (string.Equals(argument, "--token", StringComparison.Ordinal))
+            {
+                if (tokenList != null)
+                    throw new InvalidOperationException("--token can only be supplied once.");
+                if (++index >= args.Count)
+                    throw new InvalidOperationException("--token requires a value.");
+                tokenList = args[index];
+                continue;
+            }
+            if (argument.StartsWith("--token=", StringComparison.Ordinal))
+            {
+                if (tokenList != null)
+                    throw new InvalidOperationException("--token can only be supplied once.");
+                tokenList = argument["--token=".Length..];
+                if (tokenList.Length == 0)
+                    throw new InvalidOperationException("--token requires a value.");
+                continue;
+            }
+            remaining.Add(argument);
+        }
+        return (tokenList, remaining.ToArray());
+    }
+
     private static string TryNormalizePath(string value)
     {
         try { return Path.GetFullPath(value).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
@@ -274,6 +316,8 @@ internal static class CliApplication
     private const string HelpText = """
 UnityEvalTool Broker CLI
 
+  unity --token <token[/token...]> [command]
+                                Persist one or more Unity project tokens before continuing.
   unity                         Auto-select Unity for the current directory and enter its console.
   unity list                    List registered Unity instances and states.
   unity status                  Alias for list.

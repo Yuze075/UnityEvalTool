@@ -24,7 +24,7 @@ macOS 使用 LaunchAgent，Linux 使用 systemd user unit，Windows 使用计划
 通过 Unity Package Manager 添加 Unity 侧 Package：
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.3
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4
 ```
 
 打开 Unity 项目并等待编译完成，然后执行 `unity list`。只有看到该 Editor 才完成
@@ -52,15 +52,17 @@ unity tools
 http://127.0.0.1:2347/mcp
 ```
 
-token 认证默认关闭，MCP Client 只需配置端点 URL。若要启用认证，请在启动 Broker 前
-为其进程环境设置 `UNITYEVALTOOL_REQUIRE_TOKEN=true`。Broker 随后会创建
-`~/.unityevaltool/auth.json`；读取其中的 `token` 并发送：
+Unity 项目默认不要求 token 验证，因此 MCP Client 通常只需配置端点 URL。某个 Unity 项目已在
+Project Settings 开启验证时，首次通过以下 Header 录入 token：
 
 ```text
-Authorization: Bearer <token>
+Authorization: Bearer <token[/另一个-token...]>
 ```
 
-不要提交该 token。开启认证时，Unity 与原生 CLI 会自动读取已有 auth 文件。MCP 流程始终是
+Broker 会把传入值保存到 `~/.unityevaltool/auth.json`，之后可省略 Header。CLI 等价入口为
+`unity --token <token> ...`，也可以直接编辑 `auth.json`。默认最多保存 5 个 token；可在
+`~/.unityevaltool/config.json` 用 `maxStoredTokens` 调整，硬上限 32。Broker 只转发候选值；
+每个 Unity 自行验证，匹配前保持可发现但不可执行。MCP 流程始终是
 `unity_status` → `unity_connect` → `eval`；必须先发现并明确选择。详见
 [使用指南](https://github.com/Yuze075/UnityEvalTool/blob/main/README_zh.md) 和
 [Broker 协议](https://github.com/Yuze075/UnityEvalTool/blob/main/Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PROTOCOL_zh.md)。

@@ -11,10 +11,29 @@ This document defines the stable boundary between the computer-level UnityEvalTo
 - `ws://127.0.0.1:2347/cli`: interactive CLI connection.
 - `http://127.0.0.1:2347/health`: Broker health snapshot.
 
-The Broker binds loopback only. It must not silently choose another port when `2347` is unavailable.
-Token authentication is disabled by default. `UNITYEVALTOOL_REQUIRE_TOKEN=true` in the
-Broker process environment enables it for MCP, Unity, and CLI together. The health snapshot
-reports this effective mode as `requireToken`.
+The Broker binds loopback only. It must not silently choose another port when `2347` is
+unavailable. The Broker has no global authorization gate. It persists candidate tokens and
+routes them to Unity; each Unity connection owns the verification decision. The health
+snapshot keeps `requireToken: false` and reports `storedTokenCount` and
+`maxStoredTokenCount`.
+
+MCP may provision candidates with `Authorization: Bearer token[/token...]` or
+`X-UnityEvalTool-Token`. CLI provisions the same list in `cli/hello` through its public
+`--token` option. Values use ASCII letters, digits, `_`, and `-`; `/` is only the list
+separator. Explicit input is persisted in `~/.unityevaltool/auth.json`. The default capacity
+is five, configurable as `maxStoredTokens` in `~/.unityevaltool/config.json`, with a hard
+maximum of 32. Duplicate values are not stored twice.
+
+Manual configuration uses this schema (the singular `token` mirrors the first entry for
+older readers):
+
+```json
+{
+  "schemaVersion": 2,
+  "token": "project-one_token",
+  "tokens": ["project-one_token", "project-two_token"]
+}
+```
 
 ## Envelope
 
@@ -36,18 +55,27 @@ Unity and CLI WebSockets exchange one UTF-8 JSON object per WebSocket message:
 
 The first Unity message must be `unity/register`. Its payload contains:
 
-- `authToken`: empty by default; required only when Broker token authentication is enabled
+- `authToken`: retained as an empty compatibility field
 - `instanceId`: stable across Domain Reload for one Unity process
 - `connectionEpoch`: incremented for each Unity-side connection generation
 - `processId` and `processStartedAtUtc`
 - `projectName`, canonical `projectPath`, `unityVersion`, `packageVersion`
 - `environment`: `Editor` or `Player`
+- `authorizationRequired`: whether this Unity project requires a token
+- `authorizationState`: initial `NotRequired` or `Pending` state
 - the complete initial `status`
 
 Only the primary Unity Editor process may register. Asset Import Workers must never register or start the Broker.
 The successful response includes `brokerInstanceId`, a value unique to the current Broker
 process. Unity discards every retained PuerTS session if this value changes, preventing a
-new Broker process from accidentally inheriting sessions that it no longer owns.
+new Broker process from accidentally inheriting sessions that it no longer owns. The same
+response includes every currently stored candidate in `tokens`. Unity hashes the candidates
+with its project salt and publishes `unity/authorization` as `Authorized`, `Pending`, or
+`NotRequired`. New stored candidates are delivered later through the `auth/tokens` event.
+
+A pending Unity remains in discovery/status output, but `ready` waits and every MCP/CLI
+operation are rejected with `UnityAuthorizationPending`. Verification happens once per
+Unity connection; after one candidate succeeds, later commands do not re-check or expire it.
 
 ## Status
 
@@ -105,6 +133,7 @@ older cycle or stale `Ready` sample from completing the wait.
 ## Stable error codes
 
 - `AuthenticationFailed`
+- `UnityAuthorizationPending`
 - `ProtocolMismatch`
 - `InvalidRequest`
 - `DiscoveryRequired`

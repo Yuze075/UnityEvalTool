@@ -5,8 +5,7 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 
 internal static class UnityWebSocketEndpoint
 {
-    public static async Task HandleAsync(HttpContext context, BrokerRegistry registry, AuthTokenStore tokens,
-        BrokerSecurityOptions security)
+    public static async Task HandleAsync(HttpContext context, BrokerRegistry registry, AuthTokenStore tokens)
     {
         if (!context.WebSockets.IsWebSocketRequest)
         {
@@ -38,16 +37,12 @@ internal static class UnityWebSocketEndpoint
             var registration = envelope.Payload.Deserialize(BrokerJsonContext.Default.UnityRegistration)
                                ?? throw new BrokerOperationException(BrokerErrorCodes.InvalidRequest,
                                    "Unity registration payload is empty.");
-            if (!security.Accepts(tokens, registration.AuthToken))
-                throw new BrokerOperationException(BrokerErrorCodes.AuthenticationFailed, "Unity Broker token is invalid.");
+            var storedTokens = tokens.GetTokens();
             authenticationSlot.Dispose();
             connection = registry.Register(socket, registration);
-            var responsePayload = JsonSerializer.SerializeToElement(new Dictionary<string, string>
-            {
-                ["instanceId"] = registration.InstanceId,
-                ["protocolVersion"] = BrokerConstants.ProtocolVersion,
-                ["brokerInstanceId"] = BrokerHost.InstanceId
-            }, BrokerJsonContext.Default.DictionaryStringString);
+            var responsePayload = JsonSerializer.SerializeToElement(
+                new UnityRegistrationResponse(registration.InstanceId, BrokerConstants.ProtocolVersion,
+                    BrokerHost.InstanceId, storedTokens), BrokerJsonContext.Default.UnityRegistrationResponse);
             await WebSocketJson.SendAsync(socket,
                 WebSocketJson.CreateEnvelope("response", envelope.Method, envelope.Id, responsePayload), sendGate,
                 context.RequestAborted);
