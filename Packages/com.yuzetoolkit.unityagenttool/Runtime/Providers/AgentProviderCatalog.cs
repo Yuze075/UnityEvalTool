@@ -136,7 +136,6 @@ namespace YuzeToolkit.UnityAgent
             string displayName,
             string protocol,
             string baseUrl,
-            string secretEnvironmentVariable,
             string defaultModelId,
             IReadOnlyList<AgentModelPreset> models,
             string documentationUrl,
@@ -148,7 +147,6 @@ namespace YuzeToolkit.UnityAgent
             DisplayName = displayName;
             Protocol = protocol;
             BaseUrl = baseUrl;
-            SecretEnvironmentVariable = secretEnvironmentVariable;
             DefaultModelId = defaultModelId;
             Models = models;
             DocumentationUrl = documentationUrl;
@@ -164,8 +162,6 @@ namespace YuzeToolkit.UnityAgent
         public string Protocol { get; }
 
         public string BaseUrl { get; }
-
-        public string SecretEnvironmentVariable { get; }
 
         public string DefaultModelId { get; }
 
@@ -329,7 +325,6 @@ namespace YuzeToolkit.UnityAgent
             target.Name = provider.DisplayName;
             target.Protocol = provider.Protocol;
             target.BaseUrl = provider.BaseUrl;
-            target.SecretEnvironmentVariable = provider.SecretEnvironmentVariable;
             target.StrictTools = provider.StrictToolsByDefault;
             target.Model = model?.Id ?? string.Empty;
             target.ReasoningEffort = model?.DefaultReasoningEffort ?? string.Empty;
@@ -381,7 +376,7 @@ namespace YuzeToolkit.UnityAgent
             return new[]
             {
                 Provider("openai", "OpenAI", AgentProtocolIds.OpenAiResponses,
-                    "https://api.openai.com/v1/", "OPENAI_API_KEY", "gpt-5.6-sol",
+                    "https://api.openai.com/v1/", "gpt-5.6-sol",
                     "https://developers.openai.com/api/docs/models", true, true, OpenAiCompatibility,
                     Model("gpt-5.6-sol", "GPT-5.6 Sol", 1_050_000, 128_000, 32_768,
                         ReasoningAgent | AgentModelCapabilities.Vision | AgentModelCapabilities.StructuredOutput,
@@ -394,7 +389,7 @@ namespace YuzeToolkit.UnityAgent
                         OpenAiEfforts, "medium")),
 
                 Provider("anthropic", "Anthropic", AgentProtocolIds.AnthropicMessages,
-                    "https://api.anthropic.com/v1/", "ANTHROPIC_API_KEY", "claude-opus-5",
+                    "https://api.anthropic.com/v1/", "claude-opus-5",
                     "https://platform.claude.com/docs/en/about-claude/models/overview", true, false,
                     AgentWireCompatibility.ConservativeCustom,
                     Model("claude-opus-5", "Claude Opus 5", 1_000_000, 128_000, 65_536,
@@ -407,7 +402,7 @@ namespace YuzeToolkit.UnityAgent
                         AgentText | AgentModelCapabilities.Vision)),
 
                 Provider("google", "Google Gemini", AgentProtocolIds.GoogleGeminiInteractions,
-                    "https://generativelanguage.googleapis.com/v1beta/", "GEMINI_API_KEY",
+                    "https://generativelanguage.googleapis.com/v1beta/",
                     "gemini-3.6-flash", "https://ai.google.dev/gemini-api/docs/latest-model", true, false,
                     AgentWireCompatibility.ConservativeCustom,
                     Model("gemini-3.6-flash", "Gemini 3.6 Flash", 1_048_576, 65_536, 32_768,
@@ -421,7 +416,7 @@ namespace YuzeToolkit.UnityAgent
                         GeminiEfforts, "medium")),
 
                 Provider("xai", "xAI", AgentProtocolIds.OpenAiResponses,
-                    "https://api.x.ai/v1/", "XAI_API_KEY", "grok-4.6",
+                    "https://api.x.ai/v1/", "grok-4.6",
                     "https://docs.x.ai/developers/models", true, false, ResponsesCompatibility,
                     Model("grok-4.6", "Grok 4.6", 500_000, 0, 32_768,
                         ReasoningAgent | AgentModelCapabilities.Vision | AgentModelCapabilities.StructuredOutput,
@@ -431,7 +426,7 @@ namespace YuzeToolkit.UnityAgent
                         new[] { "low", "medium", "high" }, "high")),
 
                 Provider("meta", "Meta Model API", AgentProtocolIds.OpenAiResponses,
-                    "https://api.meta.ai/v1/", "MODEL_API_KEY", "muse-spark-1.1",
+                    "https://api.meta.ai/v1/", "muse-spark-1.1",
                     "https://ai.meta.com/blog/introducing-muse-spark-meta-model-api/", true, false,
                     MetaCompatibility,
                     Model("muse-spark-1.1", "Muse Spark 1.1 (Public Preview)", 1_048_576, 131_072, 32_768,
@@ -439,13 +434,13 @@ namespace YuzeToolkit.UnityAgent
                         MetaEfforts, "high", true)),
 
                 Provider("kimi", "Kimi / Moonshot AI", AgentProtocolIds.OpenAiChat,
-                    "https://api.moonshot.ai/v1/", "KIMI_API_KEY", "kimi-k2.5",
+                    "https://api.moonshot.ai/v1/", "kimi-k2.5",
                     "https://platform.moonshot.ai/docs", true, false,
                     AgentWireCompatibility.ConservativeCustom,
                     Model("kimi-k2.5", "Kimi K2.5", 262_144, 0, 32_768, ReasoningAgent)),
 
                 Provider("kimi-code", "Kimi Code", AgentProtocolIds.OpenAiChat,
-                    "https://api.kimi.com/coding/v1/", "KIMI_CODE_API_KEY", "k3",
+                    "https://api.kimi.com/coding/v1/", "k3",
                     "https://www.kimi.com/code/docs/en/", true, false,
                     AgentWireCompatibility.ConservativeCustom,
                     Model("k3", "Kimi K3", 1_048_576, 0, 32_768, ReasoningAgent,
@@ -457,7 +452,7 @@ namespace YuzeToolkit.UnityAgent
                         ReasoningAgent)),
 
                 Provider("glm", "Z.AI / GLM", AgentProtocolIds.OpenAiChat,
-                    "https://api.z.ai/api/paas/v4/", "ZAI_API_KEY", "glm-5.2",
+                    "https://api.z.ai/api/paas/v4/", "glm-5.2",
                     "https://docs.z.ai/guides/llm/glm-5.2", true, false, ToggleAndEffortCompatibility,
                     Model("glm-5.2", "GLM-5.2", 1_000_000, 128_000, 32_768,
                         ReasoningAgent | AgentModelCapabilities.StructuredOutput, DeepSeekEfforts, "max"),
@@ -467,7 +462,7 @@ namespace YuzeToolkit.UnityAgent
                         ReasoningAgent | AgentModelCapabilities.StructuredOutput, DeepSeekEfforts, "high")),
 
                 Provider("qwen", "Alibaba Qwen (International)", AgentProtocolIds.OpenAiResponses,
-                    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/", "DASHSCOPE_API_KEY",
+                    "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/",
                     "qwen3.8-max", "https://help.aliyun.com/zh/model-studio/text-generation-model/", true,
                     false, ResponsesCompatibility,
                     Model("qwen3.8-max", "Qwen3.8 Max", 1_000_000, 0, 32_768,
@@ -478,7 +473,7 @@ namespace YuzeToolkit.UnityAgent
                         ReasoningAgent | AgentModelCapabilities.StructuredOutput, QwenEfforts, "xhigh")),
 
                 Provider("qwen-cn", "Alibaba Qwen (China)", AgentProtocolIds.OpenAiResponses,
-                    "https://dashscope.aliyuncs.com/compatible-mode/v1/", "DASHSCOPE_API_KEY",
+                    "https://dashscope.aliyuncs.com/compatible-mode/v1/",
                     "qwen3.8-max", "https://help.aliyun.com/zh/model-studio/text-generation-model/", true,
                     false, ResponsesCompatibility,
                     Model("qwen3.8-max", "Qwen3.8 Max", 1_000_000, 0, 32_768,
@@ -489,7 +484,7 @@ namespace YuzeToolkit.UnityAgent
                         ReasoningAgent | AgentModelCapabilities.StructuredOutput, QwenEfforts, "xhigh")),
 
                 Provider("minimax", "MiniMax", AgentProtocolIds.OpenAiChat,
-                    "https://api.minimax.io/v1/", "MINIMAX_API_KEY", "MiniMax-M3",
+                    "https://api.minimax.io/v1/", "MiniMax-M3",
                     "https://www.minimax.io/models/text/m3", true, false, MiniMaxCompatibility,
                     Model("MiniMax-M3", "MiniMax M3", 1_000_000, 524_288, 131_072,
                         ReasoningAgent | AgentModelCapabilities.Vision, MiniMaxEfforts, "adaptive"),
@@ -499,7 +494,7 @@ namespace YuzeToolkit.UnityAgent
                         ReasoningAgent, new[] { "adaptive" }, "adaptive")),
 
                 Provider("mimo", "Xiaomi MiMo", AgentProtocolIds.OpenAiResponses,
-                    "https://api.xiaomimimo.com/v1/", "MIMO_API_KEY", "mimo-v2.5-pro",
+                    "https://api.xiaomimimo.com/v1/", "mimo-v2.5-pro",
                     "https://mimo.mi.com/docs/en-US/api/chat/responses", true, false, ResponsesCompatibility,
                     Model("mimo-v2.5-pro", "MiMo V2.5 Pro", 1_000_000, 131_072, 32_768,
                         ReasoningAgent | AgentModelCapabilities.StructuredOutput, MimoEfforts, "high"),
@@ -508,7 +503,7 @@ namespace YuzeToolkit.UnityAgent
                         MimoEfforts, "high")),
 
                 Provider("deepseek", "DeepSeek", AgentProtocolIds.OpenAiChat,
-                    "https://api.deepseek.com/", "DEEPSEEK_API_KEY", "deepseek-v4-pro",
+                    "https://api.deepseek.com/", "deepseek-v4-pro",
                     "https://api-docs.deepseek.com/quick_start/pricing", true, false,
                     ToggleAndEffortCompatibility,
                     Model("deepseek-v4-pro", "DeepSeek V4 Pro", 1_000_000, 384_000, 32_768,
@@ -523,14 +518,13 @@ namespace YuzeToolkit.UnityAgent
             string displayName,
             string protocol,
             string baseUrl,
-            string secretEnvironmentVariable,
             string defaultModelId,
             string documentationUrl,
             bool supportsRemoteModelList,
             bool strictToolsByDefault,
             AgentWireCompatibility compatibility,
             params AgentModelPreset[] models) =>
-            new(id, displayName, protocol, baseUrl, secretEnvironmentVariable, defaultModelId, models,
+            new(id, displayName, protocol, baseUrl, defaultModelId, models,
                 documentationUrl, supportsRemoteModelList, strictToolsByDefault, compatibility);
 
         private static AgentModelPreset Model(

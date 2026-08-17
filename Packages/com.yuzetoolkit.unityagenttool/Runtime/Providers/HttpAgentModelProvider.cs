@@ -10,18 +10,15 @@ namespace YuzeToolkit.UnityAgent
     public sealed class HttpAgentModelProvider : IAgentModelProvider, IDisposable
     {
         private const int MaximumTurnAttempts = 3;
-        private readonly IAgentSecretStore _secretStore;
         private readonly AgentProviderTransport _transport;
 
-        public HttpAgentModelProvider(IAgentSecretStore secretStore)
+        public HttpAgentModelProvider()
         {
-            _secretStore = secretStore ?? throw new ArgumentNullException(nameof(secretStore));
             _transport = new AgentProviderTransport();
         }
 
-        internal HttpAgentModelProvider(IAgentSecretStore secretStore, HttpClient client)
+        internal HttpAgentModelProvider(HttpClient client)
         {
-            _secretStore = secretStore ?? throw new ArgumentNullException(nameof(secretStore));
             _transport = new AgentProviderTransport(client ?? throw new ArgumentNullException(nameof(client)));
         }
 
@@ -35,7 +32,7 @@ namespace YuzeToolkit.UnityAgent
             if (request == null) throw new ArgumentNullException(nameof(request));
             var profileSnapshot = Snapshot(profile);
             var protocol = AgentWireProtocolFactory.Create(profileSnapshot.Protocol);
-            var secret = _secretStore.Resolve(profileSnapshot);
+            var secret = profileSnapshot.ApiKey;
             var uri = ResolveUri(profileSnapshot.BaseUrl, protocol.TurnPath);
             var json = AgentJson.Stringify(protocol.CreateRequest(profileSnapshot, request));
             var headers = protocol.CreateHeaders(secret);
@@ -88,9 +85,8 @@ namespace YuzeToolkit.UnityAgent
             var protocol = AgentWireProtocolFactory.Create(profileSnapshot.Protocol);
             try
             {
-                var secret = _secretStore.Resolve(profileSnapshot);
-                if (preset != null && !string.IsNullOrWhiteSpace(preset.SecretEnvironmentVariable) &&
-                    string.IsNullOrWhiteSpace(secret))
+                var secret = profileSnapshot.ApiKey;
+                if (preset != null && string.IsNullOrWhiteSpace(secret))
                     return AgentProviderCatalog.CuratedResult(profileSnapshot,
                         AgentModelDiscoverySource.CuratedFallback,
                         $"No API key is available for {preset.DisplayName}; showing the maintained fallback catalog.");
@@ -151,7 +147,7 @@ namespace YuzeToolkit.UnityAgent
                 BaseUrl = profile.BaseUrl,
                 Model = profile.Model,
                 ReasoningEffort = profile.ReasoningEffort,
-                SecretEnvironmentVariable = profile.SecretEnvironmentVariable,
+                ApiKey = profile.ApiKey,
                 MaxOutputTokens = profile.MaxOutputTokens,
                 ContextWindowTokens = profile.ContextWindowTokens,
                 StrictTools = profile.StrictTools

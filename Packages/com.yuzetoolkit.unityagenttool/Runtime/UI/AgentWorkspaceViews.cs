@@ -1327,7 +1327,6 @@ namespace YuzeToolkit.UnityAgent
         {
             var path = Path.Combine(_root, id + ".json");
             if (File.Exists(path)) File.Delete(path);
-            if (File.Exists(path + ".bak")) File.Delete(path + ".bak");
         }
 
         public string LoadSelectedId()
@@ -1346,18 +1345,24 @@ namespace YuzeToolkit.UnityAgent
             Directory.CreateDirectory(Path.GetDirectoryName(path) ??
                                       throw new InvalidOperationException("Command Line path has no directory."));
             var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            File.WriteAllText(temporary, text);
-            if (File.Exists(path))
+            try
             {
-                try { File.Replace(temporary, path, path + ".bak"); }
-                catch (PlatformNotSupportedException)
+                File.WriteAllText(temporary, text);
+                if (File.Exists(path))
                 {
-                    File.Copy(path, path + ".bak", true);
-                    File.Copy(temporary, path, true);
-                    File.Delete(temporary);
+                    try { File.Replace(temporary, path, null); }
+                    catch (PlatformNotSupportedException)
+                    {
+                        File.Copy(temporary, path, true);
+                        File.Delete(temporary);
+                    }
                 }
+                else File.Move(temporary, path);
             }
-            else File.Move(temporary, path);
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
         }
     }
 }

@@ -18,7 +18,6 @@ namespace YuzeToolkit.UnityAgent
         private readonly bool _ownsStore;
         private readonly IAgentModelProvider _provider;
         private readonly bool _ownsProvider;
-        private readonly AgentSecretStore _secretStore;
         private readonly AgentToolRegistry _tools = new();
         private readonly AgentApprovalService _approvals = new();
         private readonly AgentInstructionService _instructions = new();
@@ -43,24 +42,21 @@ namespace YuzeToolkit.UnityAgent
         public UnityAgentHost()
         {
             AgentPaths.CaptureUnityPathSnapshot();
-            _secretStore = new AgentSecretStore();
             _store = new FileAgentStore(FileAgentStore.GetDefaultRootPath());
             _ownsStore = true;
             RegisterBuiltInTools();
-            _provider = new HttpAgentModelProvider(_secretStore);
+            _provider = new HttpAgentModelProvider();
             _ownsProvider = true;
             _approvals.Changed += MarkChanged;
         }
 
         public UnityAgentHost(
             IAgentStore store,
-            IAgentModelProvider provider,
-            AgentSecretStore? secretStore = null)
+            IAgentModelProvider provider)
         {
             AgentPaths.CaptureUnityPathSnapshot();
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _provider = provider ?? throw new ArgumentNullException(nameof(provider));
-            _secretStore = secretStore ?? new AgentSecretStore();
             RegisterBuiltInTools();
             _approvals.Changed += MarkChanged;
         }
@@ -104,15 +100,6 @@ namespace YuzeToolkit.UnityAgent
             {
                 ThrowIfDisposed();
                 return _tools;
-            }
-        }
-
-        public IAgentSecretStore Secrets
-        {
-            get
-            {
-                ThrowIfDisposed();
-                return _secretStore;
             }
         }
 
@@ -1434,6 +1421,10 @@ namespace YuzeToolkit.UnityAgent
                     throw new ArgumentException($"Provider profile '{profile.Id}' uses unknown protocol '{profile.Protocol}'.", nameof(settings));
                 if (string.IsNullOrWhiteSpace(profile.BaseUrl))
                     throw new ArgumentException($"Provider profile '{profile.Id}' requires a base URL.", nameof(settings));
+                if (profile.ApiKey.Length > 131_072)
+                    throw new ArgumentException(
+                        $"Provider profile '{profile.Id}' API key exceeds the 131,072 character limit.",
+                        nameof(settings));
                 if (profile.ContextWindowTokens < 8_192)
                     throw new ArgumentException(
                         $"Provider profile '{profile.Id}' requires a context window of at least 8,192 tokens.",

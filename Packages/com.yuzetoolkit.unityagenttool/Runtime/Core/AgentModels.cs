@@ -88,7 +88,8 @@ namespace YuzeToolkit.UnityAgent
 
         public string ReasoningEffort { get; set; } = string.Empty;
 
-        public string SecretEnvironmentVariable { get; set; } = "OPENAI_API_KEY";
+        /// <summary>API key used by this machine-local Provider profile.</summary>
+        public string ApiKey { get; set; } = string.Empty;
 
         public int MaxOutputTokens { get; set; } = 4096;
 

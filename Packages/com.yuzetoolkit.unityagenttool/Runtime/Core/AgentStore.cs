@@ -77,21 +77,15 @@ namespace YuzeToolkit.UnityAgent
                     var sessionsById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                     var rewrites = new List<(string Path, AgentSessionDocument Session)>();
                     var paths = Directory.EnumerateFiles(_sessionsPath, "*", SearchOption.TopDirectoryOnly)
-                        .Where(path => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
-                                       path.EndsWith(".json.bak", StringComparison.OrdinalIgnoreCase))
-                        .Select(path => path.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)
-                            ? path.Substring(0, path.Length - 4)
-                            : path)
-                        .Distinct(StringComparer.Ordinal)
+                        .Where(path => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                         .OrderBy(path => path, StringComparer.Ordinal);
                     foreach (var path in paths)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         var requiresUpgrade = StoredSessionRequiresUpgrade(path, cancellationToken);
-                        var restoreMissingPrimary = !File.Exists(path) && File.Exists(path + ".bak");
                         var session = ReadDocument(path, AgentDocumentCodec.DeserializeSession, cancellationToken);
                         ValidateLoadedSessionIdentity(path, session, sessionsById);
-                        if (requiresUpgrade || restoreMissingPrimary)
+                        if (requiresUpgrade)
                             rewrites.Add((path, session));
                         sessions.Add(session);
                         cancellationToken.ThrowIfCancellationRequested();
@@ -133,8 +127,6 @@ namespace YuzeToolkit.UnityAgent
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (File.Exists(path)) File.Delete(path);
-                    var backup = path + ".bak";
-                    if (File.Exists(backup)) File.Delete(backup);
                 }, cancellationToken).ConfigureAwait(false);
             }
             finally
@@ -231,7 +223,6 @@ namespace YuzeToolkit.UnityAgent
                             ?? throw new InvalidOperationException("Storage path has no parent directory.");
             Directory.CreateDirectory(directory);
             var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            var backup = path + ".bak";
             try
             {
                 File.WriteAllText(temporary, json, new UTF8Encoding(false));
@@ -240,11 +231,11 @@ namespace YuzeToolkit.UnityAgent
                 {
                     try
                     {
-                        File.Replace(temporary, path, backup);
+                        File.Replace(temporary, path, null);
                     }
                     catch (PlatformNotSupportedException)
                     {
-                        ReplaceWithoutFileReplace(temporary, path, backup, cancellationToken);
+                        ReplaceWithoutFileReplace(temporary, path, cancellationToken);
                     }
                 }
                 else
@@ -271,24 +262,7 @@ namespace YuzeToolkit.UnityAgent
                 }
                 catch (Exception exception) when (IsRecoverableDocumentError(exception))
                 {
-                    var backupPath = path + ".bak";
-                    var recovery = File.Exists(backupPath)
-                        ? $" A backup is available at '{backupPath}'; restore it explicitly after reviewing the error."
-                        : " No backup is available.";
-                    throw new InvalidDataException($"Agent document is unreadable: {path}.{recovery}", exception);
-                }
-            }
-
-            var backup = path + ".bak";
-            if (File.Exists(backup))
-            {
-                try
-                {
-                    return deserialize(ReadStoredText(backup, cancellationToken));
-                }
-                catch (Exception backupError) when (IsRecoverableDocumentError(backupError))
-                {
-                    throw new InvalidDataException($"Agent document backup is unreadable: {backup}", backupError);
+                    throw new InvalidDataException($"Agent document is unreadable: {path}.", exception);
                 }
             }
 
@@ -325,10 +299,8 @@ namespace YuzeToolkit.UnityAgent
         private static void ReplaceWithoutFileReplace(
             string temporary,
             string path,
-            string backup,
             CancellationToken cancellationToken)
         {
-            File.Copy(path, backup, true);
             cancellationToken.ThrowIfCancellationRequested();
             File.Copy(temporary, path, true);
             File.Delete(temporary);
@@ -489,7 +461,7 @@ namespace YuzeToolkit.UnityAgent
 
         private static bool HasStoredDocument(string path)
         {
-            return !string.IsNullOrEmpty(path) && (File.Exists(path) || File.Exists(path + ".bak"));
+            return !string.IsNullOrEmpty(path) && File.Exists(path);
         }
 
         private AgentSettingsDocument CreateMachineDefaults()
@@ -520,15 +492,12 @@ namespace YuzeToolkit.UnityAgent
         {
             var suffix = ".invalid-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssfffZ");
             if (File.Exists(path)) File.Move(path, path + suffix);
-            var backup = path + ".bak";
-            if (File.Exists(backup)) File.Move(backup, backup + suffix);
         }
 
         private static string GetLegacyRootPath()
         {
             var recent = AgentPaths.LegacySettingsRoot;
-            if (File.Exists(Path.Combine(recent, AgentPaths.SettingsFileName)) ||
-                File.Exists(Path.Combine(recent, AgentPaths.SettingsFileName) + ".bak")) return recent;
+            if (File.Exists(Path.Combine(recent, AgentPaths.SettingsFileName))) return recent;
             return Path.GetFullPath(AgentPaths.IsEditor
                 ? Path.Combine(AgentPaths.ProjectRoot, "Library", "UnityAgentTool")
                 : Path.Combine(AgentPaths.LegacySettingsRoot, "UnityAgentTool"));
@@ -543,8 +512,7 @@ namespace YuzeToolkit.UnityAgent
                 return;
             Directory.CreateDirectory(destinationDirectory);
             foreach (var source in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.TopDirectoryOnly)
-                         .Where(path => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
-                                        path.EndsWith(".json.bak", StringComparison.OrdinalIgnoreCase))
+                         .Where(path => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                          .OrderBy(path => path, StringComparer.Ordinal))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -598,17 +566,16 @@ namespace YuzeToolkit.UnityAgent
             string primaryPath,
             CancellationToken cancellationToken)
         {
-            var path = File.Exists(primaryPath) ? primaryPath : primaryPath + ".bak";
-            if (!File.Exists(path)) return false;
+            if (!File.Exists(primaryPath)) return false;
             try
             {
-                var root = AgentJson.ParseObject(ReadStoredText(path, cancellationToken));
+                var root = AgentJson.ParseObject(ReadStoredText(primaryPath, cancellationToken));
                 return AgentJson.GetSchemaVersion(root) <
                        AgentSessionDocument.CurrentSchemaVersion;
             }
             catch (Exception exception) when (IsRecoverableDocumentError(exception))
             {
-                // ReadDocument owns the user-facing error and includes the explicit backup path.
+                // ReadDocument owns the user-facing error for malformed documents.
                 return false;
             }
         }

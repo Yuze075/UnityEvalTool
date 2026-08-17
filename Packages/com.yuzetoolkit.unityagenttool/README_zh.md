@@ -70,7 +70,7 @@ Tool 执行开始/结束事件，并携带对话 ID；单个订阅者异常只�
 
 OpenAI 模型通过 API Key 调用 OpenAI Responses API。ChatGPT/Codex 订阅不是可嵌入的 Provider 凭据，因此
 UnityAgentTool 不读取 Codex 登录缓存，也不再提供 Codex App Server。历史 `codex-app-server` Profile 会迁移为
-标准 OpenAI API 预设，之后需要 `OPENAI_API_KEY` 或本机保存的 API Key。
+标准 OpenAI API 预设，并直接使用机器本地 Provider Profile 中保存的 API Key。
 
 Editor 中若活动对话触发脚本编译，本包会先在 `Application.persistentDataPath/.unityagenttool` 写入同时绑定当前项目与 Editor
 进程的恢复 marker，再中断并持久化该轮。成功编译与 Domain Reload 后，或失败编译结束后，系统会追加一次包含
@@ -97,8 +97,8 @@ UnityAgentEditorCompilationRecovery.json  仅 Editor 使用的活动轮次恢复
 
 旧布局直接写在 `Application.persistentDataPath` 下的数据，会在 `.unityagenttool` 中尚无对应文件或历史时按类型迁移。
 
-命令行输入、输出和草稿会跨 Unity 重启保存；JavaScript `EvalSession` 不恢复。Provider 密钥只写入
-本机 `secrets.json`，不会进入默认配置。Package 自带的
+命令行输入、输出和草稿会跨 Unity 重启保存；JavaScript `EvalSession` 不恢复。Provider Profile（包括 API Key）
+直接写入本机 `providers.json`，不会进入默认配置。Package 自带的
 `Runtime/Resources/UnityAgentPackageSettings.json` 是无 Provider 默认值的唯一内置来源，C# 不重复保存
 配置值。可选的 `Assets/Resources/UnityAgentProjectSettings.json` 覆盖 Package 默认并进入 Player。
 项目覆盖尚未保存时，Project Settings 直接显示 Package JSON；Unity Agent 配置页的
@@ -112,7 +112,7 @@ Editor、Player、两者或都不启用；`embedInPlayerBuild` 则不受 scope �
 开关，不提供根配置的向后迁移。
 
 只接受机器配置 schema V13 与 Provider 配置 schema V1。V10、V11、V12 的旧合并式 `settings.json` 均不支持，
-会按损坏文档处理：主文件及备份先保留为带时间戳的 `.invalid-*` 文件，再基于当前有效 Default 重建机器配置层。
+会按损坏文档处理：主文件先保留为带时间戳的 `.invalid-*` 文件，再基于当前有效 Default 重建机器配置层。
 旧文件中的 `providerProfiles` 不会被提取，也不执行向后兼容的拆分迁移。`providers.json` 不存在或损坏时，
 只重建 Provider 配置层，不会替换有效的 `settings.json`。首次创建 Provider 文件时会写入内置 OpenAI Profile；
 之后的 Provider 完全由用户管理，不会再次从 Package/Project Default 生成。有效的现有本机配置不会被

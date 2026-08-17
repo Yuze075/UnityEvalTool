@@ -387,7 +387,7 @@ namespace YuzeToolkit.UnityAgent
                 ("baseUrl", profile.BaseUrl),
                 ("model", profile.Model),
                 ("reasoningEffort", profile.ReasoningEffort),
-                ("secretEnvironmentVariable", profile.SecretEnvironmentVariable),
+                ("apiKey", profile.ApiKey),
                 ("maxOutputTokens", profile.MaxOutputTokens),
                 ("contextWindowTokens", profile.ContextWindowTokens),
                 ("strictTools", profile.StrictTools));
@@ -410,7 +410,7 @@ namespace YuzeToolkit.UnityAgent
                 BaseUrl = baseUrl,
                 Model = AgentJson.GetString(value, "model"),
                 ReasoningEffort = AgentJson.GetString(value, "reasoningEffort"),
-                SecretEnvironmentVariable = AgentJson.GetString(value, "secretEnvironmentVariable"),
+                ApiKey = AgentJson.GetString(value, "apiKey"),
                 MaxOutputTokens = Math.Max(1, EvalData.GetInt(value, "maxOutputTokens", 4096)),
                 ContextWindowTokens = Math.Max(8_192,
                     EvalData.GetInt(value, "contextWindowTokens", 128_000)),

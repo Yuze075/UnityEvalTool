@@ -85,8 +85,8 @@ removing its retry marker.
 
 OpenAI models use the OpenAI Responses API with an API key. A ChatGPT/Codex subscription is not an embeddable
 Provider credential, so UnityAgentTool does not read Codex login caches or expose Codex App Server. Existing
-`codex-app-server` profiles are migrated to the standard OpenAI API preset and require `OPENAI_API_KEY` or a
-locally saved API key.
+`codex-app-server` profiles are migrated to the standard OpenAI API preset and use the API key saved directly in
+their machine-local Provider profile.
 
 In Editor, active conversations are paused when script compilation starts. The package writes a
 process- and project-bound recovery marker to `Application.persistentDataPath/.unityagenttool`, interrupts and persists the
@@ -117,7 +117,7 @@ Data written directly under `Application.persistentDataPath` by the previous lay
 corresponding file or history is not already present in `.unityagenttool`.
 
 Command Line input, output and drafts survive Unity restarts. JavaScript `EvalSession` instances do not.
-Provider secrets stay in the machine-local `secrets.json`. The package-owned
+Provider profiles, including their API keys, stay in the machine-local `providers.json`. The package-owned
 `Runtime/Resources/UnityAgentPackageSettings.json` is the only built-in source for provider-free defaults;
 configuration values are not duplicated in C#. An optional
 `Assets/Resources/UnityAgentProjectSettings.json` overrides it and is included in Player builds. Project Settings
@@ -134,8 +134,8 @@ two PersistentData entries keep it enabled. Machine settings schema V13 and proj
 combined build flag without backward-compatible root migration.
 
 Only machine settings schema V13 and Provider settings schema V1 are accepted. V10, V11, and V12 combined
-`settings.json` documents are unsupported and are handled as malformed documents: the file and its backup are
-retained with a timestamped `.invalid-*` suffix, then the machine layer is rebuilt from the effective defaults.
+`settings.json` documents are unsupported and are handled as malformed documents: the file is retained with a
+timestamped `.invalid-*` suffix, then the machine layer is rebuilt from the effective defaults.
 Their `providerProfiles` are never extracted, and no backward-compatible split migration is performed. When
 `providers.json` is missing or malformed, only the Provider layer is created or recovered; a valid `settings.json`
 is not replaced. The first Provider document is seeded with the built-in OpenAI profile, while subsequent Provider

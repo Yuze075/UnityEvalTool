@@ -1495,10 +1495,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly AgentChoiceField _effort;
         private readonly AgentIntegerField _maxTokens;
         private readonly AgentIntegerField _contextWindow;
-        private readonly AgentTextField _secretEnvironment;
         private readonly AgentTextField _localSecret;
-        private readonly VisualElement _localSecretActions;
-        private readonly Label _localSecretStatus;
         private readonly AgentChoiceField _permission;
         private readonly AgentIntegerField _toolTimeout;
         private readonly AgentIntegerField _maximumAgentSteps;
@@ -1706,26 +1703,9 @@ namespace YuzeToolkit.UnityAgent
                 "Used to reserve output space and compact HTTP conversation context before the provider limit.");
             providerCard.Add(_contextWindow);
             providerCard.Add(CreateSettingsGroupLabel("Credentials"));
-            _secretEnvironment = AgentUi.Field("API key environment variable", string.Empty,
-                "Portable environment variable name used to resolve the API key.");
-            providerCard.Add(_secretEnvironment);
             _localSecret = AgentUi.Field("Local API key", string.Empty,
-                "Stored only in this machine's private secrets.json. The saved value is never displayed.", true);
+                "Stored directly in this machine's providers.json. The password field displays asterisks matching the key length.", true);
             providerCard.Add(_localSecret);
-            var providerActions = AgentUi.WrapRow();
-            _localSecretActions = providerActions;
-            providerActions.style.marginTop = 8;
-            _localSecretStatus = new Label("NO LOCAL KEY SAVED");
-            _localSecretStatus.style.flexGrow = 1;
-            _localSecretStatus.style.minWidth = 150;
-            AgentUi.ApplyTypography(_localSecretStatus, AgentTypography.Caption);
-            _localSecretStatus.style.color = AgentUi.Muted;
-            providerActions.Add(_localSecretStatus);
-            providerActions.Add(AgentUi.Button("Save key", "Save this key only in the local secret store.",
-                SaveLocalSecret, 88, AgentUi.Accent, AgentUi.AccentForeground));
-            providerActions.Add(AgentUi.Button("Clear", "Remove the saved local key for this provider.",
-                ClearLocalSecret, 72, AgentUi.Danger, AgentUi.Text));
-            providerCard.Add(providerActions);
 
             var defaults = AgentUi.Card("Agent defaults", "Applied to new conversations. The workspace is always this Unity project.");
             FlattenSettingsCard(defaults);
@@ -1774,7 +1754,7 @@ namespace YuzeToolkit.UnityAgent
             _skillRoots = new AgentPathListEditor("Skill roots", "Add Skill root", true, ShowPathError);
             skillsCard.Add(_skillRoots);
 
-            var fileCard = AgentUi.Card("Storage", "All non-secret user configuration has one fixed root. Histories use two fixed child folders.");
+            var fileCard = AgentUi.Card("Storage", "All machine-local user configuration has one fixed root. Histories use two fixed child folders.");
             FlattenSettingsCard(fileCard);
             _scroll.Content.Add(fileCard);
             var settingsPath = Path.Combine(AgentPaths.SettingsRoot, AgentPaths.SettingsFileName);
@@ -2134,7 +2114,7 @@ namespace YuzeToolkit.UnityAgent
             profile.ReasoningEffort = _effort.value == "default" ? string.Empty : _effort.value;
             profile.MaxOutputTokens = Math.Max(1, _maxTokens.value);
             profile.ContextWindowTokens = Math.Max(8_192, _contextWindow.value);
-            profile.SecretEnvironmentVariable = _secretEnvironment.value.Trim();
+            profile.ApiKey = _localSecret.value;
             RefreshProfileChoices(false);
         }
 
@@ -2154,10 +2134,7 @@ namespace YuzeToolkit.UnityAgent
             EnsureChoice(_effort, _effort.value);
             _maxTokens.SetValueWithoutNotify(profile.MaxOutputTokens);
             _contextWindow.SetValueWithoutNotify(profile.ContextWindowTokens);
-            _secretEnvironment.SetValueWithoutNotify(profile.SecretEnvironmentVariable);
-            _localSecret.SetValueWithoutNotify(string.Empty);
-            RefreshLocalSecretStatus();
-            UpdateProtocolPresentation();
+            _localSecret.SetValueWithoutNotify(profile.ApiKey);
         }
 
         private void ApplySettingsModelCatalog(IEnumerable<AgentModelOption> source, string preferred)
@@ -2276,13 +2253,6 @@ namespace YuzeToolkit.UnityAgent
                 : AgentChoiceMenuState.Ready;
         }
 
-        private void RefreshLocalSecretStatus()
-        {
-            var saved = _host.Secrets.HasLocalSecret(SelectedProfile().Id);
-            _localSecretStatus.text = saved ? "LOCAL KEY · SAVED ON THIS MACHINE" : "LOCAL KEY · NOT SAVED";
-            _localSecretStatus.style.color = saved ? AgentUi.Success : AgentUi.Muted;
-        }
-
         private void ApplyProviderPreset()
         {
             if (!_initialized) return;
@@ -2330,58 +2300,11 @@ namespace YuzeToolkit.UnityAgent
             {
                 if (string.IsNullOrWhiteSpace(_baseUrl.value))
                     _baseUrl.value = "https://api.anthropic.com/v1/";
-                if (string.IsNullOrWhiteSpace(_secretEnvironment.value))
-                    _secretEnvironment.value = "ANTHROPIC_API_KEY";
             }
             else if (string.IsNullOrWhiteSpace(_baseUrl.value))
             {
                 _baseUrl.value = "https://api.openai.com/v1/";
-                if (string.IsNullOrWhiteSpace(_secretEnvironment.value))
-                    _secretEnvironment.value = "OPENAI_API_KEY";
             }
-            UpdateProtocolPresentation();
-        }
-
-        private void SaveLocalSecret()
-        {
-            var secret = _localSecret.value;
-            if (string.IsNullOrWhiteSpace(secret))
-            {
-                _showError("Local API key", "Enter an API key before saving it.");
-                return;
-            }
-            _host.Secrets.SaveLocalSecret(SelectedProfile().Id, secret);
-            _localSecret.value = string.Empty;
-            RefreshLocalSecretStatus();
-            _status.text = "Local key saved";
-        }
-
-        private void ClearLocalSecret()
-        {
-            var profile = SelectedProfile();
-            if (!_host.Secrets.HasLocalSecret(profile.Id))
-            {
-                _localSecret.value = string.Empty;
-                RefreshLocalSecretStatus();
-                return;
-            }
-            _showConfirmation("Clear local API key?",
-                $"Remove the locally saved API key for “{profile.Name}”? Environment-based authentication is unchanged.",
-                () =>
-                {
-                    _host.Secrets.ClearLocalSecret(profile.Id);
-                    _localSecret.value = string.Empty;
-                    RefreshLocalSecretStatus();
-                    _status.text = "Local key cleared";
-                });
-        }
-
-        private void UpdateProtocolPresentation()
-        {
-            _baseUrl.label = "Base URL";
-            _secretEnvironment.style.display = DisplayStyle.Flex;
-            _localSecret.style.display = DisplayStyle.Flex;
-            _localSecretActions.style.display = DisplayStyle.Flex;
         }
 
         private void RefreshArchives()
