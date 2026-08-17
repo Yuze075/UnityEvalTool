@@ -16,6 +16,7 @@ namespace YuzeToolkit.UnityAgent
         public const string SettingsDirectoryName = ".unityagenttool";
         public const string SkillDirectoryName = ".agents/skills";
         public const string SettingsFileName = "settings.json";
+        public const string ProviderSettingsFileName = "providers.json";
         public const string SecretsFileName = "secrets.json";
         public const string AgentConversationsFolderName = "AgentConversations";
         public const string CommandLineHistoryFolderName = "CommandLineHistory";

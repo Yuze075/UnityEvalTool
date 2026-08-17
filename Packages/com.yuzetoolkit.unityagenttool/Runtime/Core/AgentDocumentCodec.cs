@@ -12,6 +12,44 @@ namespace YuzeToolkit.UnityAgent
         public static string SerializeSettings(AgentSettingsDocument settings) =>
             AgentJson.Stringify(ToJson(settings));
 
+        public static string SerializeMachineSettings(AgentSettingsDocument settings) =>
+            AgentJson.Stringify(ToMachineJson(settings));
+
+        public static string SerializeProviderSettings(AgentSettingsDocument settings) =>
+            AgentJson.Stringify(ToProviderJson(AgentProviderSettingsDocument.FromSettings(settings)));
+
+        public static AgentSettingsDocument DeserializeMachineSettings(
+            string json,
+            AgentProjectSettingsDocument? projectDefaults = null)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                throw new FormatException("Agent machine settings JSON is empty.");
+            var root = AgentJson.ParseObject(json);
+            var sourceSchemaVersion = AgentJson.GetSchemaVersion(root);
+            if (sourceSchemaVersion != AgentSettingsDocument.CurrentSchemaVersion)
+            {
+                throw new FormatException(
+                    $"Settings schema version {sourceSchemaVersion} is not supported; expected " +
+                    $"{AgentSettingsDocument.CurrentSchemaVersion}.");
+            }
+            return ReadMachineSettings(root, projectDefaults);
+        }
+
+        public static AgentProviderSettingsDocument DeserializeProviderSettings(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                throw new FormatException("Agent Provider settings JSON is empty.");
+            var root = AgentJson.ParseObject(json);
+            var sourceSchemaVersion = AgentJson.GetSchemaVersion(root);
+            if (sourceSchemaVersion != AgentProviderSettingsDocument.CurrentSchemaVersion)
+            {
+                throw new FormatException(
+                    $"Provider settings schema version {sourceSchemaVersion} is not supported; expected " +
+                    $"{AgentProviderSettingsDocument.CurrentSchemaVersion}.");
+            }
+            return ReadProviderSettings(root);
+        }
+
         public static AgentSettingsDocument DeserializeSettings(
             string json,
             AgentProjectSettingsDocument? projectDefaults = null)
@@ -20,24 +58,19 @@ namespace YuzeToolkit.UnityAgent
                 throw new FormatException("Agent settings JSON is empty.");
             var root = AgentJson.ParseObject(json);
             var sourceSchemaVersion = AgentJson.GetSchemaVersion(root);
-            if (sourceSchemaVersion > AgentSettingsDocument.CurrentSchemaVersion)
+            if (sourceSchemaVersion != AgentSettingsDocument.CurrentSchemaVersion)
             {
                 throw new FormatException(
-                    $"Settings schema version {sourceSchemaVersion} is newer than the supported version " +
+                    $"Settings schema version {sourceSchemaVersion} is not supported; expected " +
                     $"{AgentSettingsDocument.CurrentSchemaVersion}.");
             }
-            var legacySystemPrompt = root.ContainsKey("systemPrompt")
-                ? AgentJson.GetString(root, "systemPrompt")
-                : string.Empty;
             var settings = new AgentSettingsDocument
             {
-                SchemaVersion = sourceSchemaVersion,
+                SchemaVersion = AgentSettingsDocument.CurrentSchemaVersion,
                 DefaultProviderProfileId = AgentJson.GetString(root, "defaultProviderProfileId"),
                 PermissionMode = ReadRequiredEnum(root, "permissionMode", projectDefaults?.PermissionMode),
-                EditorSystemPrompt = ReadRequiredString(root, "editorSystemPrompt", projectDefaults?.EditorSystemPrompt,
-                    legacySystemPrompt),
-                RuntimeSystemPrompt = ReadRequiredString(root, "runtimeSystemPrompt", projectDefaults?.RuntimeSystemPrompt,
-                    sourceSchemaVersion < 3 ? legacySystemPrompt : string.Empty),
+                EditorSystemPrompt = ReadRequiredString(root, "editorSystemPrompt", projectDefaults?.EditorSystemPrompt),
+                RuntimeSystemPrompt = ReadRequiredString(root, "runtimeSystemPrompt", projectDefaults?.RuntimeSystemPrompt),
                 DefaultToolTimeoutSeconds = ReadRequiredInt(root, "defaultToolTimeoutSeconds",
                     projectDefaults?.DefaultToolTimeoutSeconds),
                 MaximumAgentSteps = ReadRequiredInt(root, "maximumAgentSteps", projectDefaults?.MaximumAgentSteps)
@@ -71,6 +104,54 @@ namespace YuzeToolkit.UnityAgent
                 throw new FormatException("Maximum Agent steps must be positive.");
             settings.SchemaVersion = AgentSettingsDocument.CurrentSchemaVersion;
             return settings;
+        }
+
+        private static AgentSettingsDocument ReadMachineSettings(
+            Dictionary<string, object?> root,
+            AgentProjectSettingsDocument? projectDefaults)
+        {
+            var settings = new AgentSettingsDocument
+            {
+                SchemaVersion = AgentSettingsDocument.CurrentSchemaVersion,
+                PermissionMode = ReadRequiredEnum(root, "permissionMode", projectDefaults?.PermissionMode),
+                EditorSystemPrompt = ReadRequiredString(root, "editorSystemPrompt", projectDefaults?.EditorSystemPrompt),
+                RuntimeSystemPrompt = ReadRequiredString(root, "runtimeSystemPrompt", projectDefaults?.RuntimeSystemPrompt),
+                DefaultToolTimeoutSeconds = ReadRequiredInt(root, "defaultToolTimeoutSeconds",
+                    projectDefaults?.DefaultToolTimeoutSeconds),
+                MaximumAgentSteps = ReadRequiredInt(root, "maximumAgentSteps", projectDefaults?.MaximumAgentSteps)
+            };
+
+            foreach (var value in AgentJson.GetObjectArray(root, "agentsRoots"))
+                settings.AgentsRoots.Add(ReadPathLocation(value));
+            foreach (var value in AgentJson.GetObjectArray(root, "skillRoots"))
+                settings.SkillRoots.Add(ReadPathLocation(value));
+
+            if (string.IsNullOrWhiteSpace(settings.EditorSystemPrompt) ||
+                string.IsNullOrWhiteSpace(settings.RuntimeSystemPrompt))
+                throw new FormatException("Editor and Runtime system prompts are required.");
+            if (settings.DefaultToolTimeoutSeconds < 1)
+                throw new FormatException("Default Tool timeout must be positive.");
+            if (settings.MaximumAgentSteps < 1)
+                throw new FormatException("Maximum Agent steps must be positive.");
+            return settings;
+        }
+
+        private static AgentProviderSettingsDocument ReadProviderSettings(Dictionary<string, object?> root)
+        {
+            var result = new AgentProviderSettingsDocument
+            {
+                SchemaVersion = AgentProviderSettingsDocument.CurrentSchemaVersion,
+                DefaultProviderProfileId = AgentJson.GetString(root, "defaultProviderProfileId")
+            };
+            foreach (var value in AgentJson.GetObjectArray(root, "providerProfiles"))
+                result.ProviderProfiles.Add(ReadProviderProfile(value));
+
+            if (result.ProviderProfiles.Count == 0)
+                throw new FormatException("Provider settings require at least one Provider profile.");
+            if (string.IsNullOrWhiteSpace(result.DefaultProviderProfileId) ||
+                result.ProviderProfiles.All(profile => profile.Id != result.DefaultProviderProfileId))
+                result.DefaultProviderProfileId = result.ProviderProfiles[0].Id;
+            return result;
         }
 
         public static string SerializeSession(AgentSessionDocument session) =>
@@ -201,11 +282,9 @@ namespace YuzeToolkit.UnityAgent
         private static string ReadRequiredString(
             Dictionary<string, object?> root,
             string key,
-            string? defaultValue,
-            string legacyValue = "")
+            string? defaultValue)
         {
             if (root.ContainsKey(key)) return AgentJson.GetString(root, key);
-            if (!string.IsNullOrEmpty(legacyValue)) return legacyValue;
             if (defaultValue != null) return defaultValue;
             throw new FormatException($"JSON property '{key}' is required.");
         }
@@ -260,6 +339,27 @@ namespace YuzeToolkit.UnityAgent
                 Scope = value.Scope,
                 EmbedInPlayerBuild = value.EmbedInPlayerBuild
             };
+        }
+
+        private static Dictionary<string, object?> ToMachineJson(AgentSettingsDocument settings)
+        {
+            return AgentJson.Object(
+                ("schemaVersion", AgentSettingsDocument.CurrentSchemaVersion),
+                ("permissionMode", settings.PermissionMode.ToString()),
+                ("editorSystemPrompt", settings.EditorSystemPrompt),
+                ("runtimeSystemPrompt", settings.RuntimeSystemPrompt),
+                ("defaultToolTimeoutSeconds", settings.DefaultToolTimeoutSeconds),
+                ("maximumAgentSteps", settings.MaximumAgentSteps),
+                ("agentsRoots", settings.AgentsRoots.Select(ToJson).Cast<object?>().ToList()),
+                ("skillRoots", settings.SkillRoots.Select(ToJson).Cast<object?>().ToList()));
+        }
+
+        private static Dictionary<string, object?> ToProviderJson(AgentProviderSettingsDocument settings)
+        {
+            return AgentJson.Object(
+                ("schemaVersion", AgentProviderSettingsDocument.CurrentSchemaVersion),
+                ("defaultProviderProfileId", settings.DefaultProviderProfileId),
+                ("providerProfiles", settings.ProviderProfiles.Select(ToJson).Cast<object?>().ToList()));
         }
 
         private static Dictionary<string, object?> ToJson(AgentSettingsDocument settings)

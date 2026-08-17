@@ -1411,10 +1411,16 @@ namespace YuzeToolkit.UnityAgent
 
         internal static void ValidateSettings(AgentSettingsDocument settings)
         {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            ValidateProviderSettings(AgentProviderSettingsDocument.FromSettings(settings));
+            ValidateMachineSettings(settings);
+        }
+
+        internal static void ValidateProviderSettings(AgentProviderSettingsDocument settings)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (settings.ProviderProfiles == null || settings.ProviderProfiles.Count == 0)
                 throw new ArgumentException("At least one Provider profile is required.", nameof(settings));
-            if (!Enum.IsDefined(typeof(AgentPermissionMode), settings.PermissionMode))
-                throw new ArgumentException("Settings contain an unknown Agent permission mode.", nameof(settings));
 
             var profileIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var profile in settings.ProviderProfiles)
@@ -1444,6 +1450,13 @@ namespace YuzeToolkit.UnityAgent
             if (string.IsNullOrWhiteSpace(settings.DefaultProviderProfileId) ||
                 !profileIds.Contains(settings.DefaultProviderProfileId))
                 throw new ArgumentException("Default Provider profile does not exist.", nameof(settings));
+        }
+
+        internal static void ValidateMachineSettings(AgentSettingsDocument settings)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            if (!Enum.IsDefined(typeof(AgentPermissionMode), settings.PermissionMode))
+                throw new ArgumentException("Settings contain an unknown Agent permission mode.", nameof(settings));
 
             ValidatePathLocations(settings.AgentsRoots, "AGENTS.md", nameof(settings));
             ValidatePathLocations(settings.SkillRoots, "Skill", nameof(settings));

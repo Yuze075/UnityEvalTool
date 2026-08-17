@@ -1778,17 +1778,15 @@ namespace YuzeToolkit.UnityAgent
             FlattenSettingsCard(fileCard);
             _scroll.Content.Add(fileCard);
             var settingsPath = Path.Combine(AgentPaths.SettingsRoot, AgentPaths.SettingsFileName);
-            var path = new Label(settingsPath);
-            path.style.whiteSpace = WhiteSpace.Normal;
-            path.style.color = AgentUi.Muted;
-            AgentTooltip.Attach(path, settingsPath);
-            fileCard.Add(path);
+            var providerSettingsPath = Path.Combine(AgentPaths.SettingsRoot, AgentPaths.ProviderSettingsFileName);
+            AddStoragePath(fileCard, "Machine settings", settingsPath);
+            AddStoragePath(fileCard, "Provider settings", providerSettingsPath);
             fileCard.Add(new Label("Agent conversations: " +
                                    Path.Combine(AgentPaths.SettingsRoot, AgentPaths.AgentConversationsFolderName)));
             fileCard.Add(new Label("Command Line history: " +
                                    Path.Combine(AgentPaths.SettingsRoot, AgentPaths.CommandLineHistoryFolderName)));
-            fileCard.Add(AgentUi.Button("Reload from disk", "Discard unsaved UI edits and reload settings.json.",
-                () => _showConfirmation("Reload settings?", "Discard unsaved changes in this page and reload settings.json?",
+            fileCard.Add(AgentUi.Button("Reload from disk", "Discard unsaved UI edits and reload settings.json and providers.json.",
+                () => _showConfirmation("Reload settings?", "Discard unsaved changes in this page and reload settings.json and providers.json?",
                     () => RunUiTask(ReloadAsync)), 128));
 
             var projectCard = AgentUi.Card("Project Settings",
@@ -1920,6 +1918,15 @@ namespace YuzeToolkit.UnityAgent
         {
             card.style.backgroundColor = AgentUi.Transparent;
             AgentUi.SetBorder(card, AgentUi.Transparent, 0);
+        }
+
+        private static void AddStoragePath(VisualElement parent, string label, string path)
+        {
+            var value = new Label(label + ": " + path);
+            value.style.whiteSpace = WhiteSpace.Normal;
+            value.style.color = AgentUi.Muted;
+            AgentTooltip.Attach(value, path);
+            parent.Add(value);
         }
 
         public void Tick()
@@ -2646,36 +2653,65 @@ namespace YuzeToolkit.UnityAgent
         {
             _isSkillRoot = isSkillRoot;
             _showError = showError;
-            var row = AgentUi.WrapRow();
-            Add(row);
+            style.minWidth = 0;
+            style.width = new Length(100, LengthUnit.Percent);
+
+            // Keep each path field on its own full-width line. The Project Settings host owns
+            // the available content width, so fixed columns make the page look split and force
+            // the fields to compete with the host's navigation pane at smaller sizes.
+            var fieldsRow = new VisualElement();
+            fieldsRow.name = "unity-agent-path-fields";
+            fieldsRow.style.minWidth = 0;
+            fieldsRow.style.width = new Length(100, LengthUnit.Percent);
+            fieldsRow.style.flexDirection = FlexDirection.Column;
+            fieldsRow.style.flexWrap = Wrap.NoWrap;
+            fieldsRow.style.alignItems = Align.Stretch;
+            fieldsRow.style.marginBottom = 2;
+            Add(fieldsRow);
             _basePath = AgentUi.Dropdown("Base", Enum.GetNames(typeof(AgentPathBase)));
-            // Keep stable path anchors readable (for example PersistentData and
-            // RoamingApplicationData). The wrapping row handles narrow windows, so shrinking
-            // this field only makes the portable-path choice unnecessarily ambiguous.
-            _basePath.style.width = 280;
+            _basePath.style.width = new Length(100, LengthUnit.Percent);
+            _basePath.style.minWidth = 0;
+            _basePath.style.flexGrow = 0;
             _basePath.style.flexShrink = 0;
+            _basePath.style.marginRight = 0;
             _basePath.RegisterValueChangedCallback(_ => ChangedByUser());
-            row.Add(_basePath);
+            fieldsRow.Add(_basePath);
             _scope = AgentUi.Dropdown("Available in", ScopeOptions);
-            _scope.style.width = 180;
+            _scope.style.width = new Length(100, LengthUnit.Percent);
+            _scope.style.minWidth = 0;
+            _scope.style.flexGrow = 0;
             _scope.style.flexShrink = 0;
+            _scope.style.marginRight = 0;
             AgentTooltip.Attach(_scope,
                 "Controls direct path discovery. Embedded Player content is independent of this scope.");
             _scope.RegisterValueChangedCallback(_ => ChangedByUser());
-            row.Add(_scope);
+            fieldsRow.Add(_scope);
             _relativePath = AgentUi.Field("Relative path", string.Empty,
                 isSkillRoot
                     ? "Optional child path after the selected base, optional .unityagenttool, and fixed .agents/skills folders."
                     : "Optional path after the selected base and optional .unityagenttool folder. Absolute paths are rejected.");
-            _relativePath.style.flexGrow = 1;
+            _relativePath.style.width = new Length(100, LengthUnit.Percent);
             _relativePath.style.minWidth = 0;
+            _relativePath.style.flexGrow = 0;
+            _relativePath.style.flexShrink = 0;
+            _relativePath.style.flexBasis = StyleKeyword.Auto;
             _relativePath.RegisterValueChangedCallback(_ => ChangedByUser());
-            row.Add(_relativePath);
+            fieldsRow.Add(_relativePath);
+
+            var optionsRow = AgentUi.WrapRow();
+            optionsRow.name = "unity-agent-path-options";
+            optionsRow.style.width = new Length(100, LengthUnit.Percent);
+            optionsRow.style.minWidth = 0;
+            optionsRow.style.marginTop = 2;
+            optionsRow.style.marginBottom = 2;
+            optionsRow.style.alignItems = Align.Center;
+            Add(optionsRow);
             _useUnityAgentToolDirectory = new AgentToggle("Use .unityagenttool");
+            _useUnityAgentToolDirectory.style.marginRight = 12;
             AgentTooltip.Attach(_useUnityAgentToolDirectory,
                 "Insert the .unityagenttool folder below the selected base before resolving this root.");
             _useUnityAgentToolDirectory.RegisterValueChangedCallback(_ => ChangedByUser());
-            row.Add(_useUnityAgentToolDirectory);
+            optionsRow.Add(_useUnityAgentToolDirectory);
             if (showBuildToggle)
             {
                 _embedInPlayerBuild = new AgentToggle("Embed in Player build");
@@ -2683,13 +2719,18 @@ namespace YuzeToolkit.UnityAgent
                     "Copy a build-time snapshot into Player content regardless of the availability scope. " +
                     "Review external files before enabling.");
                 _embedInPlayerBuild.RegisterValueChangedCallback(_ => ChangedByUser());
-                row.Add(_embedInPlayerBuild);
+                optionsRow.Add(_embedInPlayerBuild);
             }
             _preview = new Label();
             AgentUi.ApplyTypography(_preview, AgentTypography.Caption, false);
             _preview.style.color = AgentUi.Muted;
             _preview.style.whiteSpace = WhiteSpace.Normal;
-            _preview.style.marginTop = 3;
+            _preview.style.minWidth = 0;
+            _preview.style.width = new Length(100, LengthUnit.Percent);
+            _preview.style.maxWidth = new Length(100, LengthUnit.Percent);
+            _preview.style.marginTop = 4;
+            _preview.style.paddingLeft = 1;
+            _preview.style.paddingRight = 1;
             Add(_preview);
         }
 

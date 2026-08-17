@@ -79,8 +79,15 @@ JavaScript VM。其它 Editor 进程留下的 marker 会被删除，不会在下
 
 ## 持久化
 
-所有 Unity Agent 本机数据统一使用 `Application.persistentDataPath/.unityagenttool`；机器级非密钥设置固定存放在
-`Application.persistentDataPath/.unityagenttool/settings.json`：
+所有 Unity Agent 本机数据统一使用 `Application.persistentDataPath/.unityagenttool`。依赖
+Package/Project Default 创建的机器配置与用户创建的 Provider 配置分开保存：
+
+```text
+settings.json              Package/Project Default 派生的机器配置
+providers.json             用户创建的 Provider Profile 与默认 Profile
+```
+
+该目录还包含以下固定内容：
 
 ```text
 AgentConversations/       Agent 对话文档
@@ -101,12 +108,15 @@ UnityAgentEditorCompilationRecovery.json  仅 Editor 使用的活动轮次恢复
 Editor、Player、两者或都不启用；`embedInPlayerBuild` 则不受 scope 影响，将构建时内容快照复制进 Player。
 快照源目录不存在时跳过且不让构建失败。Player 中 Player/All 实时根的优先级高于包内快照。Package 默认的
 四条根全部使用 All 且关闭 Embed：两条 ProjectRoot 根关闭 `.unityagenttool`，分别解析为项目根与项目
-`.agents/skills`；两条 PersistentData 根保持启用。设置 schema V12 与项目 schema V6 直接替换旧的混合构建
+`.agents/skills`；两条 PersistentData 根保持启用。机器配置 schema V13 与项目 schema V6 直接替换旧的混合构建
 开关，不提供根配置的向后迁移。
 
-当前 Editor 或 Player 的本机 `settings.json` 不存在、JSON 损坏或语义无效时，会从当前有效的项目覆盖或
-Package 默认重新生成完整本机配置。替换前会将损坏的主文件及备份保留为带时间戳的 `.invalid-*` 文件；
-有效的现有本机配置不会被 Project Settings 隐式改写。通过
+只接受机器配置 schema V13 与 Provider 配置 schema V1。V10、V11、V12 的旧合并式 `settings.json` 均不支持，
+会按损坏文档处理：主文件及备份先保留为带时间戳的 `.invalid-*` 文件，再基于当前有效 Default 重建机器配置层。
+旧文件中的 `providerProfiles` 不会被提取，也不执行向后兼容的拆分迁移。`providers.json` 不存在或损坏时，
+只重建 Provider 配置层，不会替换有效的 `settings.json`。首次创建 Provider 文件时会写入内置 OpenAI Profile；
+之后的 Provider 完全由用户管理，不会再次从 Package/Project Default 生成。有效的现有本机配置不会被
+Project Settings 隐式改写。通过
 **Edit > Project Settings > YuzeToolkit > Unity Agent** 编辑权限、Editor/Runtime Prompt、Tool 限制与
 有序 AGENTS.md/Skill 根目录。Editor Play Mode 使用 Editor Prompt，Runtime Prompt 只用于独立 Player。
 

@@ -97,8 +97,15 @@ instead of automatically running work after a restart.
 
 ## Persistence
 
-All machine-local Unity Agent data uses `Application.persistentDataPath/.unityagenttool`; non-secret settings live at
-`Application.persistentDataPath/.unityagenttool/settings.json` with fixed folders:
+All machine-local Unity Agent data uses `Application.persistentDataPath/.unityagenttool`. Settings derived from the
+package/project defaults and user-owned Provider profiles are stored separately:
+
+```text
+settings.json              Package/Project-default-derived machine settings
+providers.json             User-created Provider profiles and the selected default profile
+```
+
+The directory also contains fixed folders:
 
 ```text
 AgentConversations/       Agent conversation documents
@@ -123,16 +130,20 @@ Player, both, or neither. `embedInPlayerBuild` copies a build-time snapshot into
 scope; missing snapshot source directories are skipped without failing the build. In Player, live Player/All roots
 have priority over embedded snapshots. All four package-default roots use `All` with embedding disabled: the two
 ProjectRoot entries disable `.unityagenttool` and resolve to the project root / project `.agents/skills`, while the
-two PersistentData entries keep it enabled. Settings schema V12 and project schema V6 intentionally replace the old
+two PersistentData entries keep it enabled. Machine settings schema V13 and project schema V6 intentionally replace the old
 combined build flag without backward-compatible root migration.
 
-When the current Editor or Player has no machine `settings.json`, or that document is malformed or semantically
-invalid, the complete machine configuration is recreated from the effective project/package defaults. Malformed
-machine files and their backups are retained with a timestamped `.invalid-*` suffix before replacement. A valid
-existing machine file is never changed implicitly by Project Settings. Edit project defaults through
+Only machine settings schema V13 and Provider settings schema V1 are accepted. V10, V11, and V12 combined
+`settings.json` documents are unsupported and are handled as malformed documents: the file and its backup are
+retained with a timestamped `.invalid-*` suffix, then the machine layer is rebuilt from the effective defaults.
+Their `providerProfiles` are never extracted, and no backward-compatible split migration is performed. When
+`providers.json` is missing or malformed, only the Provider layer is created or recovered; a valid `settings.json`
+is not replaced. The first Provider document is seeded with the built-in OpenAI profile, while subsequent Provider
+profiles are user-owned and are never regenerated from Package/Project defaults. A valid existing machine file is
+never changed implicitly by Project Settings. Edit project defaults through
 **Edit > Project Settings > YuzeToolkit > Unity Agent**; the page covers permission, Editor/Runtime prompts, Tool
-limits, and ordered AGENTS.md/Skill roots. Editor Play Mode uses the Editor prompt; the Runtime prompt is reserved
-for standalone Players.
+limits, and ordered AGENTS.md/Skill roots. The machine settings layer is schema V13 and the separate Provider layer
+is schema V1. Editor Play Mode uses the Editor prompt; the Runtime prompt is reserved for standalone Players.
 
 ## Runtime Host
 

@@ -8,7 +8,8 @@ namespace YuzeToolkit.UnityAgent
 {
     /// <summary>
     /// Read-only path and embedded-content summary used by Editor settings surfaces. Effective
-    /// package/project defaults seed a machine settings file when it is missing or invalid.
+    /// package/project defaults seed the machine settings layer when it is missing or invalid;
+    /// user-owned Provider profiles are stored in a separate machine document.
     /// </summary>
     internal sealed class AgentBuildContentView : VisualElement
     {

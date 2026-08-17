@@ -52,8 +52,11 @@ namespace YuzeToolkit.UnityAgent
             _sessionsPath = Path.Combine(_settingsRootPath, AgentPaths.AgentConversationsFolderName);
         }
 
-        /// <summary>The fixed directory containing settings.json.</summary>
+        /// <summary>The fixed directory containing settings.json and providers.json.</summary>
         public string RootPath => _settingsRootPath;
+
+        /// <summary>The fixed path containing user-owned Provider profiles.</summary>
+        public string ProviderSettingsPath => Path.Combine(_settingsRootPath, AgentPaths.ProviderSettingsFileName);
 
         /// <summary>The fixed directory containing Agent conversation documents.</summary>
         public string HistoryRootPath => _sessionsPath;
@@ -143,6 +146,7 @@ namespace YuzeToolkit.UnityAgent
         public async Task<AgentSettingsDocument> LoadSettingsAsync(CancellationToken cancellationToken)
         {
             var path = Path.Combine(_settingsRootPath, AgentPaths.SettingsFileName);
+            var providerPath = ProviderSettingsPath;
             await _ioGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
@@ -154,52 +158,17 @@ namespace YuzeToolkit.UnityAgent
                     var legacySettingsPath = string.IsNullOrEmpty(legacyRoot)
                         ? string.Empty
                         : Path.Combine(legacyRoot, AgentPaths.SettingsFileName);
-                    AgentSettingsDocument settings;
-                    if (File.Exists(path))
-                    {
-                        try
-                        {
-                            var requiresUpgrade = StoredSettingsRequireUpgrade(path, cancellationToken);
-                            settings = ReadDocument(path,
-                                json => AgentDocumentCodec.DeserializeSettings(json, _projectDefaults),
-                                cancellationToken);
-                            UnityAgentHost.ValidateSettings(settings);
-                            if (requiresUpgrade)
-                                WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
-                        }
-                        catch (Exception exception) when (IsMalformedSettingsDocumentError(exception))
-                        {
-                            ArchiveMalformedSettings(path);
-                            settings = CreateMachineDefaults();
-                            UnityAgentHost.ValidateSettings(settings);
-                            WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
-                        }
-                    }
-                    else if (!string.IsNullOrEmpty(legacySettingsPath) &&
-                             File.Exists(legacySettingsPath))
-                    {
-                        try
-                        {
-                            settings = ReadDocument(legacySettingsPath,
-                                json => AgentDocumentCodec.DeserializeSettings(json, _projectDefaults),
-                                cancellationToken);
-                            UnityAgentHost.ValidateSettings(settings);
-                        }
-                        catch (Exception exception) when (IsMalformedSettingsDocumentError(exception))
-                        {
-                            ArchiveMalformedSettings(legacySettingsPath);
-                            settings = CreateMachineDefaults();
-                        }
-                        UnityAgentHost.ValidateSettings(settings);
-                        WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
-                    }
-                    else
-                    {
-                        settings = CreateMachineDefaults();
-                        UnityAgentHost.ValidateSettings(settings);
-                        // Materialize defaults immediately so users may edit the complete configuration file.
-                        WriteAtomic(path, AgentDocumentCodec.SerializeSettings(settings), cancellationToken);
-                    }
+                    var settings = LoadMachineSettings(path, legacySettingsPath, cancellationToken,
+                        out var machineSettingsNeedsWrite);
+                    var providerSettings = LoadProviderSettings(providerPath, cancellationToken,
+                        out var providerNeedsWrite);
+                    providerSettings.ApplyTo(settings);
+                    UnityAgentHost.ValidateSettings(settings);
+
+                    if (machineSettingsNeedsWrite)
+                        WriteAtomic(path, AgentDocumentCodec.SerializeMachineSettings(settings), cancellationToken);
+                    if (providerNeedsWrite)
+                        WriteAtomic(providerPath, AgentDocumentCodec.SerializeProviderSettings(settings), cancellationToken);
 
                     ApplyLoadedHistoryPath(legacyRoot, cancellationToken);
                     return settings;
@@ -214,15 +183,18 @@ namespace YuzeToolkit.UnityAgent
         public async Task SaveSettingsAsync(AgentSettingsDocument settings, CancellationToken cancellationToken)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
-            var json = AgentDocumentCodec.SerializeSettings(settings);
+            UnityAgentHost.ValidateSettings(settings);
+            var machineJson = AgentDocumentCodec.SerializeMachineSettings(settings);
+            var providerJson = AgentDocumentCodec.SerializeProviderSettings(settings);
             await _ioGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 await Task.Run(() =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    WriteAtomic(Path.Combine(_settingsRootPath, AgentPaths.SettingsFileName), json,
+                    WriteAtomic(Path.Combine(_settingsRootPath, AgentPaths.SettingsFileName), machineJson,
                         cancellationToken);
+                    WriteAtomic(ProviderSettingsPath, providerJson, cancellationToken);
                 }, cancellationToken).ConfigureAwait(false);
             }
             finally
@@ -456,13 +428,84 @@ namespace YuzeToolkit.UnityAgent
             WriteAtomic(marker, "UnityAgentTool legacy store migration completed.\n", cancellationToken);
         }
 
+        private AgentSettingsDocument LoadMachineSettings(
+            string path,
+            string legacyPath,
+            CancellationToken cancellationToken,
+            out bool needsWrite)
+        {
+            needsWrite = false;
+            var sourcePath = HasStoredDocument(path)
+                ? path
+                : HasStoredDocument(legacyPath) ? legacyPath : string.Empty;
+            if (string.IsNullOrEmpty(sourcePath))
+            {
+                needsWrite = true;
+                return CreateMachineDefaults();
+            }
+
+            try
+            {
+                needsWrite = !AgentPaths.PathsEqual(sourcePath, path);
+                var settings = ReadDocument(sourcePath,
+                    json => AgentDocumentCodec.DeserializeMachineSettings(json, _projectDefaults),
+                    cancellationToken);
+                UnityAgentHost.ValidateMachineSettings(settings);
+                return settings;
+            }
+            catch (Exception exception) when (IsMalformedSettingsDocumentError(exception))
+            {
+                ArchiveMalformedSettings(sourcePath);
+                needsWrite = true;
+                return CreateMachineDefaults();
+            }
+        }
+
+        private AgentProviderSettingsDocument LoadProviderSettings(
+            string path,
+            CancellationToken cancellationToken,
+            out bool needsWrite)
+        {
+            needsWrite = false;
+            if (HasStoredDocument(path))
+            {
+                try
+                {
+                    var settings = ReadDocument(path, AgentDocumentCodec.DeserializeProviderSettings,
+                        cancellationToken);
+                    UnityAgentHost.ValidateProviderSettings(settings);
+                    return settings;
+                }
+                catch (Exception exception) when (IsMalformedSettingsDocumentError(exception))
+                {
+                    ArchiveMalformedSettings(path);
+                    needsWrite = true;
+                    return CreateProviderDefaults();
+                }
+            }
+            needsWrite = true;
+            return CreateProviderDefaults();
+        }
+
+        private static bool HasStoredDocument(string path)
+        {
+            return !string.IsNullOrEmpty(path) && (File.Exists(path) || File.Exists(path + ".bak"));
+        }
+
         private AgentSettingsDocument CreateMachineDefaults()
         {
             if (_projectDefaults == null)
                 throw new InvalidOperationException(
                     "Machine settings require recovery, but the effective project/package defaults are unavailable.",
                     _projectDefaultsError);
-            return AgentSettingsDocument.CreateDefault(_projectDefaults);
+            var settings = new AgentSettingsDocument();
+            _projectDefaults.ApplyTo(settings);
+            return settings;
+        }
+
+        private static AgentProviderSettingsDocument CreateProviderDefaults()
+        {
+            return AgentProviderSettingsDocument.CreateDefault();
         }
 
         private static bool IsMalformedSettingsDocumentError(Exception exception)
@@ -549,32 +592,6 @@ namespace YuzeToolkit.UnityAgent
                 }
             }
             return secondStream.ReadByte() < 0;
-        }
-
-        private static bool StoredSettingsRequireUpgrade(
-            string primaryPath,
-            CancellationToken cancellationToken)
-        {
-            var path = File.Exists(primaryPath) ? primaryPath : primaryPath + ".bak";
-            if (!File.Exists(path)) return false;
-            try
-            {
-                var root = AgentJson.ParseObject(ReadStoredText(path, cancellationToken));
-                if (AgentJson.GetSchemaVersion(root) < AgentSettingsDocument.CurrentSchemaVersion ||
-                    !root.ContainsKey("agentsRoots") ||
-                    !root.ContainsKey("skillRoots") ||
-                    !root.ContainsKey("editorSystemPrompt") ||
-                    !root.ContainsKey("runtimeSystemPrompt")) return true;
-                return AgentJson.GetObjectArray(root, "providerProfiles")
-                    .Any(profile => !profile.ContainsKey("providerPresetId") ||
-                                    string.IsNullOrWhiteSpace(
-                                        AgentJson.GetString(profile, "providerPresetId")));
-            }
-            catch (Exception exception) when (IsRecoverableDocumentError(exception))
-            {
-                // ReadDocument owns the user-facing error and includes the explicit backup path.
-                return false;
-            }
         }
 
         private static bool StoredSessionRequiresUpgrade(

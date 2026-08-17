@@ -64,6 +64,8 @@ namespace YuzeToolkit.UnityAgent
             AddStaticValue(environment, "MCP endpoint", Endpoint);
             AddStaticValue(environment, "Settings file",
                 System.IO.Path.Combine(AgentPaths.SettingsRoot, AgentPaths.SettingsFileName));
+            AddStaticValue(environment, "Provider settings",
+                System.IO.Path.Combine(AgentPaths.SettingsRoot, AgentPaths.ProviderSettingsFileName));
             AddStaticValue(environment, "Agent conversations",
                 System.IO.Path.Combine(AgentPaths.SettingsRoot, AgentPaths.AgentConversationsFolderName));
             AddStaticValue(environment, "Command Line history",

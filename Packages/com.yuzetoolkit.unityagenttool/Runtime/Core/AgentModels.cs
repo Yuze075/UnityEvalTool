@@ -174,9 +174,53 @@ namespace YuzeToolkit.UnityAgent
 
     }
 
+    /// <summary>
+    /// Machine-local Provider profiles are user-owned configuration. They are persisted separately
+    /// from settings that are seeded from Package or Project defaults.
+    /// </summary>
+    public sealed class AgentProviderSettingsDocument
+    {
+        public const int CurrentSchemaVersion = 1;
+
+        public int SchemaVersion { get; set; } = CurrentSchemaVersion;
+
+        public string DefaultProviderProfileId { get; set; } = string.Empty;
+
+        public List<AgentProviderProfile> ProviderProfiles { get; set; } = new();
+
+        public static AgentProviderSettingsDocument CreateDefault()
+        {
+            var profile = new AgentProviderProfile();
+            if (!AgentProviderCatalog.ApplyPreset(profile, "openai"))
+                throw new InvalidOperationException("The built-in OpenAI Provider preset is missing.");
+            return new AgentProviderSettingsDocument
+            {
+                DefaultProviderProfileId = profile.Id,
+                ProviderProfiles = new List<AgentProviderProfile> { profile }
+            };
+        }
+
+        public static AgentProviderSettingsDocument FromSettings(AgentSettingsDocument settings)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            return new AgentProviderSettingsDocument
+            {
+                DefaultProviderProfileId = settings.DefaultProviderProfileId,
+                ProviderProfiles = settings.ProviderProfiles
+            };
+        }
+
+        public void ApplyTo(AgentSettingsDocument settings)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            settings.DefaultProviderProfileId = DefaultProviderProfileId;
+            settings.ProviderProfiles = ProviderProfiles;
+        }
+    }
+
     public sealed class AgentSettingsDocument
     {
-        public const int CurrentSchemaVersion = 12;
+        public const int CurrentSchemaVersion = 13;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -203,15 +247,9 @@ namespace YuzeToolkit.UnityAgent
         public static AgentSettingsDocument CreateDefault(AgentProjectSettingsDocument projectDefaults)
         {
             if (projectDefaults == null) throw new ArgumentNullException(nameof(projectDefaults));
-            var profile = new AgentProviderProfile();
-            if (!AgentProviderCatalog.ApplyPreset(profile, "openai"))
-                throw new InvalidOperationException("The built-in OpenAI Provider preset is missing.");
-            var settings = new AgentSettingsDocument
-            {
-                DefaultProviderProfileId = profile.Id,
-                ProviderProfiles = new List<AgentProviderProfile> { profile }
-            };
+            var settings = new AgentSettingsDocument();
             projectDefaults.ApplyTo(settings);
+            AgentProviderSettingsDocument.CreateDefault().ApplyTo(settings);
             return settings;
         }
     }

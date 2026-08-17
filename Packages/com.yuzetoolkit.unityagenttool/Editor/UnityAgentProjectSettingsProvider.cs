@@ -138,7 +138,7 @@ namespace YuzeToolkit.UnityAgent
 
             if (_editing == null)
             {
-                var failure = AgentUi.Card("Project defaults unavailable",
+                var failure = ProjectCard("Project defaults unavailable",
                     "The settings asset could not be read. Correct the reported data or file-system error, then retry.");
                 failure.style.marginTop = 18;
                 failure.Add(CreateWrappedLabel(_message, AgentUi.Error));
@@ -150,8 +150,12 @@ namespace YuzeToolkit.UnityAgent
 
             var scroll = AgentUi.Scroll(ScrollViewMode.Vertical);
             scroll.style.flexGrow = 1;
+            scroll.style.width = new Length(100, LengthUnit.Percent);
             scroll.style.minWidth = 0;
             scroll.style.minHeight = 0;
+            scroll.contentContainer.style.width = new Length(100, LengthUnit.Percent);
+            scroll.contentContainer.style.minWidth = 0;
+            scroll.contentContainer.style.alignItems = Align.Stretch;
             scroll.contentContainer.style.paddingLeft = 24;
             scroll.contentContainer.style.paddingRight = 24;
             scroll.contentContainer.style.paddingTop = 20;
@@ -161,7 +165,7 @@ namespace YuzeToolkit.UnityAgent
             scroll.Add(AgentUi.PageHeading("Unity Agent project defaults",
                 "Versioned, provider-free defaults used only when this Editor or Player has no machine settings."));
 
-            scroll.Add(AgentUi.Card("Configuration boundary",
+            scroll.Add(ProjectCard("Configuration boundary",
                 "These defaults are included in Player builds. Provider profiles, models, endpoints, and API keys " +
                 "remain machine-local in the Unity Agent window."));
 
@@ -172,9 +176,17 @@ namespace YuzeToolkit.UnityAgent
             RefreshFooter();
         }
 
+        private static VisualElement ProjectCard(string title, string subtitle)
+        {
+            var card = AgentUi.Card(title, subtitle);
+            card.style.maxWidth = StyleKeyword.None;
+            card.style.alignSelf = Align.Stretch;
+            return card;
+        }
+
         private void BuildAgentDefaults(VisualElement parent, AgentProjectSettingsDocument settings)
         {
-            var card = AgentUi.Card("Agent defaults", "Applied when a new conversation is created.");
+            var card = ProjectCard("Agent defaults", "Applied when a new conversation is created.");
             parent.Add(card);
 
             _permission = AgentUi.Dropdown("Permission mode", Enum.GetNames(typeof(AgentPermissionMode)));
@@ -209,7 +221,7 @@ namespace YuzeToolkit.UnityAgent
 
         private void BuildPromptDefaults(VisualElement parent, AgentProjectSettingsDocument settings)
         {
-            var card = AgentUi.Card("System prompts",
+            var card = ProjectCard("System prompts",
                 "Editor Prompt is used in Edit Mode and Editor Play Mode. Runtime Prompt is used only by a standalone Player.");
             parent.Add(card);
 
@@ -232,7 +244,7 @@ namespace YuzeToolkit.UnityAgent
 
         private void BuildRoots(VisualElement parent, AgentProjectSettingsDocument settings)
         {
-            var agentsCard = AgentUi.Card("AGENTS.md discovery roots",
+            var agentsCard = ProjectCard("AGENTS.md discovery roots",
                 "Ordered highest priority first. Availability controls direct Editor/Player discovery; " +
                 "embedding independently copies a build-time snapshot into Player.");
             _agentsRoots = new AgentPathListEditor("AGENTS.md roots", "Add AGENTS.md root", false, ShowPathError);
@@ -241,7 +253,7 @@ namespace YuzeToolkit.UnityAgent
             agentsCard.Add(_agentsRoots);
             parent.Add(agentsCard);
 
-            var skillsCard = AgentUi.Card("Skill discovery roots",
+            var skillsCard = ProjectCard("Skill discovery roots",
                 $"Each root may insert {AgentPaths.SettingsDirectoryName}, then always adds " +
                 $"{AgentPaths.SkillDirectoryName}. An optional relative path selects a child directory; " +
                 "ordering controls discovery priority.");
@@ -254,7 +266,7 @@ namespace YuzeToolkit.UnityAgent
 
         private void BuildFooter(VisualElement parent)
         {
-            var footer = AgentUi.Card("Save project defaults",
+            var footer = ProjectCard("Save project defaults",
                 "Saving changes only the versioned project asset. Existing machine settings remain unchanged.");
             _messageLabel = CreateWrappedLabel(_message, AgentUi.TextSecondary);
             footer.Add(_messageLabel);
