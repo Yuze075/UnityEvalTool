@@ -46,50 +46,10 @@ namespace YuzeToolkit.UnityAgent
             foreach (var value in AgentJson.GetObjectArray(root, "providerProfiles"))
                 settings.ProviderProfiles.Add(ReadProviderProfile(value));
 
-            if (root.ContainsKey("agentsRoots"))
-            {
-                foreach (var value in AgentJson.GetObjectArray(root, "agentsRoots"))
-                    settings.AgentsRoots.Add(ReadPathLocation(value, sourceSchemaVersion < 11));
-            }
-            else
-            {
-                settings.AgentsRoots = CloneRoots(projectDefaults?.AgentsRoots, "agentsRoots");
-                ReadLegacyContentRoots(root, settings, includeAgents: true);
-            }
-
-            if (root.ContainsKey("skillRoots"))
-            {
-                foreach (var value in AgentJson.GetObjectArray(root, "skillRoots"))
-                    settings.SkillRoots.Add(ReadPathLocation(value, sourceSchemaVersion < 11));
-            }
-            else
-            {
-                settings.SkillRoots = CloneRoots(projectDefaults?.SkillRoots, "skillRoots");
-                ReadLegacyContentRoots(root, settings, includeAgents: false);
-            }
-
-            // Schema V9 makes every AgentPathBase resolve below its own .unityagenttool namespace.
-            if (sourceSchemaVersion < 9 && projectDefaults != null)
-            {
-                RefreshDefaultRoots(settings.AgentsRoots, projectDefaults.AgentsRoots, persistentOnly: true);
-                RefreshDefaultRoots(settings.SkillRoots, projectDefaults.SkillRoots, persistentOnly: true);
-            }
-
-            // Schema V10 gives every Skill root the fixed .agents/skills prefix. Matching
-            // package-owned roots are refreshed from JSON so callers no longer repeat it.
-            if (sourceSchemaVersion < 10 && projectDefaults != null)
-            {
-                RefreshDefaultRoots(settings.SkillRoots, projectDefaults.SkillRoots, persistentOnly: false);
-            }
-
-            // Schema V11 lets each root opt out of the fixed .unityagenttool namespace. Matching
-            // package-owned roots are refreshed as one unit so their build and path defaults stay
-            // aligned, while custom root IDs retain the legacy enabled behavior.
-            if (sourceSchemaVersion < 11 && projectDefaults != null)
-            {
-                RefreshDefaultRoots(settings.AgentsRoots, projectDefaults.AgentsRoots, persistentOnly: false);
-                RefreshDefaultRoots(settings.SkillRoots, projectDefaults.SkillRoots, persistentOnly: false);
-            }
+            foreach (var value in AgentJson.GetObjectArray(root, "agentsRoots"))
+                settings.AgentsRoots.Add(ReadPathLocation(value));
+            foreach (var value in AgentJson.GetObjectArray(root, "skillRoots"))
+                settings.SkillRoots.Add(ReadPathLocation(value));
 
             if (settings.ProviderProfiles.Count == 0)
             {
@@ -228,11 +188,11 @@ namespace YuzeToolkit.UnityAgent
                     packageDefaults?.MaximumAgentSteps),
                 AgentsRoots = root.ContainsKey("agentsRoots")
                     ? AgentJson.GetObjectArray(root, "agentsRoots")
-                        .Select(value => ReadPathLocation(value, version < 5)).ToList()
+                        .Select(ReadPathLocation).ToList()
                     : CloneRoots(packageDefaults?.AgentsRoots, "agentsRoots"),
                 SkillRoots = root.ContainsKey("skillRoots")
                     ? AgentJson.GetObjectArray(root, "skillRoots")
-                        .Select(value => ReadPathLocation(value, version < 5)).ToList()
+                        .Select(ReadPathLocation).ToList()
                     : CloneRoots(packageDefaults?.SkillRoots, "skillRoots")
             };
             return result;
@@ -289,20 +249,6 @@ namespace YuzeToolkit.UnityAgent
             return roots.Select(CloneRoot).ToList();
         }
 
-        private static void RefreshDefaultRoots(
-            List<AgentPathLocation> roots,
-            IReadOnlyList<AgentPathLocation> defaults,
-            bool persistentOnly)
-        {
-            foreach (var defaultRoot in defaults)
-            {
-                if (persistentOnly && defaultRoot.BasePath != AgentPathBase.PersistentData) continue;
-                var index = roots.FindIndex(value =>
-                    string.Equals(value.Id, defaultRoot.Id, StringComparison.Ordinal));
-                if (index >= 0) roots[index] = CloneRoot(defaultRoot);
-            }
-        }
-
         private static AgentPathLocation CloneRoot(AgentPathLocation value)
         {
             return new AgentPathLocation
@@ -311,7 +257,8 @@ namespace YuzeToolkit.UnityAgent
                 BasePath = value.BasePath,
                 UseUnityAgentToolDirectory = value.UseUnityAgentToolDirectory,
                 RelativePath = value.RelativePath,
-                IncludeInPlayerBuild = value.IncludeInPlayerBuild
+                Scope = value.Scope,
+                EmbedInPlayerBuild = value.EmbedInPlayerBuild
             };
         }
 
@@ -413,25 +360,20 @@ namespace YuzeToolkit.UnityAgent
                 ("basePath", location.BasePath.ToString()),
                 ("useUnityAgentToolDirectory", location.UseUnityAgentToolDirectory),
                 ("relativePath", location.RelativePath),
-                ("includeInPlayerBuild", location.IncludeInPlayerBuild));
+                ("scope", location.Scope.ToString()),
+                ("embedInPlayerBuild", location.EmbedInPlayerBuild));
         }
 
-        private static AgentPathLocation ReadPathLocation(
-            Dictionary<string, object?> value,
-            bool allowLegacyNamespaceDefault)
+        private static AgentPathLocation ReadPathLocation(Dictionary<string, object?> value)
         {
             var location = new AgentPathLocation
             {
                 Id = ReadRequiredString(value, "id", null),
                 BasePath = ReadRequiredEnum<AgentPathBase>(value, "basePath", null),
-                UseUnityAgentToolDirectory = value.ContainsKey("useUnityAgentToolDirectory")
-                    ? ReadRequiredBool(value, "useUnityAgentToolDirectory")
-                    : allowLegacyNamespaceDefault
-                        ? true
-                        : throw new FormatException(
-                            "JSON property 'useUnityAgentToolDirectory' is required."),
+                UseUnityAgentToolDirectory = ReadRequiredBool(value, "useUnityAgentToolDirectory"),
                 RelativePath = ReadRequiredString(value, "relativePath", null),
-                IncludeInPlayerBuild = ReadRequiredBool(value, "includeInPlayerBuild")
+                Scope = ReadRequiredEnum<AgentPathScope>(value, "scope", null),
+                EmbedInPlayerBuild = ReadRequiredBool(value, "embedInPlayerBuild")
             };
             AgentPaths.Validate(location);
             return location;
@@ -545,46 +487,6 @@ namespace YuzeToolkit.UnityAgent
                 Description = AgentJson.GetString(value, "description"),
                 CreatedAtUtc = AgentJson.GetDateTime(value, "createdAtUtc", DateTime.UtcNow)
             };
-        }
-
-        private static void ReadLegacyContentRoots(
-            Dictionary<string, object?> root,
-            AgentSettingsDocument settings,
-            bool includeAgents)
-        {
-            foreach (var value in AgentJson.GetObjectArray(root, "contentRoots"))
-            {
-                var include = includeAgents
-                    ? EvalData.GetBool(value, "includeAgents", true)
-                    : EvalData.GetBool(value, "includeSkills", true);
-                if (!include) continue;
-                var legacyId = AgentJson.GetString(value, "id", Guid.NewGuid().ToString("N"));
-                var path = AgentJson.GetString(value, "path");
-                var source = includeAgents ? path : PathCombineLegacy(path, ".agents/skills");
-                var location = AgentPaths.FromLegacyPath(
-                    (includeAgents ? "agents-" : "skills-") + legacyId, source, isSkillRoot: !includeAgents);
-                // V1's separate ProjectSettings build-selection asset cannot be represented reliably in
-                // portable settings. Preserve the explicit project default, keep migrated external roots safe.
-                location.IncludeInPlayerBuild = location.BasePath == AgentPathBase.ProjectRoot &&
-                    (includeAgents
-                        ? string.IsNullOrEmpty(location.RelativePath)
-                        : string.IsNullOrEmpty(location.RelativePath));
-                var list = includeAgents ? settings.AgentsRoots : settings.SkillRoots;
-                var resolvedLocation = includeAgents
-                    ? AgentPaths.Resolve(location)
-                    : AgentPaths.ResolveSkill(location);
-                if (list.Any(existing => AgentPaths.PathsEqual(
-                        includeAgents ? AgentPaths.Resolve(existing) : AgentPaths.ResolveSkill(existing),
-                        resolvedLocation)))
-                    continue;
-                list.Add(location);
-            }
-        }
-
-        private static string PathCombineLegacy(string root, string child)
-        {
-            if (string.IsNullOrWhiteSpace(root)) return child;
-            return System.IO.Path.Combine(root, child);
         }
 
     }

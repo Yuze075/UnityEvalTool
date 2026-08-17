@@ -118,16 +118,18 @@ shows the package JSON until the project override is saved, while **Overwrite Pr
 configuration page writes the same provider-free projection through the same validated asset path.
 Each AGENTS.md or Skill root independently chooses whether to insert a `.unityagenttool` folder below its
 `AgentPathBase`. Skill roots always add the fixed `.agents/skills` directory after that optional namespace, and
-`relativePath` stores only the remaining child path. The package defaults include all four roots in Player content:
-the two ProjectRoot entries disable `.unityagenttool` and resolve to the project root / project `.agents/skills`,
-while the two PersistentData entries keep it enabled. Settings schema V11 refreshes matching package-owned roots
-from the effective JSON defaults; legacy custom roots keep the previous enabled behavior.
+`relativePath` stores only the remaining child path. `scope` independently selects direct path discovery in Editor,
+Player, both, or neither. `embedInPlayerBuild` copies a build-time snapshot into Player content independently of that
+scope; missing snapshot source directories are skipped without failing the build. In Player, live Player/All roots
+have priority over embedded snapshots. All four package-default roots use `All` with embedding disabled: the two
+ProjectRoot entries disable `.unityagenttool` and resolve to the project root / project `.agents/skills`, while the
+two PersistentData entries keep it enabled. Settings schema V12 and project schema V6 intentionally replace the old
+combined build flag without backward-compatible root migration.
 
 When the current Editor or Player has no machine `settings.json`, or that document is malformed or semantically
 invalid, the complete machine configuration is recreated from the effective project/package defaults. Malformed
 machine files and their backups are retained with a timestamped `.invalid-*` suffix before replacement. A valid
-existing machine file is never changed implicitly by Project Settings, except for the one-time schema V11 normalization
-of matching package-owned root IDs. Edit project defaults through
+existing machine file is never changed implicitly by Project Settings. Edit project defaults through
 **Edit > Project Settings > YuzeToolkit > Unity Agent**; the page covers permission, Editor/Runtime prompts, Tool
 limits, and ordered AGENTS.md/Skill roots. Editor Play Mode uses the Editor prompt; the Runtime prompt is reserved
 for standalone Players.

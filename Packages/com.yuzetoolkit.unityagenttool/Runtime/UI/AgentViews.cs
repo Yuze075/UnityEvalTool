@@ -1758,7 +1758,8 @@ namespace YuzeToolkit.UnityAgent
             _runtimeSystemPrompt.style.whiteSpace = WhiteSpace.Normal;
             defaults.Add(_runtimeSystemPrompt);
 
-            var agentsCard = AgentUi.Card("AGENTS.md discovery", "Ordered highest priority first. Each root is portable across computers.");
+            var agentsCard = AgentUi.Card("AGENTS.md discovery",
+                "Ordered highest priority first. Availability and embedded Player snapshots are independent.");
             FlattenSettingsCard(agentsCard);
             _scroll.Content.Add(agentsCard);
             _agentsRoots = new AgentPathListEditor("AGENTS.md roots", "Add AGENTS.md root", false, ShowPathError);
@@ -1766,7 +1767,8 @@ namespace YuzeToolkit.UnityAgent
 
             var skillsCard = AgentUi.Card("Skills discovery",
                 $"Each root may insert {AgentPaths.SettingsDirectoryName}, then always adds " +
-                $"{AgentPaths.SkillDirectoryName}. The optional relative path selects a child directory inside it.");
+                $"{AgentPaths.SkillDirectoryName}. Availability controls direct discovery; embedding independently " +
+                "copies a build-time snapshot into Player.");
             FlattenSettingsCard(skillsCard);
             _scroll.Content.Add(skillsCard);
             _skillRoots = new AgentPathListEditor("Skill roots", "Add Skill root", true, ShowPathError);
@@ -2551,7 +2553,8 @@ namespace YuzeToolkit.UnityAgent
                 BasePath = AgentPathBase.ProjectRoot,
                 UseUnityAgentToolDirectory = true,
                 RelativePath = string.Empty,
-                IncludeInPlayerBuild = false
+                Scope = AgentPathScope.All,
+                EmbedInPlayerBuild = false
             });
             Refresh();
             Changed?.Invoke();
@@ -2621,16 +2624,19 @@ namespace YuzeToolkit.UnityAgent
             BasePath = value.BasePath,
             UseUnityAgentToolDirectory = value.UseUnityAgentToolDirectory,
             RelativePath = value.RelativePath,
-            IncludeInPlayerBuild = value.IncludeInPlayerBuild
+            Scope = value.Scope,
+            EmbedInPlayerBuild = value.EmbedInPlayerBuild
         };
     }
 
     internal sealed class AgentPathLocationEditor : VisualElement
     {
+        private static readonly string[] ScopeOptions = { "None", "Editor only", "Player only", "All" };
         private readonly AgentChoiceField _basePath;
+        private readonly AgentChoiceField _scope;
         private readonly AgentTextField _relativePath;
         private readonly AgentToggle _useUnityAgentToolDirectory;
-        private readonly AgentToggle? _includeInBuild;
+        private readonly AgentToggle? _embedInPlayerBuild;
         private readonly Label _preview;
         private readonly bool _isSkillRoot;
         private readonly Action<string> _showError;
@@ -2650,6 +2656,13 @@ namespace YuzeToolkit.UnityAgent
             _basePath.style.flexShrink = 0;
             _basePath.RegisterValueChangedCallback(_ => ChangedByUser());
             row.Add(_basePath);
+            _scope = AgentUi.Dropdown("Available in", ScopeOptions);
+            _scope.style.width = 180;
+            _scope.style.flexShrink = 0;
+            AgentTooltip.Attach(_scope,
+                "Controls direct path discovery. Embedded Player content is independent of this scope.");
+            _scope.RegisterValueChangedCallback(_ => ChangedByUser());
+            row.Add(_scope);
             _relativePath = AgentUi.Field("Relative path", string.Empty,
                 isSkillRoot
                     ? "Optional child path after the selected base, optional .unityagenttool, and fixed .agents/skills folders."
@@ -2665,11 +2678,12 @@ namespace YuzeToolkit.UnityAgent
             row.Add(_useUnityAgentToolDirectory);
             if (showBuildToggle)
             {
-                _includeInBuild = new AgentToggle("Player build");
-                AgentTooltip.Attach(_includeInBuild,
-                    "Package this root into Player content. Review external files before enabling.");
-                _includeInBuild.RegisterValueChangedCallback(_ => ChangedByUser());
-                row.Add(_includeInBuild);
+                _embedInPlayerBuild = new AgentToggle("Embed in Player build");
+                AgentTooltip.Attach(_embedInPlayerBuild,
+                    "Copy a build-time snapshot into Player content regardless of the availability scope. " +
+                    "Review external files before enabling.");
+                _embedInPlayerBuild.RegisterValueChangedCallback(_ => ChangedByUser());
+                row.Add(_embedInPlayerBuild);
             }
             _preview = new Label();
             AgentUi.ApplyTypography(_preview, AgentTypography.Caption, false);
@@ -2685,9 +2699,10 @@ namespace YuzeToolkit.UnityAgent
         {
             _id = value.Id;
             _basePath.SetValueWithoutNotify(value.BasePath.ToString());
+            _scope.SetValueWithoutNotify(GetScopeLabel(value.Scope));
             _relativePath.SetValueWithoutNotify(value.RelativePath);
             _useUnityAgentToolDirectory.SetValueWithoutNotify(value.UseUnityAgentToolDirectory);
-            _includeInBuild?.SetValueWithoutNotify(value.IncludeInPlayerBuild);
+            _embedInPlayerBuild?.SetValueWithoutNotify(value.EmbedInPlayerBuild);
             RefreshPreview();
         }
 
@@ -2703,15 +2718,35 @@ namespace YuzeToolkit.UnityAgent
             var basePath = Enum.TryParse<AgentPathBase>(_basePath.value, out var parsed)
                 ? parsed
                 : AgentPathBase.ProjectRoot;
+            var scope = ParseScope(_scope.value);
             return new AgentPathLocation
             {
                 Id = _id,
                 BasePath = basePath,
                 UseUnityAgentToolDirectory = _useUnityAgentToolDirectory.value,
                 RelativePath = _relativePath.value.Trim(),
-                IncludeInPlayerBuild = _includeInBuild?.value ?? false
+                Scope = scope,
+                EmbedInPlayerBuild = _embedInPlayerBuild?.value ?? false
             };
         }
+
+        private static AgentPathScope ParseScope(string value) => value switch
+        {
+            "None" => AgentPathScope.None,
+            "Editor only" => AgentPathScope.EditorOnly,
+            "Player only" => AgentPathScope.PlayerOnly,
+            "All" => AgentPathScope.All,
+            _ => throw new InvalidOperationException($"Unknown Agent path scope '{value}'.")
+        };
+
+        private static string GetScopeLabel(AgentPathScope value) => value switch
+        {
+            AgentPathScope.None => "None",
+            AgentPathScope.EditorOnly => "Editor only",
+            AgentPathScope.PlayerOnly => "Player only",
+            AgentPathScope.All => "All",
+            _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unknown Agent path scope.")
+        };
 
         private void ChangedByUser()
         {

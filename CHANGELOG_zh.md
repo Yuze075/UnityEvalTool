@@ -4,6 +4,11 @@
 
 ## 未发布
 
+- 将指令根原本混合语义的 Player Build 开关替换为独立的 None/EditorOnly/PlayerOnly/All 实时路径作用域与
+  构建快照开关。Player 现在先读取 Player/All 实时根再读取包内快照；四条默认根均为 All 且关闭 Embed；
+  快照源目录缺失不再让构建失败。
+- 通过本机 schema V12 与项目 schema V6 执行明确的破坏性根配置变更，不为被删除字段提供兼容迁移。
+
 ## 2.0.5 - 2026-08-17
 
 - 在所有桌面系统上以精确参数向量调用服务管理器；创建 Windows 计划任务后校验其 Action，启动操作后

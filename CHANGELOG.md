@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+- Replace the combined instruction-root Player build flag with independent None/EditorOnly/PlayerOnly/All live-path
+  scope and build-time embedding controls. Player now loads live Player/All roots before embedded snapshots, all
+  default roots use All with embedding disabled, and missing embedded source directories no longer fail builds.
+- Make the root configuration a deliberate breaking change through machine schema V12 and project schema V6, with
+  no compatibility migration for the removed field.
+
 ## 2.0.5 - 2026-08-17
 
 - Pass service-manager arguments as exact vectors on every desktop OS, verify the Windows Scheduled Task action

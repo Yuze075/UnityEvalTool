@@ -1516,7 +1516,8 @@ namespace YuzeToolkit.UnityAgent
                     left[index].BasePath != right[index].BasePath ||
                     left[index].UseUnityAgentToolDirectory != right[index].UseUnityAgentToolDirectory ||
                     !string.Equals(left[index].RelativePath, right[index].RelativePath, StringComparison.Ordinal) ||
-                    left[index].IncludeInPlayerBuild != right[index].IncludeInPlayerBuild)
+                    left[index].Scope != right[index].Scope ||
+                    left[index].EmbedInPlayerBuild != right[index].EmbedInPlayerBuild)
                     return false;
             }
             return true;

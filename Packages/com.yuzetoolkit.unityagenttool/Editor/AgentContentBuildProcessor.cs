@@ -95,8 +95,9 @@ namespace YuzeToolkit.UnityAgent
             for (var rootIndex = 0; rootIndex < locations.Count; rootIndex++)
             {
                 var location = locations[rootIndex];
-                if (!location.IncludeInPlayerBuild) continue;
+                if (!location.EmbedInPlayerBuild) continue;
                 var sourceRoot = ResolveBuildLocation(location, "AGENTS.md", isSkillRoot: false);
+                if (sourceRoot == null) continue;
                 foreach (var sourceFile in FindAgentsFiles(sourceRoot, projectRoot))
                 {
                     var fullSource = Path.GetFullPath(sourceFile);
@@ -127,8 +128,9 @@ namespace YuzeToolkit.UnityAgent
             var outputIndex = 0;
             foreach (var location in locations)
             {
-                if (!location.IncludeInPlayerBuild) continue;
+                if (!location.EmbedInPlayerBuild) continue;
                 var sourceRoot = ResolveBuildLocation(location, "Skill", isSkillRoot: true);
+                if (sourceRoot == null) continue;
                 if (!seenRoots.Add(sourceRoot)) continue;
                 var relativeDestination = $"skills/{outputIndex:D4}";
                 var destinationRoot = Path.Combine(contentTarget,
@@ -141,7 +143,7 @@ namespace YuzeToolkit.UnityAgent
             }
         }
 
-        private static string ResolveBuildLocation(
+        private static string? ResolveBuildLocation(
             AgentPathLocation location,
             string kind,
             bool isSkillRoot)
@@ -151,8 +153,12 @@ namespace YuzeToolkit.UnityAgent
                 AgentPaths.Validate(location);
                 var fullPath = isSkillRoot ? AgentPaths.ResolveSkill(location) : AgentPaths.Resolve(location);
                 if (!Directory.Exists(fullPath))
-                    throw new BuildFailedException(
-                        $"UnityAgentTool {kind} root '{location.Id}' does not exist: {fullPath}");
+                {
+                    Debug.LogWarning(
+                        $"UnityAgentTool skipped embedded {kind} root '{location.Id}' because the source " +
+                        $"directory does not exist: {fullPath}");
+                    return null;
+                }
                 RejectReparsePoint(new DirectoryInfo(fullPath));
                 return fullPath;
             }

@@ -7,9 +7,8 @@ using UnityEngine.UIElements;
 namespace YuzeToolkit.UnityAgent
 {
     /// <summary>
-    /// Read-only build summary used by Editor settings surfaces. Build inclusion is represented by
-    /// the two ordered root lists in the active machine settings. Effective package/project defaults
-    /// seed a machine settings file when it is missing or invalid.
+    /// Read-only path and embedded-content summary used by Editor settings surfaces. Effective
+    /// package/project defaults seed a machine settings file when it is missing or invalid.
     /// </summary>
     internal sealed class AgentBuildContentView : VisualElement
     {
@@ -27,12 +26,12 @@ namespace YuzeToolkit.UnityAgent
             style.borderTopColor = new Color(0.18f, 0.21f, 0.25f);
             style.backgroundColor = new Color(0.055f, 0.068f, 0.085f);
 
-            var title = new Label("Player build instruction content");
+            var title = new Label("Instruction path availability and embedded content");
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
             Add(title);
             var help = new Label(
-                "Configured AGENTS.md and Skill roots are packaged in their displayed order. " +
-                "The default project entries are explicit settings and may be reordered or removed.");
+                "Availability controls direct Editor/Player path discovery. Embed copies a build-time " +
+                "snapshot into Player independently of availability.");
             help.style.whiteSpace = WhiteSpace.Normal;
             help.style.color = new Color(0.52f, 0.56f, 0.62f);
             Add(help);
@@ -70,7 +69,7 @@ namespace YuzeToolkit.UnityAgent
             {
                 var root = roots[index];
                 var relative = string.IsNullOrEmpty(root.RelativePath) ? "." : root.RelativePath;
-                var buildState = root.IncludeInPlayerBuild ? "included" : "Editor only";
+                var buildState = root.EmbedInPlayerBuild ? "embedded" : "not embedded";
                 var fixedPath = isSkillRoot
                     ? root.UseUnityAgentToolDirectory
                         ? $"{AgentPaths.SettingsDirectoryName} / {AgentPaths.SkillDirectoryName}"
@@ -78,11 +77,22 @@ namespace YuzeToolkit.UnityAgent
                     : root.UseUnityAgentToolDirectory
                         ? AgentPaths.SettingsDirectoryName
                         : ".";
-                var item = new Label($"{index + 1}. {root.BasePath} / {fixedPath} / {relative}  ·  {buildState}");
+                var item = new Label(
+                    $"{index + 1}. {root.BasePath} / {fixedPath} / {relative}  ·  " +
+                    $"{GetScopeLabel(root.Scope)}  ·  {buildState}");
                 AgentTooltip.Attach(item, isSkillRoot ? AgentPaths.ResolveSkill(root) : AgentPaths.Resolve(root));
                 item.style.color = new Color(0.72f, 0.76f, 0.82f);
                 _rootList.Add(item);
             }
         }
+
+        private static string GetScopeLabel(AgentPathScope scope) => scope switch
+        {
+            AgentPathScope.None => "None",
+            AgentPathScope.EditorOnly => "Editor only",
+            AgentPathScope.PlayerOnly => "Player only",
+            AgentPathScope.All => "Editor and Player",
+            _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unknown Agent path scope.")
+        };
     }
 }

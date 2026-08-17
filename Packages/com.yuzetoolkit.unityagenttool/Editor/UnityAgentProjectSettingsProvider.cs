@@ -233,7 +233,8 @@ namespace YuzeToolkit.UnityAgent
         private void BuildRoots(VisualElement parent, AgentProjectSettingsDocument settings)
         {
             var agentsCard = AgentUi.Card("AGENTS.md discovery roots",
-                "Ordered highest priority first. Editor discovery reads every root; Player build controls packaging.");
+                "Ordered highest priority first. Availability controls direct Editor/Player discovery; " +
+                "embedding independently copies a build-time snapshot into Player.");
             _agentsRoots = new AgentPathListEditor("AGENTS.md roots", "Add AGENTS.md root", false, ShowPathError);
             _agentsRoots.SetItems(settings.AgentsRoots);
             _agentsRoots.Changed += MarkDirty;

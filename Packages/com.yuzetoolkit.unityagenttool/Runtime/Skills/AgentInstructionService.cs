@@ -98,17 +98,19 @@ namespace YuzeToolkit.UnityAgent
         public IReadOnlyList<AgentResolvedPath> ResolveAgentsRoots(AgentSettingsDocument settings)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
+            var configured = ResolveConfiguredRoots(settings.AgentsRoots, "AGENTS.md", isSkillRoot: false);
             return AgentPaths.IsEditor
-                ? ResolveConfiguredRoots(settings.AgentsRoots, "AGENTS.md", isSkillRoot: false)
-                : ReadPackagedRoots().AgentsRoots;
+                ? configured
+                : CombineRoots(configured, ReadPackagedRoots().AgentsRoots);
         }
 
         public IReadOnlyList<AgentResolvedPath> ResolveSkillRoots(AgentSettingsDocument settings)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
+            var configured = ResolveConfiguredRoots(settings.SkillRoots, "Skill", isSkillRoot: true);
             return AgentPaths.IsEditor
-                ? ResolveConfiguredRoots(settings.SkillRoots, "Skill", isSkillRoot: true)
-                : ReadPackagedRoots().SkillRoots;
+                ? configured
+                : CombineRoots(configured, ReadPackagedRoots().SkillRoots);
         }
 
         private static IReadOnlyList<AgentResolvedPath> ResolveConfiguredRoots(
@@ -126,6 +128,7 @@ namespace YuzeToolkit.UnityAgent
                 AgentPaths.Validate(location);
                 if (!usedIds.Add(location.Id))
                     throw new InvalidDataException($"Duplicate {kind} root id '{location.Id}'.");
+                if (!IsScopeEnabled(location.Scope)) continue;
                 var resolved = isSkillRoot ? AgentPaths.ResolveSkill(location) : AgentPaths.Resolve(location);
                 // The first entry wins when multiple portable locations resolve to the same directory.
                 if (roots.Any(existing => AgentPaths.PathsEqual(existing.Path, resolved))) continue;
@@ -136,6 +139,31 @@ namespace YuzeToolkit.UnityAgent
                 });
             }
             return roots;
+        }
+
+        private static bool IsScopeEnabled(AgentPathScope scope)
+        {
+            return AgentPaths.IsEditor
+                ? scope is AgentPathScope.EditorOnly or AgentPathScope.All
+                : scope is AgentPathScope.PlayerOnly or AgentPathScope.All;
+        }
+
+        private static IReadOnlyList<AgentResolvedPath> CombineRoots(
+            IReadOnlyList<AgentResolvedPath> configured,
+            IReadOnlyList<AgentResolvedPath> embedded)
+        {
+            var result = new List<AgentResolvedPath>(configured.Count + embedded.Count);
+            foreach (var root in configured)
+                AddRootIfUnique(result, root);
+            foreach (var root in embedded)
+                AddRootIfUnique(result, root);
+            return result;
+        }
+
+        private static void AddRootIfUnique(List<AgentResolvedPath> result, AgentResolvedPath root)
+        {
+            if (result.Any(existing => AgentPaths.PathsEqual(existing.Path, root.Path))) return;
+            result.Add(root);
         }
 
         private static PackagedInstructionRoots ReadPackagedRoots()

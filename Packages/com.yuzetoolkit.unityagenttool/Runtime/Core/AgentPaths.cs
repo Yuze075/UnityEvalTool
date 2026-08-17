@@ -122,6 +122,8 @@ namespace YuzeToolkit.UnityAgent
             }
             if (!Enum.IsDefined(typeof(AgentPathBase), location.BasePath))
                 throw new ArgumentException($"Agent path location '{location.Id}' has an unknown base.", parameterName);
+            if (!Enum.IsDefined(typeof(AgentPathScope), location.Scope))
+                throw new ArgumentException($"Agent path location '{location.Id}' has an unknown scope.", parameterName);
             ValidateRelativePath(location.RelativePath, parameterName);
         }
 
@@ -144,64 +146,6 @@ namespace YuzeToolkit.UnityAgent
                 throw new ArgumentException("Agent relative path is not a valid file-system path.", parameterName,
                     exception);
             }
-        }
-
-        internal static AgentPathLocation FromLegacyPath(string id, string path, bool isSkillRoot = false)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                throw new FormatException("Legacy Agent content root path is empty.");
-            var absolute = Path.IsPathRooted(path)
-                ? Path.GetFullPath(path)
-                : Path.GetFullPath(Path.Combine(ProjectRoot, path));
-
-            var bases = new[]
-            {
-                AgentPathBase.ProjectRoot,
-                AgentPathBase.UserProfile,
-                AgentPathBase.PersistentData,
-                AgentPathBase.Documents,
-                AgentPathBase.LocalApplicationData,
-                AgentPathBase.RoamingApplicationData,
-                AgentPathBase.TemporaryCache,
-                AgentPathBase.StreamingAssets
-            };
-            AgentPathBase? selected = null;
-            string? selectedRelative = null;
-            var selectedUseUnityAgentToolDirectory = true;
-            foreach (var candidate in bases)
-            {
-                foreach (var useUnityAgentToolDirectory in new[] { false, true })
-                {
-                    string candidateBase;
-                    try
-                    {
-                        candidateBase = GetBasePath(candidate, useUnityAgentToolDirectory);
-                        if (isSkillRoot)
-                            candidateBase = Path.GetFullPath(Path.Combine(candidateBase,
-                                NormalizeRelativePath(SkillDirectoryName)));
-                    }
-                    catch (Exception exception) when (exception is DirectoryNotFoundException or PlatformNotSupportedException)
-                    {
-                        continue;
-                    }
-                    if (!HaveSamePathRoot(candidateBase, absolute)) continue;
-                    var relative = MakeRelativePath(candidateBase, absolute);
-                    if (selectedRelative != null && relative.Length >= selectedRelative.Length) continue;
-                    selected = candidate;
-                    selectedRelative = relative;
-                    selectedUseUnityAgentToolDirectory = useUnityAgentToolDirectory;
-                }
-            }
-            if (selected == null || selectedRelative == null)
-                throw new FormatException(
-                    $"Legacy absolute path cannot be represented by any portable Agent path base: {absolute}");
-            return new AgentPathLocation
-            {
-                Id = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id,
-                BasePath = selected.Value,
-                UseUnityAgentToolDirectory = selectedUseUnityAgentToolDirectory,
-                RelativePath = selectedRelative
-            };
         }
 
         public static bool PathsEqual(string first, string second) =>
@@ -228,20 +172,6 @@ namespace YuzeToolkit.UnityAgent
 
         private static bool LooksLikeWindowsDrive(string value) =>
             value.Length >= 2 && char.IsLetter(value[0]) && value[1] == ':';
-
-        private static bool HaveSamePathRoot(string first, string second) =>
-            string.Equals(Path.GetPathRoot(first), Path.GetPathRoot(second), PathComparison);
-
-        private static string MakeRelativePath(string basePath, string targetPath)
-        {
-            if (PathsEqual(basePath, targetPath)) return string.Empty;
-            var baseUri = new Uri(EnsureTrailingSeparator(Path.GetFullPath(basePath)));
-            var targetUri = new Uri(Path.GetFullPath(targetPath));
-            if (!string.Equals(baseUri.Scheme, targetUri.Scheme, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Paths do not use the same URI scheme.");
-            return Uri.UnescapeDataString(baseUri.MakeRelativeUri(targetUri).ToString())
-                .Replace('/', Path.DirectorySeparatorChar);
-        }
 
         private static string EnsureTrailingSeparator(string path)
         {

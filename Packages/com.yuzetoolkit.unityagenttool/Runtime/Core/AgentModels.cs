@@ -134,6 +134,18 @@ namespace YuzeToolkit.UnityAgent
     }
 
     /// <summary>
+    /// Selects the environments in which a configured path is discovered directly. Embedded Player
+    /// content is an independent source and is not restricted by this scope.
+    /// </summary>
+    public enum AgentPathScope
+    {
+        None = 0,
+        EditorOnly = 1,
+        PlayerOnly = 2,
+        All = 3
+    }
+
+    /// <summary>
     /// A portable path made from a stable base and an optional relative path.
     /// RelativePath may contain parent segments, but it must never be absolute.
     /// </summary>
@@ -151,17 +163,20 @@ namespace YuzeToolkit.UnityAgent
 
         public string RelativePath { get; set; } = string.Empty;
 
+        /// <summary>Controls direct path discovery in Editor and Player environments.</summary>
+        public AgentPathScope Scope { get; set; } = AgentPathScope.All;
+
         /// <summary>
-        /// When true, this instruction root is copied into Player StreamingAssets. Editor discovery
-        /// always follows the ordered list regardless of this flag.
+        /// When true, the build-time contents of this root are copied into Player StreamingAssets.
+        /// Embedded content is loaded in Player regardless of Scope.
         /// </summary>
-        public bool IncludeInPlayerBuild { get; set; }
+        public bool EmbedInPlayerBuild { get; set; }
 
     }
 
     public sealed class AgentSettingsDocument
     {
-        public const int CurrentSchemaVersion = 11;
+        public const int CurrentSchemaVersion = 12;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -207,7 +222,7 @@ namespace YuzeToolkit.UnityAgent
     /// </summary>
     public sealed class AgentProjectSettingsDocument
     {
-        public const int CurrentSchemaVersion = 5;
+        public const int CurrentSchemaVersion = 6;
 
         public int SchemaVersion { get; set; } = CurrentSchemaVersion;
         public AgentPermissionMode PermissionMode { get; set; } = AgentPermissionMode.ConfirmWrites;
@@ -246,7 +261,8 @@ namespace YuzeToolkit.UnityAgent
             BasePath = value.BasePath,
             UseUnityAgentToolDirectory = value.UseUnityAgentToolDirectory,
             RelativePath = value.RelativePath,
-            IncludeInPlayerBuild = value.IncludeInPlayerBuild
+            Scope = value.Scope,
+            EmbedInPlayerBuild = value.EmbedInPlayerBuild
         };
     }
 
