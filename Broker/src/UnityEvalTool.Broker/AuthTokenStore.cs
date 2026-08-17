@@ -9,6 +9,8 @@ internal sealed class AuthTokenStore
     public const int DefaultMaxStoredTokens = 5;
     public const int HardMaxStoredTokens = 32;
     public const int MaxTokenLength = 256;
+    private const int PublicationAttempts = 100;
+    private const int PublicationDelayMilliseconds = 20;
 
     private readonly string _filePath;
     private readonly string _configPath;
@@ -254,7 +256,7 @@ internal sealed class AuthTokenStore
             }
             File.AppendAllText(temporaryPath, Environment.NewLine);
             TryRestrictPermissions(temporaryPath);
-            File.Move(temporaryPath, _filePath, true);
+            PublishTemporaryFile(temporaryPath);
             TryRestrictPermissions(_filePath);
         }
         finally
@@ -262,6 +264,26 @@ internal sealed class AuthTokenStore
             try { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); }
             catch (IOException) { }
         }
+    }
+
+    private void PublishTemporaryFile(string temporaryPath)
+    {
+        IOException? lastError = null;
+        for (var attempt = 0; attempt < PublicationAttempts; attempt++)
+        {
+            try
+            {
+                File.Move(temporaryPath, _filePath, true);
+                return;
+            }
+            catch (IOException ex)
+            {
+                lastError = ex;
+                Thread.Sleep(PublicationDelayMilliseconds);
+            }
+        }
+
+        throw new IOException($"Timed out publishing UnityEvalTool auth tokens '{_filePath}'.", lastError);
     }
 
     private void EnsureDirectory()

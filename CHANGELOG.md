@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+## 2.0.5 - 2026-08-17
+
+- Pass service-manager arguments as exact vectors on every desktop OS, verify the Windows Scheduled Task action
+  after creation, wait for Broker readiness after start operations, and make unavailable service status fail.
+- Register the native CLI installation once per process and publish `install.json` through a bounded cross-process
+  lock plus same-directory atomic replacement; retry Windows atomic publication while short-lived readers are open.
+- Preserve Windows backslashes and empty arguments across the native CLI-to-Unity command protocol, and apply
+  case-sensitive project containment on case-sensitive file systems.
 - Harden the embedded Agent with ObserveOnly/ConfirmWrites/FullAccess capability modes, Tool risk and Editor/Player
   surfaces, request-time exposure filtering, execution-time enforcement, bounded file roots, and protected deletion.
 - Add SHA-256 guarded atomic `file_apply_patch`, safe `unity_snapshot` / `unity_scene_query` inspection Tools,

@@ -85,15 +85,15 @@ namespace YuzeToolkit
             candidate = TrimTrailingSeparators(candidate);
 
             var rootWithSeparator = EnsureTrailingSeparator(root);
-            if (!candidate.Equals(root, StringComparison.OrdinalIgnoreCase) &&
-                !candidate.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
+            if (!candidate.Equals(root, PathComparison) &&
+                !candidate.StartsWith(rootWithSeparator, PathComparison))
             {
                 error = "Path must stay inside the Unity project.";
                 return false;
             }
 
             fullPath = candidate;
-            projectRelativePath = candidate.Equals(root, StringComparison.OrdinalIgnoreCase)
+            projectRelativePath = candidate.Equals(root, PathComparison)
                 ? string.Empty
                 : candidate.Substring(rootWithSeparator.Length)
                     .Replace(Path.DirectorySeparatorChar, '/')
@@ -156,6 +156,9 @@ namespace YuzeToolkit
         {
             return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         }
+
+        private static StringComparison PathComparison =>
+            Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
         public static Type? FindType(string typeName)
         {

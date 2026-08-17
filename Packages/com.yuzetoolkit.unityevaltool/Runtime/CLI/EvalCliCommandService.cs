@@ -660,19 +660,31 @@ namespace YuzeToolkit
             var inQuote = false;
             var quote = '\0';
             var escaped = false;
+            var tokenStarted = false;
 
-            foreach (var c in line)
+            for (var index = 0; index < line.Length; index++)
             {
+                var c = line[index];
                 if (escaped)
                 {
                     builder.Append(c);
+                    tokenStarted = true;
                     escaped = false;
                     continue;
                 }
 
                 if (c == '\\' && quote != '\'')
                 {
-                    escaped = true;
+                    var hasEscapedCharacter = index + 1 < line.Length &&
+                                              (line[index + 1] is '\\' or '"' or '\'' ||
+                                               char.IsWhiteSpace(line[index + 1]));
+                    if (hasEscapedCharacter)
+                        escaped = true;
+                    else
+                    {
+                        builder.Append(c);
+                        tokenStarted = true;
+                    }
                     continue;
                 }
 
@@ -681,10 +693,12 @@ namespace YuzeToolkit
                     if (c == quote)
                     {
                         inQuote = false;
+                        tokenStarted = true;
                         continue;
                     }
 
                     builder.Append(c);
+                    tokenStarted = true;
                     continue;
                 }
 
@@ -692,6 +706,7 @@ namespace YuzeToolkit
                 {
                     inQuote = true;
                     quote = c;
+                    tokenStarted = true;
                     continue;
                 }
 
@@ -702,6 +717,7 @@ namespace YuzeToolkit
                 }
 
                 builder.Append(c);
+                tokenStarted = true;
             }
 
             if (inQuote)
@@ -711,9 +727,10 @@ namespace YuzeToolkit
 
             void Flush()
             {
-                if (builder.Length == 0) return;
+                if (!tokenStarted) return;
                 result.Add(builder.ToString());
                 builder.Clear();
+                tokenStarted = false;
             }
         }
 

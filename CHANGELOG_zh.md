@@ -4,6 +4,14 @@
 
 ## 未发布
 
+## 2.0.5 - 2026-08-17
+
+- 在所有桌面系统上以精确参数向量调用服务管理器；创建 Windows 计划任务后校验其 Action，启动操作后
+  等待 Broker 就绪，并让不可用的服务状态以失败退出。
+- 每个原生 CLI 进程只注册一次安装信息，通过有界跨进程锁与同目录原子替换发布 `install.json`；
+  Windows 短时读取占用导致原子发布冲突时进行有界重试。
+- 在原生 CLI 到 Unity 的命令协议中保留 Windows 反斜杠与空参数，并在区分大小写的文件系统上使用
+  区分大小写的项目目录边界判断。
 - 为内嵌 Agent 增加 ObserveOnly/ConfirmWrites/FullAccess 能力模式、Tool 风险与 Editor/Player 表面、
   请求前暴露过滤、执行时二次校验、有界文件根与受保护删除。
 - 增加由 SHA-256 保护的原子 `file_apply_patch`、安全的 `unity_snapshot` / `unity_scene_query`

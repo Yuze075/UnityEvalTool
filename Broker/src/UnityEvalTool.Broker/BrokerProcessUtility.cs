@@ -4,18 +4,18 @@ namespace YuzeToolkit.UnityEvalTool.Broker;
 
 internal static class BrokerProcessUtility
 {
-    public static async Task<(int ExitCode, string Output)> RunAsync(string fileName, string arguments,
+    public static async Task<(int ExitCode, string Output)> RunAsync(string fileName, IReadOnlyList<string> arguments,
         bool throwOnFailure = true, CancellationToken cancellationToken = default)
     {
         var startInfo = new ProcessStartInfo
         {
             FileName = fileName,
-            Arguments = arguments,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
         using var process = Process.Start(startInfo)
                             ?? throw new InvalidOperationException($"Failed to start '{fileName}'.");
         var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
@@ -24,7 +24,8 @@ internal static class BrokerProcessUtility
         var output = string.Join(Environment.NewLine,
             new[] { await stdout, await stderr }.Where(value => !string.IsNullOrWhiteSpace(value))).Trim();
         if (throwOnFailure && process.ExitCode != 0)
-            throw new InvalidOperationException($"'{fileName} {arguments}' failed with exit code {process.ExitCode}. {output}");
+            throw new InvalidOperationException(
+                $"'{fileName} {string.Join(' ', arguments)}' failed with exit code {process.ExitCode}. {output}");
         return (process.ExitCode, output);
     }
 

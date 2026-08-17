@@ -8,7 +8,6 @@ internal static class CliApplication
 {
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken)
     {
-        InstallMetadataStore.RegisterCurrentExecutable();
         var parsedArguments = ExtractTokenOption(args);
         args = parsedArguments.Arguments;
         var suppliedTokenList = parsedArguments.TokenList;
@@ -242,7 +241,6 @@ internal static class CliApplication
 
     private static async Task<int> DoctorAsync(CancellationToken cancellationToken)
     {
-        InstallMetadataStore.RegisterCurrentExecutable();
         Console.WriteLine("Executable: " + (InstallMetadataStore.GetCurrentExecutable() ?? "unpublished/dotnet host"));
         var tokenStore = new AuthTokenStore();
         Console.WriteLine($"Auth file: {tokenStore.FilePath} ({tokenStore.GetTokens().Count}/{tokenStore.MaxStoredTokens} stored tokens)");
@@ -264,7 +262,8 @@ internal static class CliApplication
     }
 
     private static string RebuildCommandLine(IReadOnlyList<string> args) => string.Join(" ", args.Select(argument =>
-        string.IsNullOrEmpty(argument) || argument.Any(char.IsWhiteSpace) || argument.Contains('"') || argument.Contains('\'')
+        string.IsNullOrEmpty(argument) || argument.Any(char.IsWhiteSpace) || argument.Contains('"') ||
+        argument.Contains('\'') || argument.Contains('\\')
             ? "\"" + argument.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) + "\""
             : argument));
 

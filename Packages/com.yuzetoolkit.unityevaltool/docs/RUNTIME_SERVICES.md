@@ -46,6 +46,21 @@ deliberately fork the product design.
 WebGL is not a supported Broker target because the local ClientWebSocket/current-user
 service model is unavailable there.
 
+## Native executable and user service
+
+The published `unity` executable registers its absolute path once when each process starts.
+It publishes `~/.unityevaltool/install.json` under a bounded cross-process lock by writing a
+complete same-directory temporary file and atomically replacing the previous document.
+Readers therefore observe either the previous complete document or the new complete document,
+never a truncate-in-place window.
+
+`unity service install|start|restart` invokes launchd, systemd, or Windows Task Scheduler with
+an exact argument vector and waits for the Broker health endpoint before reporting success.
+On Windows, installation also reads the created task XML and verifies that its executable
+Command is the current native binary and its Arguments value is exactly `broker`. The status
+command fails when the platform service is unavailable; Windows status additionally validates
+the stored task action and Broker health.
+
 ## Public runtime surface
 
 - `UnityBrokerClient.Shared.IsConnected`

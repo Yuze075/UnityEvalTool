@@ -37,6 +37,17 @@ UI Package 与 UnityEvalTool 的 Player runtime client 相互独立。验证默�
 WebGL 不是受支持的 Broker 目标，因为该平台无法使用本地 ClientWebSocket/
 当前用户服务模型。
 
+## 原生程序与用户服务
+
+已发布的 `unity` 原生程序在每个进程启动时只注册一次自身绝对路径。它在有界跨进程锁内写入
+同目录完整临时文件，再以原子替换发布 `~/.unityevaltool/install.json`。读取端因此只会看到
+替换前或替换后的完整文档，不会遇到原地截断产生的半写入窗口。
+
+`unity service install|start|restart` 以精确参数向量调用 launchd、systemd 或 Windows Task
+Scheduler，并在报告成功前等待 Broker 健康端点。Windows 安装还会读取刚创建的任务 XML，确认
+Action 的 Command 是当前原生程序，Arguments 严格为 `broker`。平台服务不可用时，status 命令
+以失败退出；Windows status 还会校验已保存的任务 Action 与 Broker 健康状态。
+
 ## 公共运行时接口
 
 - `UnityBrokerClient.Shared.IsConnected`

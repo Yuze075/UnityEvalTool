@@ -52,7 +52,7 @@ a JavaScript backend for your project.
 In Unity, open **Window > Package Manager**, choose **Add package from git URL**, and enter:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.5
 ```
 
 The equivalent `Packages/manifest.json` dependency is:
@@ -60,7 +60,7 @@ The equivalent `Packages/manifest.json` dependency is:
 ```json
 {
   "dependencies": {
-    "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.4"
+    "com.yuzetoolkit.unityevaltool": "https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityevaltool#v2.0.5"
   }
 }
 ```
@@ -176,7 +176,7 @@ and the [Broker protocol](Packages/com.yuzetoolkit.unityevaltool/docs/BROKER_PRO
 Install UnityAgentTool after UnityEvalTool with **Add package from git URL**:
 
 ```text
-https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityagenttool#v2.0.4
+https://github.com/Yuze075/UnityEvalTool.git?path=/Packages/com.yuzetoolkit.unityagenttool#v2.0.5
 ```
 
 Then place `Runtime/Panel/Prefabs/DebugPanel.prefab` from that package in a scene or a
