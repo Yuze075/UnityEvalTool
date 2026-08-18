@@ -1,13 +1,33 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace YuzeToolkit.UnityEvalTool.Broker;
 
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)]
 [McpServerToolType]
 internal sealed class UnityBrokerTools(BrokerRegistry registry)
 {
+    // MCP protocol versions through 2025-11-25 require every outputSchema.properties value to be a
+    // JSON object, but the MCP SDK derives the boolean JSON Schema "true" for JsonElement returns,
+    // which strict clients then reject. "{}" is the object-form equivalent of "true": the SDK wraps
+    // it into the same {"result": ...} envelope on those protocol versions, so the wire format of
+    // both tools/list and structuredContent stays unchanged.
+    private static readonly JsonDocument PermissiveOutputSchema = JsonDocument.Parse("{}");
+
+    internal static IReadOnlyList<McpServerTool> CreateTools(UnityBrokerTools tools) =>
+    [
+        McpServerTool.Create(GetMethod(nameof(StatusAsync)), tools,
+            new McpServerToolCreateOptions { OutputSchema = PermissiveOutputSchema.RootElement }),
+        McpServerTool.Create(GetMethod(nameof(Connect)), tools,
+            new McpServerToolCreateOptions { OutputSchema = PermissiveOutputSchema.RootElement }),
+        McpServerTool.Create(GetMethod(nameof(EvalAsync)), tools),
+    ];
+
+    private static MethodInfo GetMethod(string name) => typeof(UnityBrokerTools).GetMethod(name)!;
     [McpServerTool(Name = "unity_status", UseStructuredContent = true)]
     [Description("Read Unity instances and lifecycle state, or wait for a state transition without polling eval. Call this before unity_connect. Event-driven waits survive temporary disconnects. ready includes normal Ready and executable CompilationFailed repair mode; compilation-complete returns after either compilation success or failure. Always inspect phase, canEval, and compiler counts in the result.")]
     public async Task<JsonElement> StatusAsync(

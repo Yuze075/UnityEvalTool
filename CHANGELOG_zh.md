@@ -2,8 +2,12 @@
 
 [English](CHANGELOG.md) | **简体中文**
 
-## 未发布
+## 2.0.6 - 2026-08-18
 
+- 为 Broker 的 `unity_status` 与 `unity_connect` 工具显式输出对象形式的宽容 `{}` output schema。MCP C# SDK
+  对 `JsonElement` 返回值推导出的布尔 JSON Schema `true` 违反了 Broker 所协商的全部 MCP 协议版本对
+  `outputSchema.properties` 值必须为对象的要求，导致 kimi-code 等严格客户端拒绝整个服务器；`{}` 保持
+  原有 `{"result": ...}` 包装与 structuredContent 线格式不变。
 - 将指令根原本混合语义的 Player Build 开关替换为独立的 None/EditorOnly/PlayerOnly/All 实时路径作用域与
   构建快照开关。Player 现在先读取 Player/All 实时根再读取包内快照；四条默认根均为 All 且关闭 Embed；
   快照源目录缺失不再让构建失败。

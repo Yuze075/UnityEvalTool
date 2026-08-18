@@ -2,8 +2,13 @@
 
 **English** | [简体中文](CHANGELOG_zh.md)
 
-## Unreleased
+## 2.0.6 - 2026-08-18
 
+- Emit an explicit object-form permissive `{}` output schema for the `unity_status` and `unity_connect` Broker
+  tools. The MCP C# SDK derives the boolean JSON Schema `true` for `JsonElement` returns, which violates the
+  `outputSchema.properties` object requirement of every MCP protocol version the Broker negotiates and made
+  strict clients such as kimi-code reject the whole server; `{}` keeps the same `{"result": ...}` wire envelope
+  and structuredContent shape.
 - Replace the combined instruction-root Player build flag with independent None/EditorOnly/PlayerOnly/All live-path
   scope and build-time embedding controls. Player now loads live Player/All roots before embedded snapshots, all
   default roots use All with embedding disabled, and missing embedded source directories no longer fail builds.

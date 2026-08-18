@@ -12,13 +12,14 @@ internal static class BrokerHost
         var builder = WebApplication.CreateSlimBuilder(args);
         builder.WebHost.ConfigureKestrel(options => options.ListenLocalhost(BrokerConstants.Port));
         builder.Services.AddSingleton<AuthTokenStore>();
-        builder.Services.AddSingleton<BrokerRegistry>();
+        var registry = new BrokerRegistry();
+        builder.Services.AddSingleton(registry);
         builder.Services.AddHostedService<BrokerMaintenanceService>();
         builder.Services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, BrokerJsonContext.Default));
         builder.Services.AddMcpServer()
             .WithHttpTransport(options => options.Stateless = true)
-            .WithTools<UnityBrokerTools>();
+            .WithTools(UnityBrokerTools.CreateTools(new UnityBrokerTools(registry)));
 
         var app = builder.Build();
         // Invalid user-edited credential/config files fail before the port starts accepting clients.
