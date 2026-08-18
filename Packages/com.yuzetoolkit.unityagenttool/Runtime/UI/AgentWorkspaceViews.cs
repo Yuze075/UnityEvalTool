@@ -68,6 +68,7 @@ namespace YuzeToolkit.UnityAgent
         private readonly Dictionary<DebugWindowRegistration, AgentButton> _buttons = new();
         private readonly Dictionary<DebugWindowRegistration, DebugWindowVisualInstance> _visuals = new();
         private readonly List<DebugWindowRegistration> _registrations = new();
+        private readonly Dictionary<string, Vector2> _scrollOffsets = new(StringComparer.Ordinal);
         private DebugWindowRegistration? _active;
         private int _revision = -1;
         private bool _isPlaying;
@@ -108,11 +109,13 @@ namespace YuzeToolkit.UnityAgent
             _registrations.Clear();
             _buttons.Clear();
             _visuals.Clear();
+            _scrollOffsets.Clear();
         }
 
         private void Rebuild()
         {
             var preferred = _active?.Title;
+            CaptureScrollOffsets();
             foreach (var visual in _visuals.Values) visual.Dispose();
             _registrations.Clear();
             _buttons.Clear();
@@ -134,6 +137,7 @@ namespace YuzeToolkit.UnityAgent
                 _registrations.Add(registration);
                 _visuals.Add(registration, visual);
                 _content.Add(visual.VisualElement);
+                RestoreScrollOffset(registration, visual);
                 var captured = registration;
                 var button = AgentUi.Button(registration.Title, "Open this Debug Panel page.",
                     () => Select(captured), 0, AgentUi.Transparent, AgentUi.TextSecondary);
@@ -155,6 +159,29 @@ namespace YuzeToolkit.UnityAgent
                 return;
             }
             Select(_registrations.FirstOrDefault(value => value.Title == preferred) ?? _registrations[0]);
+        }
+
+        private void CaptureScrollOffsets()
+        {
+            foreach (var pair in _visuals)
+            {
+                var scroll = pair.Value.VisualElement.Q<ScrollView>();
+                if (scroll != null)
+                    _scrollOffsets[pair.Key.Title] = scroll.scrollOffset;
+            }
+        }
+
+        private void RestoreScrollOffset(DebugWindowRegistration registration, DebugWindowVisualInstance visual)
+        {
+            if (!_scrollOffsets.TryGetValue(registration.Title, out var offset)) return;
+            var scroll = visual.VisualElement.Q<ScrollView>();
+            if (scroll == null) return;
+
+            scroll.schedule.Execute(() =>
+            {
+                if (scroll.panel == null) return;
+                scroll.scrollOffset = offset;
+            });
         }
 
         private void Select(DebugWindowRegistration registration)

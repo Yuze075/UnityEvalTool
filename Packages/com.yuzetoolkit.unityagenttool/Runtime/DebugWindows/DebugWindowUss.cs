@@ -68,6 +68,7 @@ namespace YuzeToolkit
         {
             layer.AddToClassList(LayerClass);
             layer.pickingMode = PickingMode.Ignore;
+            AgentUi.ApplyFont(layer);
         }
 
         public static void ApplyWindow(VisualElement window)
@@ -315,6 +316,26 @@ namespace YuzeToolkit
         public static void ApplyFieldWithoutLabel<TValue>(BaseField<TValue> field)
         {
             field.AddToClassList(FieldWithoutLabelClass);
+        }
+
+        public static void ApplyTextArea(TextField field)
+        {
+            ApplyField(field);
+            field.multiline = true;
+            field.style.height = StyleKeyword.Auto;
+            field.style.minHeight = 128;
+
+            var input = field.Q<VisualElement>(className: "unity-base-text-field__input");
+            if (input == null)
+                input = field.Q<VisualElement>(className: "unity-base-field__input");
+            if (input != null)
+            {
+                input.style.height = StyleKeyword.Auto;
+                input.style.minHeight = 112;
+                input.style.alignItems = Align.FlexStart;
+                input.style.paddingTop = 7;
+                input.style.paddingBottom = 7;
+            }
         }
 
         public static void ApplyButton(AgentButton button, DebugButtonStyle style)

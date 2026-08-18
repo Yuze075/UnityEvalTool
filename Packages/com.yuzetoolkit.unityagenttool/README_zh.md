@@ -144,6 +144,8 @@ var handle = DebugWindowModule.RegisterWindow(window =>
     window.SetTitle("Player");
     window.AddReadOnly("State", () => player.StateName);
     window.AddPrimaryButton("Reset", player.Reset);
+    window.AddTextArea("Lua", () => luaCode, value => luaCode = value);
+    window.AddChoice("Template", () => templateNames, () => selectedTemplate, value => selectedTemplate = value);
 });
 ```
 
@@ -151,6 +153,11 @@ var handle = DebugWindowModule.RegisterWindow(window =>
 由功能所有者单独实现，并通过 `EvalToolRegistry.RegisterRootScoped` 独立注册和释放。`AddButton` 是普通动作，
 `AddPrimaryButton` 用于页面主动作，`AddPreviousButton` / `AddNextButton` 用于方向操作。布尔、枚举、折叠、
 范围和进度等默认控件均使用 Agent 调色板和包自有交互样式，不依赖 Unity 默认皮肤。
+`AddTextArea` 提供包自有样式的多行编辑框，`AddReadOnlyTextArea` 提供同样样式的只读配置代码区域，
+`AddChoice` 提供可在运行时更新选项的包自有字符串下拉框；这些控件与既有字段共用绑定刷新和弹窗生命周期规则。
+动态重建窗口中的折叠对象可使用 `AddFoldout(label, isOpenGetter, setOpen, configure)`，由调用方模型保存展开状态，
+这样增删内容触发窗口重建时不会把用户已经打开的折叠对象重置为关闭。
+动态选择器的绑定会每帧刷新，但选项和当前值未变化时不会关闭已经打开的弹窗。
 
 ## 程序集
 

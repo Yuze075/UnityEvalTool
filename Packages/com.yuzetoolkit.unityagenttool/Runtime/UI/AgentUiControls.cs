@@ -1152,9 +1152,7 @@ namespace YuzeToolkit.UnityAgent
         public static void Show(VisualElement anchor, IReadOnlyList<AgentMenuItem> items, int minWidth = 220,
             bool openUpward = false)
         {
-            var panelRoot = anchor.panel?.visualTree;
-            if (panelRoot == null) return;
-            var root = FindPopupRoot(anchor, panelRoot);
+            var root = ResolvePopupHost(anchor);
             if (root == null) return;
             root.Q<VisualElement>(LayerName)?.RemoveFromHierarchy();
             AgentTooltip.HideAll(root);
@@ -1328,16 +1326,21 @@ namespace YuzeToolkit.UnityAgent
             });
         }
 
-        private static VisualElement FindPopupRoot(VisualElement anchor, VisualElement panelRoot)
+        internal static VisualElement? ResolvePopupHost(VisualElement anchor)
         {
+            var panelRoot = anchor.panel?.visualTree;
+            if (panelRoot == null) return null;
             for (var current = anchor; current != null && current != panelRoot; current = current.parent)
             {
                 // EditorWindow panels contain internal chrome outside the user's content coordinates.
                 // The workbench is the shared visible viewport in both Editor and Player, so owned
                 // popups stay readable and clamp against the same logical rectangle as their anchors.
-                if (current is UnityAgentWorkbenchView) return current;
+                if (current is UnityAgentWorkbenchView ||
+                    current.ClassListContains(global::YuzeToolkit.DebugWindowUss.LayerClass))
+                    return current;
             }
-            return panelRoot;
+            Debug.LogError("Unity Agent popup has no package-owned workbench or Debug Panel layer host.");
+            return null;
         }
     }
 

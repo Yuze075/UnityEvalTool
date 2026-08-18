@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -214,6 +215,28 @@ namespace YuzeToolkit
             return this;
         }
 
+        public new DebugWindowBuilder AddTextArea(string label, Func<string> getter, Action<string>? setter)
+        {
+            base.AddTextArea(label, getter, setter);
+            return this;
+        }
+
+        public new DebugWindowBuilder AddReadOnlyTextArea(string label, Func<string> getter)
+        {
+            base.AddReadOnlyTextArea(label, getter);
+            return this;
+        }
+
+        public new DebugWindowBuilder AddChoice(
+            string label,
+            Func<IReadOnlyList<string>> optionsGetter,
+            Func<int> indexGetter,
+            Action<int> setter)
+        {
+            base.AddChoice(label, optionsGetter, indexGetter, setter);
+            return this;
+        }
+
         public new DebugWindowBuilder AddSlider(
             string label,
             float lowValue,
@@ -350,6 +373,16 @@ namespace YuzeToolkit
         public new DebugWindowBuilder AddFoldout(string label, Action<DebugGroupBuilder> configure)
         {
             base.AddFoldout(label, configure);
+            return this;
+        }
+
+        public new DebugWindowBuilder AddFoldout(
+            string label,
+            Func<bool> isOpenGetter,
+            Action<bool> setOpen,
+            Action<DebugGroupBuilder> configure)
+        {
+            base.AddFoldout(label, isOpenGetter, setOpen, configure);
             return this;
         }
 
@@ -519,6 +552,26 @@ namespace YuzeToolkit
         public DebugGroupBuilder AddString(string label, Func<string> getter, Action<string> setter) =>
             AddValue(label, getter, setter);
 
+        public DebugGroupBuilder AddTextArea(string label, Func<string> getter, Action<string>? setter)
+        {
+            if (getter == null) throw new ArgumentNullException(nameof(getter));
+            GroupNode.Children.Add(new DebugTextAreaNode(label, getter, setter));
+            return this;
+        }
+
+        public DebugGroupBuilder AddReadOnlyTextArea(string label, Func<string> getter) =>
+            AddTextArea(label, getter, null);
+
+        public DebugGroupBuilder AddChoice(
+            string label,
+            Func<IReadOnlyList<string>> optionsGetter,
+            Func<int> indexGetter,
+            Action<int> setter)
+        {
+            GroupNode.Children.Add(new DebugChoiceNode(label, optionsGetter, indexGetter, setter));
+            return this;
+        }
+
         public DebugGroupBuilder AddSlider(
             string label,
             float lowValue,
@@ -664,6 +717,26 @@ namespace YuzeToolkit
         public DebugGroupBuilder AddFoldout(string label, Action<DebugGroupBuilder> configure)
         {
             return AddGroup(label, configure);
+        }
+
+        public DebugGroupBuilder AddFoldout(
+            string label,
+            Func<bool> isOpenGetter,
+            Action<bool> setOpen,
+            Action<DebugGroupBuilder> configure)
+        {
+            if (isOpenGetter == null) throw new ArgumentNullException(nameof(isOpenGetter));
+            if (setOpen == null) throw new ArgumentNullException(nameof(setOpen));
+            if (configure == null) throw new ArgumentNullException(nameof(configure));
+
+            var node = new DebugGroupNode(label)
+            {
+                IsOpenGetter = isOpenGetter,
+                IsOpenSetter = setOpen
+            };
+            configure(new DebugGroupBuilder(node));
+            GroupNode.Children.Add(node);
+            return this;
         }
 
         public DebugGroupBuilder AddHorizontalGroup(Action<DebugGroupBuilder> configure)

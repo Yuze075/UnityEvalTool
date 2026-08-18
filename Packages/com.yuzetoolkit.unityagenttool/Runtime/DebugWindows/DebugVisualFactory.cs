@@ -75,6 +75,7 @@ namespace YuzeToolkit
             {
                 if (activeTextField != null && IsDescendantOf(evt.target as VisualElement, activeTextField))
                 {
+                    if (activeTextField.multiline) return;
                     if (evt.keyCode is KeyCode.Return or KeyCode.KeypadEnter)
                     {
                         evt.PreventDefault();
@@ -176,6 +177,8 @@ namespace YuzeToolkit
                     return CreateImage(image, bindings);
                 case DebugButtonNode button:
                     return CreateButton(button);
+                case DebugChoiceNode choice:
+                    return CreateChoiceField(choice, bindings);
                 case DebugStateButtonNode stateButton:
                     return CreateStateButton(stateButton, bindings);
                 case DebugStateLabelNode stateLabel:
@@ -190,6 +193,8 @@ namespace YuzeToolkit
                     return CreateIntSlider(slider, bindings);
                 case DebugProgressNode progress:
                     return CreateProgress(progress, bindings);
+                case DebugTextAreaNode textArea:
+                    return CreateTextArea(textArea, bindings);
                 case IDebugFieldNode field:
                     return CreateField(field, node.Label, bindings);
                 default:
@@ -201,15 +206,20 @@ namespace YuzeToolkit
         {
             var foldout = new VisualElement();
             DebugWindowUss.ApplyFoldout(foldout);
-            var content = new VisualElement { style = { display = DisplayStyle.None, minWidth = 0 } };
+            var isOpen = group.IsOpenGetter?.Invoke() ?? false;
+            var content = new VisualElement
+            {
+                style = { display = isOpen ? DisplayStyle.Flex : DisplayStyle.None, minWidth = 0 }
+            };
             AgentButton? header = null;
             header = CreateAgentButton(group.Label, DebugButtonStyle.Default, () =>
             {
                 var open = content.resolvedStyle.display == DisplayStyle.None;
                 content.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
+                group.IsOpenSetter?.Invoke(open);
                 header!.SetIcon(open ? AgentIconKind.ChevronDown : AgentIconKind.ChevronRight);
             });
-            header.SetIcon(AgentIconKind.ChevronRight);
+            header.SetIcon(isOpen ? AgentIconKind.ChevronDown : AgentIconKind.ChevronRight);
             DebugWindowUss.ApplyFoldoutHeader(header);
             foldout.Add(header);
             foreach (var child in group.Children)
@@ -464,6 +474,56 @@ namespace YuzeToolkit
             if (type == typeof(BoundsInt)) return CreateTypedField<BoundsInt, BoundsIntField>(node, label, new BoundsIntField(), bindings);
             if (type.IsEnum) return CreateEnumField(node, label, bindings);
             return CreateObjectField(node, label, bindings);
+        }
+
+        private static VisualElement CreateTextArea(DebugTextAreaNode node,
+            ICollection<IDebugValueBinding> bindings)
+        {
+            var field = new TextField { multiline = true };
+            field.label = node.Label;
+            field.SetEnabled(!node.IsReadOnly);
+            DebugWindowUss.ApplyTextArea(field);
+            if (string.IsNullOrEmpty(node.Label))
+                DebugWindowUss.ApplyFieldWithoutLabel(field);
+
+            var binding = new ObjectFieldBinding<string>(node, field);
+            bindings.Add(binding);
+            binding.Refresh();
+            if (!node.IsReadOnly)
+            {
+                field.RegisterValueChangedCallback(evt =>
+                {
+                    if (binding.IsRefreshing) return;
+                    node.SetObjectValue(evt.newValue);
+                    binding.Refresh();
+                });
+            }
+            return field;
+        }
+
+        private static VisualElement CreateChoiceField(DebugChoiceNode node,
+            ICollection<IDebugValueBinding> bindings)
+        {
+            var options = node.OptionsGetter();
+            if (options == null || options.Count == 0)
+            {
+                var empty = CreateLabel(string.IsNullOrWhiteSpace(node.Label)
+                    ? "No options"
+                    : $"{node.Label} [No options]");
+                return empty;
+            }
+
+            var field = new DebugChoiceDropdown(node.Label, options, node.IndexGetter());
+            var binding = new ChoiceBinding(node, field);
+            bindings.Add(binding);
+            binding.Refresh();
+            field.ValueChanged += index =>
+            {
+                if (binding.IsRefreshing) return;
+                node.Setter(index);
+                binding.Refresh();
+            };
+            return field;
         }
 
         private static VisualElement CreateReadOnlyLabel(
@@ -858,6 +918,33 @@ namespace YuzeToolkit
                     IsRefreshing = true;
                     if (_node.GetObjectValue() is Enum value)
                         _field.SetValueWithoutNotify(value);
+                }
+                finally
+                {
+                    IsRefreshing = false;
+                }
+            }
+        }
+
+        private sealed class ChoiceBinding : IDebugValueBinding
+        {
+            private readonly DebugChoiceNode _node;
+            private readonly DebugChoiceDropdown _field;
+
+            public ChoiceBinding(DebugChoiceNode node, DebugChoiceDropdown field)
+            {
+                _node = node;
+                _field = field;
+            }
+
+            public bool IsRefreshing { get; private set; }
+
+            public void Refresh()
+            {
+                IsRefreshing = true;
+                try
+                {
+                    _field.SetOptionsWithoutNotify(_node.OptionsGetter(), _node.IndexGetter());
                 }
                 finally
                 {

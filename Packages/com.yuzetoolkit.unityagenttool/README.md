@@ -170,6 +170,8 @@ var handle = DebugWindowModule.RegisterWindow(window =>
     window.SetTitle("Player");
     window.AddReadOnly("State", () => player.StateName);
     window.AddPrimaryButton("Reset", player.Reset);
+    window.AddTextArea("Lua", () => luaCode, value => luaCode = value);
+    window.AddChoice("Template", () => templateNames, () => selectedTemplate, value => selectedTemplate = value);
 });
 ```
 
@@ -179,6 +181,12 @@ register its lifetime through `EvalToolRegistry.RegisterRootScoped`. `AddButton`
 `AddPrimaryButton` is the page's primary action, and `AddPreviousButton` / `AddNextButton` are directional
 actions. Default boolean, enum, foldout, range, and progress controls use the Agent palette and package-owned
 interaction styling instead of Unity's default skin.
+`AddTextArea` provides a package-styled multiline editor, `AddReadOnlyTextArea` provides the same presentation for
+configuration-owned code, and `AddChoice` provides a package-owned string popup for runtime option lists. Both
+controls keep the same binding refresh and popup lifetime rules as the existing fields.
+For foldouts whose contents are rebuilt dynamically, use `AddFoldout(label, isOpenGetter, setOpen, configure)`;
+the getter and setter keep the foldout state in the feature-owned model instead of resetting it during a window rebuild.
+Dynamic choice bindings are refreshed every frame without closing an unchanged popup.
 
 ## Assemblies
 

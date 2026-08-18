@@ -25,6 +25,10 @@ namespace YuzeToolkit
 
         public List<DebugNode> Children { get; } = new();
 
+        public Func<bool>? IsOpenGetter { get; set; }
+
+        public Action<bool>? IsOpenSetter { get; set; }
+
     }
 
     internal sealed class DebugWindowNode : DebugGroupNode
@@ -122,6 +126,27 @@ namespace YuzeToolkit
         public DebugButtonStyle Style { get; }
     }
 
+    internal sealed class DebugChoiceNode : DebugNode
+    {
+        public DebugChoiceNode(
+            string label,
+            Func<IReadOnlyList<string>> optionsGetter,
+            Func<int> indexGetter,
+            Action<int> setter)
+            : base(label)
+        {
+            OptionsGetter = optionsGetter ?? throw new ArgumentNullException(nameof(optionsGetter));
+            IndexGetter = indexGetter ?? throw new ArgumentNullException(nameof(indexGetter));
+            Setter = setter ?? throw new ArgumentNullException(nameof(setter));
+        }
+
+        public Func<IReadOnlyList<string>> OptionsGetter { get; }
+
+        public Func<int> IndexGetter { get; }
+
+        public Action<int> Setter { get; }
+    }
+
     internal sealed class DebugStateButtonNode : DebugNode
     {
         public DebugStateButtonNode(
@@ -210,6 +235,14 @@ namespace YuzeToolkit
             Setter((TValue)Convert.ChangeType(value, targetType));
         }
 
+    }
+
+    internal sealed class DebugTextAreaNode : DebugFieldNode<string>
+    {
+        public DebugTextAreaNode(string label, Func<string> getter, Action<string>? setter)
+            : base(label, getter, setter)
+        {
+        }
     }
 
     internal sealed class DebugStateLabelNode : DebugFieldNode<bool>

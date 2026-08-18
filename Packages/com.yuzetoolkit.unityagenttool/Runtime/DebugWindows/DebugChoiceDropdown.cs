@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 using YuzeToolkit.UnityAgent;
@@ -7,26 +8,24 @@ using YuzeToolkit.UnityAgent;
 namespace YuzeToolkit
 {
     /// <summary>
-    /// Runtime-owned enum selector. It intentionally does not use EnumField/GenericDropdownMenu,
-    /// because those popups are rendered with Unity's editor/runtime theme outside the control tree.
+    /// Runtime-owned string selector. It uses the same package-owned popup and vector icons as enum selectors,
+    /// while allowing project data such as Resources-backed template names to provide the options.
     /// </summary>
-    internal sealed class DebugEnumDropdown : VisualElement
+    internal sealed class DebugChoiceDropdown : VisualElement
     {
         private readonly Label _label;
         private readonly AgentButton _button;
-        private readonly Type _enumType;
+        private readonly List<string> _options = new();
         private VisualElement? _popup;
         private VisualElement? _popupHost;
-        private Enum _value;
+        private int _index;
 
-        public DebugEnumDropdown(string label, Type enumType, Enum value)
+        public DebugChoiceDropdown(string label, IReadOnlyList<string> options, int index)
         {
-            if (enumType == null) throw new ArgumentNullException(nameof(enumType));
-            if (!enumType.IsEnum) throw new ArgumentException("Enum type is required.", nameof(enumType));
-            if (value == null) throw new ArgumentNullException(nameof(value));
-
-            _enumType = enumType;
-            _value = value;
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            for (var optionIndex = 0; optionIndex < options.Count; optionIndex++)
+                _options.Add(options[optionIndex] ?? string.Empty);
+            _index = _options.Count == 0 ? -1 : Mathf.Clamp(index, 0, _options.Count - 1);
 
             AddToClassList(DebugWindowUss.EnumFieldClass);
             style.flexGrow = 1;
@@ -43,7 +42,7 @@ namespace YuzeToolkit
             _button = new AgentButton(string.Empty, string.Empty, TogglePopup,
                 AgentUi.Input, AgentUi.Text, AgentIconKind.ChevronDown)
             {
-                name = "unity-debug-tool-enum-button"
+                name = "unity-debug-tool-choice-button"
             };
             _button.EnableContentWrapping();
             _button.focusable = false;
@@ -68,12 +67,30 @@ namespace YuzeToolkit
             RegisterCallback<DetachFromPanelEvent>(_ => ClosePopup());
         }
 
-        public event Action<Enum>? ValueChanged;
+        public event Action<int>? ValueChanged;
 
-        public void SetValueWithoutNotify(Enum value)
+        public void SetOptionsWithoutNotify(IReadOnlyList<string> options, int index)
         {
-            if (value == null || value.GetType() != _enumType) return;
-            _value = value;
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            var nextIndex = options.Count == 0 ? -1 : Mathf.Clamp(index, 0, options.Count - 1);
+            var optionsChanged = _options.Count != options.Count;
+            if (!optionsChanged)
+            {
+                for (var optionIndex = 0; optionIndex < options.Count; optionIndex++)
+                {
+                    if (string.Equals(_options[optionIndex], options[optionIndex], StringComparison.Ordinal)) continue;
+                    optionsChanged = true;
+                    break;
+                }
+            }
+
+            if (!optionsChanged && _index == nextIndex) return;
+
+            ClosePopup();
+            _options.Clear();
+            for (var optionIndex = 0; optionIndex < options.Count; optionIndex++)
+                _options.Add(options[optionIndex] ?? string.Empty);
+            _index = nextIndex;
             RefreshButton();
         }
 
@@ -85,15 +102,11 @@ namespace YuzeToolkit
                 return;
             }
 
-            if (!enabledInHierarchy) return;
-
-            var values = Enum.GetValues(_enumType);
-            if (values.Length == 0) return;
-
+            if (!enabledInHierarchy || _options.Count == 0) return;
             var host = AgentPopupMenu.ResolvePopupHost(this);
             if (host == null) return;
 
-            var popup = new VisualElement { name = "unity-debug-tool-enum-popup" };
+            var popup = new VisualElement { name = "unity-debug-tool-choice-popup" };
             popup.AddToClassList(DebugWindowUss.EnumPopupClass);
             popup.pickingMode = PickingMode.Position;
             popup.style.position = Position.Absolute;
@@ -114,15 +127,14 @@ namespace YuzeToolkit
             scroll.tabIndex = -1;
             popup.Add(scroll);
 
-            for (var index = 0; index < values.Length; index++)
+            for (var optionIndex = 0; optionIndex < _options.Count; optionIndex++)
             {
-                if (values.GetValue(index) is not Enum option) continue;
-                var captured = option;
-                var selected = Equals(captured, _value);
+                var capturedIndex = optionIndex;
+                var selected = capturedIndex == _index;
                 var item = new AgentButton(
-                    FormatOption(captured),
+                    _options[capturedIndex],
                     string.Empty,
-                    () => Select(captured),
+                    () => Select(capturedIndex),
                     selected ? AgentUi.Active : AgentUi.Transparent,
                     selected ? AgentUi.Accent : AgentUi.Text,
                     selected ? AgentIconKind.Check : AgentIconKind.None);
@@ -130,7 +142,7 @@ namespace YuzeToolkit
                 item.focusable = false;
                 item.tabIndex = -1;
                 item.AddToClassList(DebugWindowUss.EnumPopupItemClass);
-                item.EnableInClassList(DebugWindowUss.EnumPopupItemSelectedClass, Equals(captured, _value));
+                item.EnableInClassList(DebugWindowUss.EnumPopupItemSelectedClass, selected);
                 item.style.minHeight = 36;
                 item.style.height = StyleKeyword.Auto;
                 item.style.width = Length.Percent(100);
@@ -148,36 +160,28 @@ namespace YuzeToolkit
             _popup = popup;
             _popupHost = host;
             host.Add(popup);
-            PositionPopup(host, popup, values.Length);
+            PositionPopup(host, popup, _options.Count);
             host.RegisterCallback<PointerDownEvent>(OnHostPointerDown, TrickleDown.TrickleDown);
-            host.RegisterCallback<PointerMoveEvent>(OnHostPointerMove, TrickleDown.TrickleDown);
             host.RegisterCallback<KeyDownEvent>(OnHostKeyDown, TrickleDown.TrickleDown);
             host.RegisterCallback<GeometryChangedEvent>(OnHostGeometryChanged);
             _button.AddToClassList(DebugWindowUss.EnumButtonOpenClass);
         }
 
-        private void Select(Enum value)
+        private void Select(int index)
         {
-            if (!Equals(_value, value))
+            if (index != _index)
             {
-                _value = value;
+                _index = index;
                 RefreshButton();
-                ValueChanged?.Invoke(value);
+                ValueChanged?.Invoke(index);
             }
 
             ClosePopup();
         }
 
-        private void RefreshButton()
-        {
-            _button.text = FormatOption(_value);
-        }
-
-        private static string FormatOption(Enum value)
-        {
-            var text = value.ToString();
-            return string.IsNullOrWhiteSpace(text) ? Convert.ToInt64(value).ToString() : text;
-        }
+        private void RefreshButton() => _button.text = _index >= 0 && _index < _options.Count
+            ? _options[_index]
+            : "No options";
 
         private void PositionPopup(VisualElement host, VisualElement popup, int optionCount)
         {
@@ -208,12 +212,6 @@ namespace YuzeToolkit
             ClosePopup();
         }
 
-        private void OnHostPointerMove(PointerMoveEvent evt)
-        {
-            if (evt.pressedButtons == 0 || IsDescendantOf(evt.target as VisualElement, _popup)) return;
-            ClosePopup();
-        }
-
         private void OnHostKeyDown(KeyDownEvent evt)
         {
             if (evt.keyCode != KeyCode.Escape) return;
@@ -233,7 +231,6 @@ namespace YuzeToolkit
             if (_popupHost != null)
             {
                 _popupHost.UnregisterCallback<PointerDownEvent>(OnHostPointerDown, TrickleDown.TrickleDown);
-                _popupHost.UnregisterCallback<PointerMoveEvent>(OnHostPointerMove, TrickleDown.TrickleDown);
                 _popupHost.UnregisterCallback<KeyDownEvent>(OnHostKeyDown, TrickleDown.TrickleDown);
                 _popupHost.UnregisterCallback<GeometryChangedEvent>(OnHostGeometryChanged);
             }

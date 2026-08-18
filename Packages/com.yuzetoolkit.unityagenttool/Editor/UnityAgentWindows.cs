@@ -82,8 +82,12 @@ namespace YuzeToolkit.UnityAgent
                 UnityAgentProjectSettingsProvider.OverwriteFromMachineSettings);
             AssemblyReloadEvents.beforeAssemblyReload -= UnityAgentHost.DisposeDefault;
             AssemblyReloadEvents.beforeAssemblyReload += UnityAgentHost.DisposeDefault;
+            AssemblyReloadEvents.beforeAssemblyReload -= AgentUi.DisposeEditorFontResources;
+            AssemblyReloadEvents.beforeAssemblyReload += AgentUi.DisposeEditorFontResources;
             EditorApplication.quitting -= UnityAgentHost.DisposeDefault;
             EditorApplication.quitting += UnityAgentHost.DisposeDefault;
+            EditorApplication.quitting -= AgentUi.DisposeEditorFontResources;
+            EditorApplication.quitting += AgentUi.DisposeEditorFontResources;
         }
 
         private static void OnPlayModeStateChanged(PlayModeStateChange state)

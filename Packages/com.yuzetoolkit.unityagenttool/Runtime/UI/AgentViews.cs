@@ -6,6 +6,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEngine.TextCore.LowLevel;
+using UnityEngine.TextCore.Text;
+#endif
 using UnityEngine.UIElements;
 
 namespace YuzeToolkit.UnityAgent
@@ -2872,6 +2876,26 @@ namespace YuzeToolkit.UnityAgent
 
     internal static class AgentUi
     {
+#if UNITY_EDITOR
+        private const string EditorFontValidationText = "通用命令调用器设置调试面板gypqj ÅÉ";
+        private static readonly (string Family, string Style)[] EditorFontCandidates =
+        {
+            ("Heiti SC", "Medium"),
+            ("Heiti SC", "Light"),
+            ("Arial Unicode MS", "Regular"),
+            ("Microsoft YaHei UI", "Regular"),
+            ("Microsoft YaHei", "Regular"),
+            ("Noto Sans CJK SC", "Regular"),
+            ("Noto Sans SC", "Regular"),
+            ("WenQuanYi Micro Hei", "Regular"),
+            ("Songti SC", "Regular"),
+            ("Hiragino Sans GB", "W3")
+        };
+
+        private static FontAsset? _editorFontAsset;
+        private static bool _editorFontResolutionAttempted;
+#endif
+
         // Source-pinned DeepSeek Harness dark tokens. Editor and Runtime use this single table.
         public static readonly Color Background = new Color32(21, 21, 23, 255);
         public static readonly Color Sidebar = new Color32(27, 27, 28, 255);
@@ -2924,9 +2948,82 @@ namespace YuzeToolkit.UnityAgent
 
         public static void ApplyRoot(VisualElement root)
         {
+            ApplyFont(root);
             root.style.color = Text;
             ApplyTypography(root, AgentTypography.Body);
         }
+
+        public static void ApplyFont(VisualElement root)
+        {
+#if UNITY_EDITOR
+            var fontAsset = ResolveEditorFontAsset();
+            if (fontAsset != null)
+                root.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromSDFFont(fontAsset));
+#endif
+        }
+
+#if UNITY_EDITOR
+        internal static void DisposeEditorFontResources()
+        {
+            if (_editorFontAsset != null) DestroyEditorFontAsset(_editorFontAsset);
+            _editorFontAsset = null;
+            _editorFontResolutionAttempted = false;
+        }
+
+        private static FontAsset? ResolveEditorFontAsset()
+        {
+            if (_editorFontAsset != null) return _editorFontAsset;
+            if (_editorFontResolutionAttempted) return null;
+            _editorFontResolutionAttempted = true;
+
+            var installedFontNames = FontEngine.GetSystemFontNames();
+            if (installedFontNames == null)
+            {
+                Debug.LogError("Unity Agent could not enumerate system fonts for Editor UI text rendering.");
+                return null;
+            }
+
+            var installed = new HashSet<string>(installedFontNames, StringComparer.OrdinalIgnoreCase);
+            foreach (var candidate in EditorFontCandidates)
+            {
+                if (!installed.Contains(candidate.Family + " - " + candidate.Style)) continue;
+
+                var fontAsset = FontAsset.CreateFontAsset(candidate.Family, candidate.Style, 90);
+                if (fontAsset == null) continue;
+                fontAsset.TryAddCharacters(EditorFontValidationText, true);
+                if (EditorFontValidationText.Any(character => !fontAsset.HasCharacter(character)))
+                {
+                    DestroyEditorFontAsset(fontAsset);
+                    continue;
+                }
+
+                fontAsset.name = "Unity Agent Editor System Font";
+                fontAsset.hideFlags = HideFlags.HideAndDontSave;
+                if (fontAsset.material != null) fontAsset.material.hideFlags = HideFlags.HideAndDontSave;
+                foreach (var texture in fontAsset.atlasTextures)
+                    if (texture != null)
+                        texture.hideFlags = HideFlags.HideAndDontSave;
+                _editorFontAsset = fontAsset;
+                return _editorFontAsset;
+            }
+
+            Debug.LogError(
+                "Unity Agent could not find an installed system font that covers its Editor UI text. " +
+                "Install a CJK-capable system font or extend AgentUi.EditorFontCandidates for this platform.");
+            return null;
+        }
+
+        private static void DestroyEditorFontAsset(FontAsset fontAsset)
+        {
+            var material = fontAsset.material;
+            var textures = fontAsset.atlasTextures;
+            UnityEngine.Object.DestroyImmediate(fontAsset);
+            if (material != null) UnityEngine.Object.DestroyImmediate(material);
+            foreach (var texture in textures)
+                if (texture != null)
+                    UnityEngine.Object.DestroyImmediate(texture);
+        }
+#endif
 
         public static void ApplyTypography(VisualElement element, AgentTypography role, bool singleLine = true)
         {
